@@ -1,5 +1,5 @@
 Analysis & Synthesis report for System_Bus_Final
-Tue Sep  1 21:29:22 2026
+Wed Sep  2 01:50:49 2026
 Quartus Prime Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
 
 
@@ -14,20 +14,20 @@ Quartus Prime Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
   6. Analysis & Synthesis Resource Usage Summary
   7. Analysis & Synthesis Resource Utilization by Entity
   8. Analysis & Synthesis RAM Summary
-  9. State Machine - |top_bus_system|master_node:m1_inst|state
- 10. State Machine - |top_bus_system|master_node:m0_inst|state
- 11. State Machine - |top_bus_system|arbiter_2m_split:arbiter_inst|state
+  9. State Machine - |top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst|state
+ 10. State Machine - |top_bus_system|bus_interconnect:interconnect_inst|master_node:m0_inst|state
+ 11. State Machine - |top_bus_system|bus_interconnect:interconnect_inst|arbiter_2m_split:arbiter_inst|state
  12. Registers Removed During Synthesis
  13. General Register Statistics
  14. Inverted Register Statistics
  15. Registers Added for RAM Pass-Through Logic
  16. Multiplexer Restructuring Statistics (Restructuring Performed)
- 17. Source assignments for slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated
- 18. Parameter Settings for User Entity Instance: slave_fast_ram:s1_inst
- 19. Parameter Settings for User Entity Instance: slave_fast_ram:s2_inst
- 20. Parameter Settings for Inferred Entity Instance: slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0
+ 17. Source assignments for bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated
+ 18. Parameter Settings for User Entity Instance: bus_interconnect:interconnect_inst|slave_fast_ram:s1_inst
+ 19. Parameter Settings for User Entity Instance: bus_interconnect:interconnect_inst|slave_fast_ram:s2_inst
+ 20. Parameter Settings for Inferred Entity Instance: bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0
  21. altsyncram Parameter Settings by Entity Instance
- 22. Port Connectivity Checks: "address_decoder:decoder_inst"
+ 22. Port Connectivity Checks: "bus_interconnect:interconnect_inst|address_decoder:decoder_inst"
  23. Post-Synthesis Netlist Statistics for Top Partition
  24. Elapsed Time Per Partition
  25. Analysis & Synthesis Messages
@@ -57,7 +57,7 @@ on the Quartus Prime software download page.
 +--------------------------------------------------------------------------------------+
 ; Analysis & Synthesis Summary                                                         ;
 +------------------------------------+-------------------------------------------------+
-; Analysis & Synthesis Status        ; Successful - Tue Sep  1 21:29:22 2026           ;
+; Analysis & Synthesis Status        ; Successful - Wed Sep  2 01:50:49 2026           ;
 ; Quartus Prime Version              ; 25.1std.0 Build 1129 10/21/2025 SC Lite Edition ;
 ; Revision Name                      ; System_Bus_Final                                ;
 ; Top-level Entity Name              ; top_bus_system                                  ;
@@ -191,6 +191,7 @@ on the Quartus Prime software download page.
 ; slave_0_split_4k.v               ; yes             ; User Verilog HDL File        ; C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v        ;         ;
 ; slave_fast_ram.v                 ; yes             ; User Verilog HDL File        ; C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v          ;         ;
 ; top_bus_system.v                 ; yes             ; User Verilog HDL File        ; C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v          ;         ;
+; bus_interconnect.v               ; yes             ; User Verilog HDL File        ; C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v        ;         ;
 ; altsyncram.tdf                   ; yes             ; Megafunction                 ; c:/altera_lite/25.1std/quartus/libraries/megafunctions/altsyncram.tdf                                 ;         ;
 ; stratix_ram_block.inc            ; yes             ; Megafunction                 ; c:/altera_lite/25.1std/quartus/libraries/megafunctions/stratix_ram_block.inc                          ;         ;
 ; lpm_mux.inc                      ; yes             ; Megafunction                 ; c:/altera_lite/25.1std/quartus/libraries/megafunctions/lpm_mux.inc                                    ;         ;
@@ -237,38 +238,39 @@ on the Quartus Prime software download page.
 +---------------------------------------------+-----------+
 
 
-+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-; Analysis & Synthesis Resource Utilization by Entity                                                                                                                                                                                                                                                          ;
-+-------------------------------------------+---------------------+---------------------------+-------------+--------------+---------+-----------+------+--------------+----------------------------------------------------------------------------------------------+-------------------------+--------------+
-; Compilation Hierarchy Node                ; Combinational ALUTs ; Dedicated Logic Registers ; Memory Bits ; DSP Elements ; DSP 9x9 ; DSP 18x18 ; Pins ; Virtual Pins ; Full Hierarchy Name                                                                          ; Entity Name             ; Library Name ;
-+-------------------------------------------+---------------------+---------------------------+-------------+--------------+---------+-----------+------+--------------+----------------------------------------------------------------------------------------------+-------------------------+--------------+
-; |top_bus_system                           ; 1010 (44)           ; 1253 (0)                  ; 512         ; 0            ; 0       ; 0         ; 70   ; 0            ; |top_bus_system                                                                              ; top_bus_system          ; work         ;
-;    |address_decoder:decoder_inst|         ; 4 (4)               ; 0 (0)                     ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|address_decoder:decoder_inst                                                 ; address_decoder         ; work         ;
-;    |arbiter_2m_split:arbiter_inst|        ; 8 (8)               ; 4 (4)                     ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|arbiter_2m_split:arbiter_inst                                                ; arbiter_2m_split        ; work         ;
-;    |cross_fpga_bridge_dummy:bridge_inst|  ; 13 (13)             ; 17 (17)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|cross_fpga_bridge_dummy:bridge_inst                                          ; cross_fpga_bridge_dummy ; work         ;
-;    |master_node:m0_inst|                  ; 30 (30)             ; 63 (63)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|master_node:m0_inst                                                          ; master_node             ; work         ;
-;    |master_node:m1_inst|                  ; 19 (19)             ; 62 (62)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|master_node:m1_inst                                                          ; master_node             ; work         ;
-;    |slave_0_split_4k:s0_inst|             ; 42 (42)             ; 65 (65)                   ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_0_split_4k:s0_inst                                                     ; slave_0_split_4k        ; work         ;
-;       |altsyncram:mem_rtl_0|              ; 0 (0)               ; 0 (0)                     ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0                                ; altsyncram              ; work         ;
-;          |altsyncram_45k1:auto_generated| ; 0 (0)               ; 0 (0)                     ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated ; altsyncram_45k1         ; work         ;
-;    |slave_fast_ram:s1_inst|               ; 425 (425)           ; 521 (521)                 ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_fast_ram:s1_inst                                                       ; slave_fast_ram          ; work         ;
-;    |slave_fast_ram:s2_inst|               ; 425 (425)           ; 521 (521)                 ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_fast_ram:s2_inst                                                       ; slave_fast_ram          ; work         ;
-+-------------------------------------------+---------------------+---------------------------+-------------+--------------+---------+-----------+------+--------------+----------------------------------------------------------------------------------------------+-------------------------+--------------+
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Analysis & Synthesis Resource Utilization by Entity                                                                                                                                                                                                                                                                                                ;
++----------------------------------------------+---------------------+---------------------------+-------------+--------------+---------+-----------+------+--------------+---------------------------------------------------------------------------------------------------------------------------------+-------------------------+--------------+
+; Compilation Hierarchy Node                   ; Combinational ALUTs ; Dedicated Logic Registers ; Memory Bits ; DSP Elements ; DSP 9x9 ; DSP 18x18 ; Pins ; Virtual Pins ; Full Hierarchy Name                                                                                                             ; Entity Name             ; Library Name ;
++----------------------------------------------+---------------------+---------------------------+-------------+--------------+---------+-----------+------+--------------+---------------------------------------------------------------------------------------------------------------------------------+-------------------------+--------------+
+; |top_bus_system                              ; 1010 (0)            ; 1253 (0)                  ; 512         ; 0            ; 0       ; 0         ; 70   ; 0            ; |top_bus_system                                                                                                                 ; top_bus_system          ; work         ;
+;    |bus_interconnect:interconnect_inst|      ; 1010 (44)           ; 1253 (0)                  ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst                                                                              ; bus_interconnect        ; work         ;
+;       |address_decoder:decoder_inst|         ; 4 (4)               ; 0 (0)                     ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|address_decoder:decoder_inst                                                 ; address_decoder         ; work         ;
+;       |arbiter_2m_split:arbiter_inst|        ; 8 (8)               ; 4 (4)                     ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|arbiter_2m_split:arbiter_inst                                                ; arbiter_2m_split        ; work         ;
+;       |cross_fpga_bridge_dummy:bridge_inst|  ; 13 (13)             ; 17 (17)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|cross_fpga_bridge_dummy:bridge_inst                                          ; cross_fpga_bridge_dummy ; work         ;
+;       |master_node:m0_inst|                  ; 30 (30)             ; 63 (63)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m0_inst                                                          ; master_node             ; work         ;
+;       |master_node:m1_inst|                  ; 19 (19)             ; 62 (62)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst                                                          ; master_node             ; work         ;
+;       |slave_0_split_4k:s0_inst|             ; 42 (42)             ; 65 (65)                   ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst                                                     ; slave_0_split_4k        ; work         ;
+;          |altsyncram:mem_rtl_0|              ; 0 (0)               ; 0 (0)                     ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0                                ; altsyncram              ; work         ;
+;             |altsyncram_45k1:auto_generated| ; 0 (0)               ; 0 (0)                     ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated ; altsyncram_45k1         ; work         ;
+;       |slave_fast_ram:s1_inst|               ; 425 (425)           ; 521 (521)                 ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|slave_fast_ram:s1_inst                                                       ; slave_fast_ram          ; work         ;
+;       |slave_fast_ram:s2_inst|               ; 425 (425)           ; 521 (521)                 ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|bus_interconnect:interconnect_inst|slave_fast_ram:s2_inst                                                       ; slave_fast_ram          ; work         ;
++----------------------------------------------+---------------------+---------------------------+-------------+--------------+---------+-----------+------+--------------+---------------------------------------------------------------------------------------------------------------------------------+-------------------------+--------------+
 Note: For table entries with two numbers listed, the numbers in parentheses indicate the number of resources of the given type used by the specific entity alone. The numbers listed outside of parentheses indicate the total resources of the given type used by the specific entity and all of its sub-entities in the hierarchy.
 
 
-+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-; Analysis & Synthesis RAM Summary                                                                                                                                                            ;
-+-----------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+------+------+
-; Name                                                                                    ; Type ; Mode             ; Port A Depth ; Port A Width ; Port B Depth ; Port B Width ; Size ; MIF  ;
-+-----------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+------+------+
-; slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated|ALTSYNCRAM ; M9K  ; Simple Dual Port ; 64           ; 8            ; 64           ; 8            ; 512  ; None ;
-+-----------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+------+------+
++--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Analysis & Synthesis RAM Summary                                                                                                                                                                                               ;
++----------------------------------------------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+------+------+
+; Name                                                                                                                       ; Type ; Mode             ; Port A Depth ; Port A Width ; Port B Depth ; Port B Width ; Size ; MIF  ;
++----------------------------------------------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+------+------+
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated|ALTSYNCRAM ; M9K  ; Simple Dual Port ; 64           ; 8            ; 64           ; 8            ; 512  ; None ;
++----------------------------------------------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+------+------+
 
 
 Encoding Type:  One-Hot
 +------------------------------------------------------------------------------------------------+
-; State Machine - |top_bus_system|master_node:m1_inst|state                                      ;
+; State Machine - |top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst|state   ;
 +---------------+------------+---------------+------------+-------------+-----------+------------+
 ; Name          ; state.DONE ; state.SPLIT_W ; state.WAIT ; state.DRIVE ; state.REQ ; state.IDLE ;
 +---------------+------------+---------------+------------+-------------+-----------+------------+
@@ -283,7 +285,7 @@ Encoding Type:  One-Hot
 
 Encoding Type:  One-Hot
 +------------------------------------------------------------------------------------------------+
-; State Machine - |top_bus_system|master_node:m0_inst|state                                      ;
+; State Machine - |top_bus_system|bus_interconnect:interconnect_inst|master_node:m0_inst|state   ;
 +---------------+------------+---------------+------------+-------------+-----------+------------+
 ; Name          ; state.DONE ; state.SPLIT_W ; state.WAIT ; state.DRIVE ; state.REQ ; state.IDLE ;
 +---------------+------------+---------------+------------+-------------+-----------+------------+
@@ -297,33 +299,33 @@ Encoding Type:  One-Hot
 
 
 Encoding Type:  One-Hot
-+---------------------------------------------------------------------+
-; State Machine - |top_bus_system|arbiter_2m_split:arbiter_inst|state ;
-+----------------+------------+----------------+----------------------+
-; Name           ; state.IDLE ; state.GRANT_M1 ; state.GRANT_M0       ;
-+----------------+------------+----------------+----------------------+
-; state.IDLE     ; 0          ; 0              ; 0                    ;
-; state.GRANT_M0 ; 1          ; 0              ; 1                    ;
-; state.GRANT_M1 ; 1          ; 1              ; 0                    ;
-+----------------+------------+----------------+----------------------+
++--------------------------------------------------------------------------------------------------------+
+; State Machine - |top_bus_system|bus_interconnect:interconnect_inst|arbiter_2m_split:arbiter_inst|state ;
++----------------+------------+----------------+---------------------------------------------------------+
+; Name           ; state.IDLE ; state.GRANT_M1 ; state.GRANT_M0                                          ;
++----------------+------------+----------------+---------------------------------------------------------+
+; state.IDLE     ; 0          ; 0              ; 0                                                       ;
+; state.GRANT_M0 ; 1          ; 0              ; 1                                                       ;
+; state.GRANT_M1 ; 1          ; 1              ; 0                                                       ;
++----------------+------------+----------------+---------------------------------------------------------+
 
 
-+-----------------------------------------------------------------------------------+
-; Registers Removed During Synthesis                                                ;
-+------------------------------------------+----------------------------------------+
-; Register name                            ; Reason for Removal                     ;
-+------------------------------------------+----------------------------------------+
-; slave_0_split_4k:s0_inst|latency_cnt[2]  ; Stuck at GND due to stuck port data_in ;
-; master_node:m1_inst|state~10             ; Lost fanout                            ;
-; master_node:m1_inst|state~11             ; Lost fanout                            ;
-; master_node:m1_inst|state~12             ; Lost fanout                            ;
-; master_node:m0_inst|state~10             ; Lost fanout                            ;
-; master_node:m0_inst|state~11             ; Lost fanout                            ;
-; master_node:m0_inst|state~12             ; Lost fanout                            ;
-; master_node:m1_inst|state.SPLIT_W        ; Stuck at GND due to stuck port data_in ;
-; arbiter_2m_split:arbiter_inst|state.IDLE ; Lost fanout                            ;
-; Total Number of Removed Registers = 9    ;                                        ;
-+------------------------------------------+----------------------------------------+
++----------------------------------------------------------------------------------------------------------------------+
+; Registers Removed During Synthesis                                                                                   ;
++-----------------------------------------------------------------------------+----------------------------------------+
+; Register name                                                               ; Reason for Removal                     ;
++-----------------------------------------------------------------------------+----------------------------------------+
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|latency_cnt[2]  ; Stuck at GND due to stuck port data_in ;
+; bus_interconnect:interconnect_inst|master_node:m1_inst|state~10             ; Lost fanout                            ;
+; bus_interconnect:interconnect_inst|master_node:m1_inst|state~11             ; Lost fanout                            ;
+; bus_interconnect:interconnect_inst|master_node:m1_inst|state~12             ; Lost fanout                            ;
+; bus_interconnect:interconnect_inst|master_node:m0_inst|state~10             ; Lost fanout                            ;
+; bus_interconnect:interconnect_inst|master_node:m0_inst|state~11             ; Lost fanout                            ;
+; bus_interconnect:interconnect_inst|master_node:m0_inst|state~12             ; Lost fanout                            ;
+; bus_interconnect:interconnect_inst|master_node:m1_inst|state.SPLIT_W        ; Stuck at GND due to stuck port data_in ;
+; bus_interconnect:interconnect_inst|arbiter_2m_split:arbiter_inst|state.IDLE ; Lost fanout                            ;
+; Total Number of Removed Registers = 9                                       ;                                        ;
++-----------------------------------------------------------------------------+----------------------------------------+
 
 
 +------------------------------------------------------+
@@ -341,186 +343,186 @@ Encoding Type:  One-Hot
 +----------------------------------------------+-------+
 
 
-+------------------------------------------------------------+
-; Inverted Register Statistics                               ;
-+--------------------------------------------------+---------+
-; Inverted Register                                ; Fan out ;
-+--------------------------------------------------+---------+
-; cross_fpga_bridge_dummy:bridge_inst|dummy_reg[1] ; 1       ;
-; cross_fpga_bridge_dummy:bridge_inst|dummy_reg[2] ; 1       ;
-; cross_fpga_bridge_dummy:bridge_inst|dummy_reg[3] ; 1       ;
-; cross_fpga_bridge_dummy:bridge_inst|dummy_reg[4] ; 1       ;
-; cross_fpga_bridge_dummy:bridge_inst|dummy_reg[5] ; 1       ;
-; cross_fpga_bridge_dummy:bridge_inst|dummy_reg[7] ; 1       ;
-; Total number of inverted registers = 6           ;         ;
-+--------------------------------------------------+---------+
++-----------------------------------------------------------------------------------------------+
+; Inverted Register Statistics                                                                  ;
++-------------------------------------------------------------------------------------+---------+
+; Inverted Register                                                                   ; Fan out ;
++-------------------------------------------------------------------------------------+---------+
+; bus_interconnect:interconnect_inst|cross_fpga_bridge_dummy:bridge_inst|dummy_reg[1] ; 1       ;
+; bus_interconnect:interconnect_inst|cross_fpga_bridge_dummy:bridge_inst|dummy_reg[2] ; 1       ;
+; bus_interconnect:interconnect_inst|cross_fpga_bridge_dummy:bridge_inst|dummy_reg[3] ; 1       ;
+; bus_interconnect:interconnect_inst|cross_fpga_bridge_dummy:bridge_inst|dummy_reg[4] ; 1       ;
+; bus_interconnect:interconnect_inst|cross_fpga_bridge_dummy:bridge_inst|dummy_reg[5] ; 1       ;
+; bus_interconnect:interconnect_inst|cross_fpga_bridge_dummy:bridge_inst|dummy_reg[7] ; 1       ;
+; Total number of inverted registers = 6                                              ;         ;
++-------------------------------------------------------------------------------------+---------+
 
 
-+------------------------------------------------------------------------------------+
-; Registers Added for RAM Pass-Through Logic                                         ;
-+-----------------------------------------------+------------------------------------+
-; Register Name                                 ; RAM Name                           ;
-+-----------------------------------------------+------------------------------------+
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[0]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[1]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[2]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[3]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[4]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[5]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[6]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[7]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[8]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[9]  ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[10] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[11] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[12] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[13] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[14] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[15] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[16] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[17] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[18] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[19] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[20] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-+-----------------------------------------------+------------------------------------+
++----------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Registers Added for RAM Pass-Through Logic                                                                                                               ;
++----------------------------------------------------------------------------------+-----------------------------------------------------------------------+
+; Register Name                                                                    ; RAM Name                                                              ;
++----------------------------------------------------------------------------------+-----------------------------------------------------------------------+
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[0]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[1]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[2]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[3]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[4]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[5]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[6]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[7]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[8]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[9]  ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[10] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[11] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[12] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[13] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[14] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[15] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[16] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[17] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[18] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[19] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
+; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0_bypass[20] ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0 ;
++----------------------------------------------------------------------------------+-----------------------------------------------------------------------+
 
 
-+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-; Multiplexer Restructuring Statistics (Restructuring Performed)                                                                                                           ;
-+--------------------+-----------+---------------+----------------------+------------------------+------------+------------------------------------------------------------+
-; Multiplexer Inputs ; Bus Width ; Baseline Area ; Area if Restructured ; Saving if Restructured ; Registered ; Example Multiplexer Output                                 ;
-+--------------------+-----------+---------------+----------------------+------------------------+------------+------------------------------------------------------------+
-; 3:1                ; 14 bits   ; 28 LEs        ; 0 LEs                ; 28 LEs                 ; Yes        ; |top_bus_system|master_node:m0_inst|m_addr[6]              ;
-; 3:1                ; 14 bits   ; 28 LEs        ; 0 LEs                ; 28 LEs                 ; Yes        ; |top_bus_system|master_node:m1_inst|m_addr[7]              ;
-; 3:1                ; 8 bits    ; 16 LEs        ; 0 LEs                ; 16 LEs                 ; Yes        ; |top_bus_system|master_node:m1_inst|cmd_rdata[4]           ;
-; 3:1                ; 8 bits    ; 16 LEs        ; 0 LEs                ; 16 LEs                 ; Yes        ; |top_bus_system|master_node:m0_inst|cmd_rdata[2]           ;
-; 3:1                ; 8 bits    ; 16 LEs        ; 8 LEs                ; 8 LEs                  ; Yes        ; |top_bus_system|slave_0_split_4k:s0_inst|dout[3]           ;
-; 3:1                ; 8 bits    ; 16 LEs        ; 16 LEs               ; 0 LEs                  ; Yes        ; |top_bus_system|slave_0_split_4k:s0_inst|split_data_reg[7] ;
-; 4:1                ; 3 bits    ; 6 LEs         ; 6 LEs                ; 0 LEs                  ; Yes        ; |top_bus_system|slave_0_split_4k:s0_inst|latency_cnt[2]    ;
-; 5:1                ; 9 bits    ; 27 LEs        ; 9 LEs                ; 18 LEs                 ; Yes        ; |top_bus_system|master_node:m0_inst|m_wdata[0]             ;
-; 5:1                ; 9 bits    ; 27 LEs        ; 9 LEs                ; 18 LEs                 ; Yes        ; |top_bus_system|master_node:m1_inst|m_wdata[3]             ;
-; 3:1                ; 24 bits   ; 48 LEs        ; 48 LEs               ; 0 LEs                  ; No         ; |top_bus_system|bus_addr[13]                               ;
-; 5:1                ; 9 bits    ; 27 LEs        ; 18 LEs               ; 9 LEs                  ; No         ; |top_bus_system|bus_rdata[0]                               ;
-; 7:1                ; 2 bits    ; 8 LEs         ; 6 LEs                ; 2 LEs                  ; No         ; |top_bus_system|master_node:m1_inst|Selector3              ;
-; 8:1                ; 2 bits    ; 10 LEs        ; 6 LEs                ; 4 LEs                  ; No         ; |top_bus_system|master_node:m0_inst|Selector3              ;
-; 8:1                ; 2 bits    ; 10 LEs        ; 4 LEs                ; 6 LEs                  ; No         ; |top_bus_system|master_node:m1_inst|Selector1              ;
-; 8:1                ; 2 bits    ; 10 LEs        ; 6 LEs                ; 4 LEs                  ; No         ; |top_bus_system|master_node:m1_inst|Selector4              ;
-; 9:1                ; 2 bits    ; 12 LEs        ; 8 LEs                ; 4 LEs                  ; No         ; |top_bus_system|master_node:m0_inst|Selector5              ;
-+--------------------+-----------+---------------+----------------------+------------------------+------------+------------------------------------------------------------+
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Multiplexer Restructuring Statistics (Restructuring Performed)                                                                                                                                              ;
++--------------------+-----------+---------------+----------------------+------------------------+------------+-----------------------------------------------------------------------------------------------+
+; Multiplexer Inputs ; Bus Width ; Baseline Area ; Area if Restructured ; Saving if Restructured ; Registered ; Example Multiplexer Output                                                                    ;
++--------------------+-----------+---------------+----------------------+------------------------+------------+-----------------------------------------------------------------------------------------------+
+; 3:1                ; 14 bits   ; 28 LEs        ; 0 LEs                ; 28 LEs                 ; Yes        ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m0_inst|m_addr[6]              ;
+; 3:1                ; 14 bits   ; 28 LEs        ; 0 LEs                ; 28 LEs                 ; Yes        ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst|m_addr[7]              ;
+; 3:1                ; 8 bits    ; 16 LEs        ; 0 LEs                ; 16 LEs                 ; Yes        ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst|cmd_rdata[4]           ;
+; 3:1                ; 8 bits    ; 16 LEs        ; 0 LEs                ; 16 LEs                 ; Yes        ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m0_inst|cmd_rdata[2]           ;
+; 3:1                ; 8 bits    ; 16 LEs        ; 8 LEs                ; 8 LEs                  ; Yes        ; |top_bus_system|bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|dout[3]           ;
+; 3:1                ; 8 bits    ; 16 LEs        ; 16 LEs               ; 0 LEs                  ; Yes        ; |top_bus_system|bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|split_data_reg[7] ;
+; 4:1                ; 3 bits    ; 6 LEs         ; 6 LEs                ; 0 LEs                  ; Yes        ; |top_bus_system|bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|latency_cnt[2]    ;
+; 5:1                ; 9 bits    ; 27 LEs        ; 9 LEs                ; 18 LEs                 ; Yes        ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m0_inst|m_wdata[0]             ;
+; 5:1                ; 9 bits    ; 27 LEs        ; 9 LEs                ; 18 LEs                 ; Yes        ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst|m_wdata[3]             ;
+; 3:1                ; 24 bits   ; 48 LEs        ; 48 LEs               ; 0 LEs                  ; No         ; |top_bus_system|bus_interconnect:interconnect_inst|bus_addr[13]                               ;
+; 5:1                ; 9 bits    ; 27 LEs        ; 18 LEs               ; 9 LEs                  ; No         ; |top_bus_system|bus_interconnect:interconnect_inst|bus_rdata[0]                               ;
+; 7:1                ; 2 bits    ; 8 LEs         ; 6 LEs                ; 2 LEs                  ; No         ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst|Selector3              ;
+; 8:1                ; 2 bits    ; 10 LEs        ; 6 LEs                ; 4 LEs                  ; No         ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m0_inst|Selector3              ;
+; 8:1                ; 2 bits    ; 10 LEs        ; 4 LEs                ; 6 LEs                  ; No         ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst|Selector1              ;
+; 8:1                ; 2 bits    ; 10 LEs        ; 6 LEs                ; 4 LEs                  ; No         ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst|Selector4              ;
+; 9:1                ; 2 bits    ; 12 LEs        ; 8 LEs                ; 4 LEs                  ; No         ; |top_bus_system|bus_interconnect:interconnect_inst|master_node:m0_inst|Selector5              ;
++--------------------+-----------+---------------+----------------------+------------------------+------------+-----------------------------------------------------------------------------------------------+
 
 
-+-----------------------------------------------------------------------------------------------------+
-; Source assignments for slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated ;
-+---------------------------------+--------------------+------+---------------------------------------+
-; Assignment                      ; Value              ; From ; To                                    ;
-+---------------------------------+--------------------+------+---------------------------------------+
-; OPTIMIZE_POWER_DURING_SYNTHESIS ; NORMAL_COMPILATION ; -    ; -                                     ;
-+---------------------------------+--------------------+------+---------------------------------------+
++----------------------------------------------------------------------------------------------------------------------------------------+
+; Source assignments for bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated ;
++---------------------------------+--------------------+------+--------------------------------------------------------------------------+
+; Assignment                      ; Value              ; From ; To                                                                       ;
++---------------------------------+--------------------+------+--------------------------------------------------------------------------+
+; OPTIMIZE_POWER_DURING_SYNTHESIS ; NORMAL_COMPILATION ; -    ; -                                                                        ;
++---------------------------------+--------------------+------+--------------------------------------------------------------------------+
 
 
-+---------------------------------------------------------------------+
-; Parameter Settings for User Entity Instance: slave_fast_ram:s1_inst ;
-+----------------+-------+--------------------------------------------+
-; Parameter Name ; Value ; Type                                       ;
-+----------------+-------+--------------------------------------------+
-; ADDR_WIDTH     ; 12    ; Signed Integer                             ;
-+----------------+-------+--------------------------------------------+
++--------------------------------------------------------------------------------------------------------+
+; Parameter Settings for User Entity Instance: bus_interconnect:interconnect_inst|slave_fast_ram:s1_inst ;
++----------------+-------+-------------------------------------------------------------------------------+
+; Parameter Name ; Value ; Type                                                                          ;
++----------------+-------+-------------------------------------------------------------------------------+
+; ADDR_WIDTH     ; 12    ; Signed Integer                                                                ;
++----------------+-------+-------------------------------------------------------------------------------+
 Note: In order to hide this table in the UI and the text report file, please set the "Show Parameter Settings in Synthesis Report" option in "Analysis and Synthesis Settings -> More Settings" to "Off".
 
 
-+---------------------------------------------------------------------+
-; Parameter Settings for User Entity Instance: slave_fast_ram:s2_inst ;
-+----------------+-------+--------------------------------------------+
-; Parameter Name ; Value ; Type                                       ;
-+----------------+-------+--------------------------------------------+
-; ADDR_WIDTH     ; 11    ; Signed Integer                             ;
-+----------------+-------+--------------------------------------------+
++--------------------------------------------------------------------------------------------------------+
+; Parameter Settings for User Entity Instance: bus_interconnect:interconnect_inst|slave_fast_ram:s2_inst ;
++----------------+-------+-------------------------------------------------------------------------------+
+; Parameter Name ; Value ; Type                                                                          ;
++----------------+-------+-------------------------------------------------------------------------------+
+; ADDR_WIDTH     ; 11    ; Signed Integer                                                                ;
++----------------+-------+-------------------------------------------------------------------------------+
 Note: In order to hide this table in the UI and the text report file, please set the "Show Parameter Settings in Synthesis Report" option in "Analysis and Synthesis Settings -> More Settings" to "Off".
 
 
-+------------------------------------------------------------------------------------------------+
-; Parameter Settings for Inferred Entity Instance: slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0 ;
-+------------------------------------+----------------------+------------------------------------+
-; Parameter Name                     ; Value                ; Type                               ;
-+------------------------------------+----------------------+------------------------------------+
-; BYTE_SIZE_BLOCK                    ; 8                    ; Untyped                            ;
-; AUTO_CARRY_CHAINS                  ; ON                   ; AUTO_CARRY                         ;
-; IGNORE_CARRY_BUFFERS               ; OFF                  ; IGNORE_CARRY                       ;
-; AUTO_CASCADE_CHAINS                ; ON                   ; AUTO_CASCADE                       ;
-; IGNORE_CASCADE_BUFFERS             ; OFF                  ; IGNORE_CASCADE                     ;
-; WIDTH_BYTEENA                      ; 1                    ; Untyped                            ;
-; OPERATION_MODE                     ; DUAL_PORT            ; Untyped                            ;
-; WIDTH_A                            ; 8                    ; Untyped                            ;
-; WIDTHAD_A                          ; 6                    ; Untyped                            ;
-; NUMWORDS_A                         ; 64                   ; Untyped                            ;
-; OUTDATA_REG_A                      ; UNREGISTERED         ; Untyped                            ;
-; ADDRESS_ACLR_A                     ; NONE                 ; Untyped                            ;
-; OUTDATA_ACLR_A                     ; NONE                 ; Untyped                            ;
-; WRCONTROL_ACLR_A                   ; NONE                 ; Untyped                            ;
-; INDATA_ACLR_A                      ; NONE                 ; Untyped                            ;
-; BYTEENA_ACLR_A                     ; NONE                 ; Untyped                            ;
-; WIDTH_B                            ; 8                    ; Untyped                            ;
-; WIDTHAD_B                          ; 6                    ; Untyped                            ;
-; NUMWORDS_B                         ; 64                   ; Untyped                            ;
-; INDATA_REG_B                       ; CLOCK1               ; Untyped                            ;
-; WRCONTROL_WRADDRESS_REG_B          ; CLOCK1               ; Untyped                            ;
-; RDCONTROL_REG_B                    ; CLOCK1               ; Untyped                            ;
-; ADDRESS_REG_B                      ; CLOCK0               ; Untyped                            ;
-; OUTDATA_REG_B                      ; UNREGISTERED         ; Untyped                            ;
-; BYTEENA_REG_B                      ; CLOCK1               ; Untyped                            ;
-; INDATA_ACLR_B                      ; NONE                 ; Untyped                            ;
-; WRCONTROL_ACLR_B                   ; NONE                 ; Untyped                            ;
-; ADDRESS_ACLR_B                     ; NONE                 ; Untyped                            ;
-; OUTDATA_ACLR_B                     ; NONE                 ; Untyped                            ;
-; RDCONTROL_ACLR_B                   ; NONE                 ; Untyped                            ;
-; BYTEENA_ACLR_B                     ; NONE                 ; Untyped                            ;
-; WIDTH_BYTEENA_A                    ; 1                    ; Untyped                            ;
-; WIDTH_BYTEENA_B                    ; 1                    ; Untyped                            ;
-; RAM_BLOCK_TYPE                     ; M9K                  ; Untyped                            ;
-; BYTE_SIZE                          ; 8                    ; Untyped                            ;
-; READ_DURING_WRITE_MODE_MIXED_PORTS ; OLD_DATA             ; Untyped                            ;
-; READ_DURING_WRITE_MODE_PORT_A      ; NEW_DATA_NO_NBE_READ ; Untyped                            ;
-; READ_DURING_WRITE_MODE_PORT_B      ; NEW_DATA_NO_NBE_READ ; Untyped                            ;
-; INIT_FILE                          ; UNUSED               ; Untyped                            ;
-; INIT_FILE_LAYOUT                   ; PORT_A               ; Untyped                            ;
-; MAXIMUM_DEPTH                      ; 0                    ; Untyped                            ;
-; CLOCK_ENABLE_INPUT_A               ; NORMAL               ; Untyped                            ;
-; CLOCK_ENABLE_INPUT_B               ; NORMAL               ; Untyped                            ;
-; CLOCK_ENABLE_OUTPUT_A              ; NORMAL               ; Untyped                            ;
-; CLOCK_ENABLE_OUTPUT_B              ; NORMAL               ; Untyped                            ;
-; CLOCK_ENABLE_CORE_A                ; USE_INPUT_CLKEN      ; Untyped                            ;
-; CLOCK_ENABLE_CORE_B                ; USE_INPUT_CLKEN      ; Untyped                            ;
-; ENABLE_ECC                         ; FALSE                ; Untyped                            ;
-; ECC_PIPELINE_STAGE_ENABLED         ; FALSE                ; Untyped                            ;
-; WIDTH_ECCSTATUS                    ; 3                    ; Untyped                            ;
-; DEVICE_FAMILY                      ; Cyclone IV E         ; Untyped                            ;
-; CBXI_PARAMETER                     ; altsyncram_45k1      ; Untyped                            ;
-+------------------------------------+----------------------+------------------------------------+
++-----------------------------------------------------------------------------------------------------------------------------------+
+; Parameter Settings for Inferred Entity Instance: bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0 ;
++------------------------------------+----------------------+-----------------------------------------------------------------------+
+; Parameter Name                     ; Value                ; Type                                                                  ;
++------------------------------------+----------------------+-----------------------------------------------------------------------+
+; BYTE_SIZE_BLOCK                    ; 8                    ; Untyped                                                               ;
+; AUTO_CARRY_CHAINS                  ; ON                   ; AUTO_CARRY                                                            ;
+; IGNORE_CARRY_BUFFERS               ; OFF                  ; IGNORE_CARRY                                                          ;
+; AUTO_CASCADE_CHAINS                ; ON                   ; AUTO_CASCADE                                                          ;
+; IGNORE_CASCADE_BUFFERS             ; OFF                  ; IGNORE_CASCADE                                                        ;
+; WIDTH_BYTEENA                      ; 1                    ; Untyped                                                               ;
+; OPERATION_MODE                     ; DUAL_PORT            ; Untyped                                                               ;
+; WIDTH_A                            ; 8                    ; Untyped                                                               ;
+; WIDTHAD_A                          ; 6                    ; Untyped                                                               ;
+; NUMWORDS_A                         ; 64                   ; Untyped                                                               ;
+; OUTDATA_REG_A                      ; UNREGISTERED         ; Untyped                                                               ;
+; ADDRESS_ACLR_A                     ; NONE                 ; Untyped                                                               ;
+; OUTDATA_ACLR_A                     ; NONE                 ; Untyped                                                               ;
+; WRCONTROL_ACLR_A                   ; NONE                 ; Untyped                                                               ;
+; INDATA_ACLR_A                      ; NONE                 ; Untyped                                                               ;
+; BYTEENA_ACLR_A                     ; NONE                 ; Untyped                                                               ;
+; WIDTH_B                            ; 8                    ; Untyped                                                               ;
+; WIDTHAD_B                          ; 6                    ; Untyped                                                               ;
+; NUMWORDS_B                         ; 64                   ; Untyped                                                               ;
+; INDATA_REG_B                       ; CLOCK1               ; Untyped                                                               ;
+; WRCONTROL_WRADDRESS_REG_B          ; CLOCK1               ; Untyped                                                               ;
+; RDCONTROL_REG_B                    ; CLOCK1               ; Untyped                                                               ;
+; ADDRESS_REG_B                      ; CLOCK0               ; Untyped                                                               ;
+; OUTDATA_REG_B                      ; UNREGISTERED         ; Untyped                                                               ;
+; BYTEENA_REG_B                      ; CLOCK1               ; Untyped                                                               ;
+; INDATA_ACLR_B                      ; NONE                 ; Untyped                                                               ;
+; WRCONTROL_ACLR_B                   ; NONE                 ; Untyped                                                               ;
+; ADDRESS_ACLR_B                     ; NONE                 ; Untyped                                                               ;
+; OUTDATA_ACLR_B                     ; NONE                 ; Untyped                                                               ;
+; RDCONTROL_ACLR_B                   ; NONE                 ; Untyped                                                               ;
+; BYTEENA_ACLR_B                     ; NONE                 ; Untyped                                                               ;
+; WIDTH_BYTEENA_A                    ; 1                    ; Untyped                                                               ;
+; WIDTH_BYTEENA_B                    ; 1                    ; Untyped                                                               ;
+; RAM_BLOCK_TYPE                     ; M9K                  ; Untyped                                                               ;
+; BYTE_SIZE                          ; 8                    ; Untyped                                                               ;
+; READ_DURING_WRITE_MODE_MIXED_PORTS ; OLD_DATA             ; Untyped                                                               ;
+; READ_DURING_WRITE_MODE_PORT_A      ; NEW_DATA_NO_NBE_READ ; Untyped                                                               ;
+; READ_DURING_WRITE_MODE_PORT_B      ; NEW_DATA_NO_NBE_READ ; Untyped                                                               ;
+; INIT_FILE                          ; UNUSED               ; Untyped                                                               ;
+; INIT_FILE_LAYOUT                   ; PORT_A               ; Untyped                                                               ;
+; MAXIMUM_DEPTH                      ; 0                    ; Untyped                                                               ;
+; CLOCK_ENABLE_INPUT_A               ; NORMAL               ; Untyped                                                               ;
+; CLOCK_ENABLE_INPUT_B               ; NORMAL               ; Untyped                                                               ;
+; CLOCK_ENABLE_OUTPUT_A              ; NORMAL               ; Untyped                                                               ;
+; CLOCK_ENABLE_OUTPUT_B              ; NORMAL               ; Untyped                                                               ;
+; CLOCK_ENABLE_CORE_A                ; USE_INPUT_CLKEN      ; Untyped                                                               ;
+; CLOCK_ENABLE_CORE_B                ; USE_INPUT_CLKEN      ; Untyped                                                               ;
+; ENABLE_ECC                         ; FALSE                ; Untyped                                                               ;
+; ECC_PIPELINE_STAGE_ENABLED         ; FALSE                ; Untyped                                                               ;
+; WIDTH_ECCSTATUS                    ; 3                    ; Untyped                                                               ;
+; DEVICE_FAMILY                      ; Cyclone IV E         ; Untyped                                                               ;
+; CBXI_PARAMETER                     ; altsyncram_45k1      ; Untyped                                                               ;
++------------------------------------+----------------------+-----------------------------------------------------------------------+
 Note: In order to hide this table in the UI and the text report file, please set the "Show Parameter Settings in Synthesis Report" option in "Analysis and Synthesis Settings -> More Settings" to "Off".
 
 
-+-------------------------------------------------------------------------------------------+
-; altsyncram Parameter Settings by Entity Instance                                          ;
-+-------------------------------------------+-----------------------------------------------+
-; Name                                      ; Value                                         ;
-+-------------------------------------------+-----------------------------------------------+
-; Number of entity instances                ; 1                                             ;
-; Entity Instance                           ; slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0 ;
-;     -- OPERATION_MODE                     ; DUAL_PORT                                     ;
-;     -- WIDTH_A                            ; 8                                             ;
-;     -- NUMWORDS_A                         ; 64                                            ;
-;     -- OUTDATA_REG_A                      ; UNREGISTERED                                  ;
-;     -- WIDTH_B                            ; 8                                             ;
-;     -- NUMWORDS_B                         ; 64                                            ;
-;     -- ADDRESS_REG_B                      ; CLOCK0                                        ;
-;     -- OUTDATA_REG_B                      ; UNREGISTERED                                  ;
-;     -- RAM_BLOCK_TYPE                     ; M9K                                           ;
-;     -- READ_DURING_WRITE_MODE_MIXED_PORTS ; OLD_DATA                                      ;
-+-------------------------------------------+-----------------------------------------------+
++------------------------------------------------------------------------------------------------------------------------------+
+; altsyncram Parameter Settings by Entity Instance                                                                             ;
++-------------------------------------------+----------------------------------------------------------------------------------+
+; Name                                      ; Value                                                                            ;
++-------------------------------------------+----------------------------------------------------------------------------------+
+; Number of entity instances                ; 1                                                                                ;
+; Entity Instance                           ; bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0 ;
+;     -- OPERATION_MODE                     ; DUAL_PORT                                                                        ;
+;     -- WIDTH_A                            ; 8                                                                                ;
+;     -- NUMWORDS_A                         ; 64                                                                               ;
+;     -- OUTDATA_REG_A                      ; UNREGISTERED                                                                     ;
+;     -- WIDTH_B                            ; 8                                                                                ;
+;     -- NUMWORDS_B                         ; 64                                                                               ;
+;     -- ADDRESS_REG_B                      ; CLOCK0                                                                           ;
+;     -- OUTDATA_REG_B                      ; UNREGISTERED                                                                     ;
+;     -- RAM_BLOCK_TYPE                     ; M9K                                                                              ;
+;     -- READ_DURING_WRITE_MODE_MIXED_PORTS ; OLD_DATA                                                                         ;
++-------------------------------------------+----------------------------------------------------------------------------------+
 
 
 +----------------------------------------------------------------------------------------------------------------------+
-; Port Connectivity Checks: "address_decoder:decoder_inst"                                                             ;
+; Port Connectivity Checks: "bus_interconnect:interconnect_inst|address_decoder:decoder_inst"                          ;
 +------------+--------+----------+-------------------------------------------------------------------------------------+
 ; Port       ; Type   ; Severity ; Details                                                                             ;
 +------------+--------+----------+-------------------------------------------------------------------------------------+
@@ -570,7 +572,7 @@ Note: In order to hide this table in the UI and the text report file, please set
 Info: *******************************************************************
 Info: Running Quartus Prime Analysis & Synthesis
     Info: Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
-    Info: Processing started: Tue Sep  1 21:29:13 2026
+    Info: Processing started: Wed Sep  2 01:50:40 2026
 Info: Command: quartus_map --read_settings_files=on --write_settings_files=off System_Bus_Final -c System_Bus_Final
 Warning (18236): Number of processors has not been specified which may cause overloading on shared machines.  Set the global assignment NUM_PARALLEL_PROCESSORS in your QSF to an appropriate value for best performance.
 Info (20030): Parallel compilation is enabled and will use 4 of the 4 processors detected
@@ -597,23 +599,26 @@ Info (12021): Found 1 design units, including 1 entities, in source file slave_0
 Info (12021): Found 1 design units, including 1 entities, in source file slave_fast_ram.v
     Info (12023): Found entity 1: slave_fast_ram File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 1
 Info (12021): Found 1 design units, including 1 entities, in source file top_bus_system.v
-    Info (12023): Found entity 1: top_bus_system File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 25
+    Info (12023): Found entity 1: top_bus_system File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 3
 Info (12021): Found 1 design units, including 1 entities, in source file tb_slave_fast_ram.v
     Info (12023): Found entity 1: tb_slave_fast_ram File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_slave_fast_ram.v Line: 3
+Info (12021): Found 1 design units, including 1 entities, in source file bus_interconnect.v
+    Info (12023): Found entity 1: bus_interconnect File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v Line: 3
 Info (12127): Elaborating entity "top_bus_system" for the top level hierarchy
-Info (12128): Elaborating entity "arbiter_2m_split" for hierarchy "arbiter_2m_split:arbiter_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 83
-Info (12128): Elaborating entity "master_node" for hierarchy "master_node:m0_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 93
-Info (12128): Elaborating entity "address_decoder" for hierarchy "address_decoder:decoder_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 119
-Info (12128): Elaborating entity "slave_0_split_4k" for hierarchy "slave_0_split_4k:s0_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 127
-Info (12128): Elaborating entity "slave_fast_ram" for hierarchy "slave_fast_ram:s1_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 134
-Info (12128): Elaborating entity "slave_fast_ram" for hierarchy "slave_fast_ram:s2_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 141
-Info (12128): Elaborating entity "cross_fpga_bridge_dummy" for hierarchy "cross_fpga_bridge_dummy:bridge_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 149
-Warning (276020): Inferred RAM node "slave_0_split_4k:s0_inst|mem_rtl_0" from synchronous design logic.  Pass-through logic has been added to match the read-during-write behavior of the original design.
+Info (12128): Elaborating entity "bus_interconnect" for hierarchy "bus_interconnect:interconnect_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 52
+Info (12128): Elaborating entity "arbiter_2m_split" for hierarchy "bus_interconnect:interconnect_inst|arbiter_2m_split:arbiter_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v Line: 62
+Info (12128): Elaborating entity "master_node" for hierarchy "bus_interconnect:interconnect_inst|master_node:m0_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v Line: 83
+Info (12128): Elaborating entity "address_decoder" for hierarchy "bus_interconnect:interconnect_inst|address_decoder:decoder_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v Line: 120
+Info (12128): Elaborating entity "slave_0_split_4k" for hierarchy "bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v Line: 134
+Info (12128): Elaborating entity "slave_fast_ram" for hierarchy "bus_interconnect:interconnect_inst|slave_fast_ram:s1_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v Line: 146
+Info (12128): Elaborating entity "slave_fast_ram" for hierarchy "bus_interconnect:interconnect_inst|slave_fast_ram:s2_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v Line: 158
+Info (12128): Elaborating entity "cross_fpga_bridge_dummy" for hierarchy "bus_interconnect:interconnect_inst|cross_fpga_bridge_dummy:bridge_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v Line: 172
+Warning (276020): Inferred RAM node "bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0" from synchronous design logic.  Pass-through logic has been added to match the read-during-write behavior of the original design.
 Info (276014): Found 2 instances of uninferred RAM logic
-    Info (276007): RAM logic "slave_fast_ram:s1_inst|mem" is uninferred due to asynchronous read logic File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 16
-    Info (276007): RAM logic "slave_fast_ram:s2_inst|mem" is uninferred due to asynchronous read logic File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 16
+    Info (276007): RAM logic "bus_interconnect:interconnect_inst|slave_fast_ram:s1_inst|mem" is uninferred due to asynchronous read logic File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 16
+    Info (276007): RAM logic "bus_interconnect:interconnect_inst|slave_fast_ram:s2_inst|mem" is uninferred due to asynchronous read logic File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 16
 Info (19000): Inferred 1 megafunctions from design logic
-    Info (276029): Inferred altsyncram megafunction from the following design logic: "slave_0_split_4k:s0_inst|mem_rtl_0" 
+    Info (276029): Inferred altsyncram megafunction from the following design logic: "bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|mem_rtl_0" 
         Info (286033): Parameter OPERATION_MODE set to DUAL_PORT
         Info (286033): Parameter WIDTH_A set to 8
         Info (286033): Parameter WIDTHAD_A set to 6
@@ -630,8 +635,8 @@ Info (19000): Inferred 1 megafunctions from design logic
         Info (286033): Parameter WRCONTROL_ACLR_A set to NONE
         Info (286033): Parameter RAM_BLOCK_TYPE set to M9K
         Info (286033): Parameter READ_DURING_WRITE_MODE_MIXED_PORTS set to OLD_DATA
-Info (12130): Elaborated megafunction instantiation "slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0"
-Info (12133): Instantiated megafunction "slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0" with the following parameter:
+Info (12130): Elaborated megafunction instantiation "bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0"
+Info (12133): Instantiated megafunction "bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0" with the following parameter:
     Info (12134): Parameter "OPERATION_MODE" = "DUAL_PORT"
     Info (12134): Parameter "WIDTH_A" = "8"
     Info (12134): Parameter "WIDTHAD_A" = "6"
@@ -653,13 +658,13 @@ Info (12021): Found 1 design units, including 1 entities, in source file db/alts
 Info (13000): Registers with preset signals will power-up high File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/cross_fpga_bridge_dummy.v Line: 50
 Info (13003): DEV_CLRn pin will set, and not reset, register with preset signal due to NOT Gate Push-Back
 Warning (13024): Output pins are stuck at VCC or GND
-    Warning (13410): Pin "ext_tx_serial" is stuck at VCC File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 48
+    Warning (13410): Pin "ext_tx_serial" is stuck at VCC File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 26
 Info (286030): Timing-Driven Synthesis is running
 Info (17049): 7 registers lost all their fanouts during netlist optimizations.
 Info (16010): Generating hard_block partition "hard_block:auto_generated_inst"
     Info (16011): Adding 0 node(s), including 0 DDIO, 0 PLL, 0 transceiver and 0 LCELL
 Warning (21074): Design contains 1 input pin(s) that do not drive logic
-    Warning (15610): No output dependent on input pin "ext_rx_serial" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 46
+    Warning (15610): No output dependent on input pin "ext_rx_serial" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 24
 Info (21057): Implemented 2273 device resources after synthesis - the final resource count might be different
     Info (21058): Implemented 51 input pins
     Info (21059): Implemented 19 output pins
@@ -667,8 +672,8 @@ Info (21057): Implemented 2273 device resources after synthesis - the final reso
     Info (21064): Implemented 8 RAM segments
 Info: Quartus Prime Analysis & Synthesis was successful. 0 errors, 6 warnings
     Info: Peak virtual memory: 4809 megabytes
-    Info: Processing ended: Tue Sep  1 21:29:22 2026
+    Info: Processing ended: Wed Sep  2 01:50:49 2026
     Info: Elapsed time: 00:00:09
-    Info: Total CPU time (on all processors): 00:00:19
+    Info: Total CPU time (on all processors): 00:00:18
 
 

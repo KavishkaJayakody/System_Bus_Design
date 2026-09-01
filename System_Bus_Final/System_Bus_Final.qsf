@@ -87,12 +87,13 @@ set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_global_assignment -name EDA_TEST_BENCH_NAME tb_slave_0_split_4k -section_id eda_simulation
 set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id tb_slave_0_split_4k
 set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME tb_slave_0_split_4k -section_id tb_slave_0_split_4k
+set_global_assignment -name EDA_TEST_BENCH_NAME tb_top_bus_system -section_id eda_simulation
+set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id tb_top_bus_system
+set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME tb_top_bus_system -section_id tb_top_bus_system
+set_global_assignment -name VERILOG_FILE bus_interconnect.v
 set_global_assignment -name EDA_TEST_BENCH_FILE tb_address_decoder.v -section_id tb_address_decoder
 set_global_assignment -name EDA_TEST_BENCH_FILE tb_arbiter_2m_split.v -section_id tb_arbiter_2m_split
 set_global_assignment -name EDA_TEST_BENCH_FILE tb_slave_fast_ram.v -section_id tb_slave_fast_ram
 set_global_assignment -name EDA_TEST_BENCH_FILE tb_slave_0_split_4k.v -section_id tb_slave_0_split_4k
-set_global_assignment -name EDA_TEST_BENCH_NAME tb_top_bus_system -section_id eda_simulation
-set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id tb_top_bus_system
-set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME tb_top_bus_system -section_id tb_top_bus_system
 set_global_assignment -name EDA_TEST_BENCH_FILE tb_top_bus_system.v -section_id tb_top_bus_system
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

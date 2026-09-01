@@ -12,6 +12,7 @@ vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Des
 vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v}
 vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v}
 vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v}
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v}
 
 vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_top_bus_system.v}
 

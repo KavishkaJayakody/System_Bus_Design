@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 
 module tb_top_bus_system;
-    localparam CLK_PERIOD = 20; // 50 MHz
+    localparam CLK_PERIOD = 20; // 50 MHz Clock (20ns)
 
     reg        clk;
     reg        rst_n;
@@ -28,79 +28,90 @@ module tb_top_bus_system;
 
     integer error_count = 0;
 
+    // ------------------------------------------------------------------------
     // DUT Instantiation
+    // ------------------------------------------------------------------------
     top_bus_system uut (
-        .clk(clk),
-        .rst_n(rst_n),
-        .m0_cmd_start(m0_cmd_start),
-        .m0_cmd_we(m0_cmd_we),
-        .m0_cmd_addr(m0_cmd_addr),
-        .m0_cmd_wdata(m0_cmd_wdata),
-        .m0_cmd_rdata(m0_cmd_rdata),
-        .m0_cmd_done(m0_cmd_done),
-        .m1_cmd_start(m1_cmd_start),
-        .m1_cmd_we(m1_cmd_we),
-        .m1_cmd_addr(m1_cmd_addr),
-        .m1_cmd_wdata(m1_cmd_wdata),
-        .m1_cmd_rdata(m1_cmd_rdata),
-        .m1_cmd_done(m1_cmd_done),
-        .ext_rx_serial(ext_rx_serial),
-        .ext_tx_serial(ext_tx_serial)
+        .clk           (clk),
+        .rst_n         (rst_n),
+        .m0_cmd_start (m0_cmd_start),
+        .m0_cmd_we    (m0_cmd_we),
+        .m0_cmd_addr  (m0_cmd_addr),
+        .m0_cmd_wdata (m0_cmd_wdata),
+        .m0_cmd_rdata (m0_cmd_rdata),
+        .m0_cmd_done  (m0_cmd_done),
+        .m1_cmd_start (m1_cmd_start),
+        .m1_cmd_we    (m1_cmd_we),
+        .m1_cmd_addr  (m1_cmd_addr),
+        .m1_cmd_wdata (m1_cmd_wdata),
+        .m1_cmd_rdata (m1_cmd_rdata),
+        .m1_cmd_done  (m1_cmd_done),
+        .ext_rx_serial (ext_rx_serial),
+        .ext_tx_serial (ext_tx_serial)
     );
 
+    // Clock Generator
     always #(CLK_PERIOD/2) clk = ~clk;
 
-    // Task for Master 0 Transaction
-    task execute_m0(input we, input [13:0] addr, input [7:0] wdata);
+    // ------------------------------------------------------------------------
+    // Synchronous Command Driving Tasks (Re-entrant automatic scope)
+    // ------------------------------------------------------------------------
+    task automatic execute_m0(input we, input [13:0] addr, input [7:0] wdata);
         begin
-            @(posedge clk); #2;
-            m0_cmd_we    = we;
-            m0_cmd_addr  = addr;
-            m0_cmd_wdata = wdata;
-            m0_cmd_start = 1'b1;
-            @(posedge clk); #2;
-            m0_cmd_start = 1'b0;
+            @(posedge clk);
+            m0_cmd_we    <= we;
+            m0_cmd_addr  <= addr;
+            m0_cmd_wdata <= wdata;
+            m0_cmd_start <= 1'b1;
+            
+            @(posedge clk);
+            m0_cmd_start <= 1'b0;
         end
     endtask
 
-    // Task for Master 1 Transaction
-    task execute_m1(input we, input [13:0] addr, input [7:0] wdata);
+    task automatic execute_m1(input we, input [13:0] addr, input [7:0] wdata);
         begin
-            @(posedge clk); #2;
-            m1_cmd_we    = we;
-            m1_cmd_addr  = addr;
-            m1_cmd_wdata = wdata;
-            m1_cmd_start = 1'b1;
-            @(posedge clk); #2;
-            m1_cmd_start = 1'b0;
+            @(posedge clk);
+            m1_cmd_we    <= we;
+            m1_cmd_addr  <= addr;
+            m1_cmd_wdata <= wdata;
+            m1_cmd_start <= 1'b1;
+            
+            @(posedge clk);
+            m1_cmd_start <= 1'b0;
         end
     endtask
 
+    // ------------------------------------------------------------------------
+    // Main Verification Flow
+    // ------------------------------------------------------------------------
     initial begin
-        // Initialize
-        clk           = 0;
-        rst_n         = 0;
-        m0_cmd_start = 0; m0_cmd_we = 0; m0_cmd_addr = 0; m0_cmd_wdata = 0;
-        m1_cmd_start = 0; m1_cmd_we = 0; m1_cmd_addr = 0; m1_cmd_wdata = 0;
-        ext_rx_serial = 1;
+        // Signal Initialization
+        clk           = 1'b0;
+        rst_n         = 1'b0;
+        m0_cmd_start = 1'b0; m0_cmd_we = 1'b0; m0_cmd_addr = 14'h0; m0_cmd_wdata = 8'h0;
+        m1_cmd_start = 1'b0; m1_cmd_we = 1'b0; m1_cmd_addr = 14'h0; m1_cmd_wdata = 8'h0;
+        ext_rx_serial = 1'b1;
 
         $display("=========================================================");
-        $display("   STARTING TOP BUS SYSTEM INTEGRATION VERIFICATION       ");
+        $display("   STARTING TOP BUS SYSTEM INTEGRATION VERIFICATION      ");
         $display("=========================================================");
 
-        #40;
-        rst_n = 1;
-        #20;
+        // Power-On Reset Sequence
+        #(CLK_PERIOD * 2);
+        rst_n = 1'b1;
+        #(CLK_PERIOD);
 
         // ---------------------------------------------------------------
         // TEST 1: Master 0 Write & Read to Fast RAM (Slave 1 @ 0x1000)
         // ---------------------------------------------------------------
         $display("\n[TEST 1] M0 Fast RAM Write & Read (0x1000)...");
         execute_m0(1'b1, 14'h1000, 8'hC5); // Write 0xC5
-        wait(m0_cmd_done);
-        
+        @(posedge m0_cmd_done);
+
         execute_m0(1'b0, 14'h1000, 8'h00); // Read Back
-        wait(m0_cmd_done);
+        @(posedge m0_cmd_done);
+        
         if (m0_cmd_rdata == 8'hC5)
             $display("-> SUCCESS: M0 read 0x%02X from 0x1000", m0_cmd_rdata);
         else begin
@@ -113,10 +124,11 @@ module tb_top_bus_system;
         // ---------------------------------------------------------------
         $display("\n[TEST 2] M1 Fast RAM Write & Read (0x2000)...");
         execute_m1(1'b1, 14'h2000, 8'h3B); // Write 0x3B
-        wait(m1_cmd_done);
+        @(posedge m1_cmd_done);
 
         execute_m1(1'b0, 14'h2000, 8'h00); // Read Back
-        wait(m1_cmd_done);
+        @(posedge m1_cmd_done);
+        
         if (m1_cmd_rdata == 8'h3B)
             $display("-> SUCCESS: M1 read 0x%02X from 0x2000", m1_cmd_rdata);
         else begin
@@ -129,7 +141,8 @@ module tb_top_bus_system;
         // ---------------------------------------------------------------
         $display("\n[TEST 3] M0 Bridge Reg Read Default (0x3000)...");
         execute_m0(1'b0, 14'h3000, 8'h00);
-        wait(m0_cmd_done);
+        @(posedge m0_cmd_done);
+        
         if (m0_cmd_rdata == 8'hBE)
             $display("-> SUCCESS: M0 read default 0xBE from Bridge Reg");
         else begin
@@ -139,28 +152,24 @@ module tb_top_bus_system;
 
         // ---------------------------------------------------------------
         // TEST 4: Split Transaction & Interleaved Arbitrated Access
-        // 1. M0 writes 0x7E to Split RAM (0x0010)
-        // 2. M0 issues Split Read to 0x0010
-        // 3. M1 issues read to Fast RAM (0x1000) while M0 is waiting on split
-        // 4. M0 completes split re-acquisition and receives 0x7E
         // ---------------------------------------------------------------
         $display("\n[TEST 4] Split Read & Arbitration Interleaving...");
         
         // Step 1: M0 Write 0x7E to Slave 0
         execute_m0(1'b1, 14'h0010, 8'h7E);
-        wait(m0_cmd_done);
+        @(posedge m0_cmd_done);
 
         // Step 2: M0 Starts Split Read
         execute_m0(1'b0, 14'h0010, 8'h00);
         
-        // Step 3: Trigger M1 read concurrently while M0 is split
-        #20;
+        // Step 3: Trigger M1 read while M0 is stalled in split state
+        #(CLK_PERIOD);
         execute_m1(1'b0, 14'h1000, 8'h00);
 
-        // Wait for both masters to finish
+        // Step 4: Evaluate Parallel Completion via Fork-Join
         fork
             begin
-                wait(m0_cmd_done);
+                @(posedge m0_cmd_done);
                 if (m0_cmd_rdata == 8'h7E)
                     $display("-> SUCCESS: M0 Split Read completed with 0x7E");
                 else begin
@@ -169,7 +178,7 @@ module tb_top_bus_system;
                 end
             end
             begin
-                wait(m1_cmd_done);
+                @(posedge m1_cmd_done);
                 if (m1_cmd_rdata == 8'hC5)
                     $display("-> SUCCESS: M1 serviced during M0 split delay with 0xC5");
                 else begin
@@ -179,7 +188,7 @@ module tb_top_bus_system;
             end
         join
 
-        #100;
+        #(CLK_PERIOD * 5);
         $display("=========================================================");
         if (error_count == 0)
             $display(">> TOP SYSTEM TEST PASSED: All Interconnect Operations Correct! <<");
