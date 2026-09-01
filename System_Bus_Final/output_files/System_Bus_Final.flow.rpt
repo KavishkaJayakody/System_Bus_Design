@@ -1,5 +1,5 @@
 Flow report for System_Bus_Final
-Wed Sep  2 01:51:15 2026
+Wed Sep  2 04:34:50 2026
 Quartus Prime Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
 
 
@@ -41,21 +41,21 @@ on the Quartus Prime software download page.
 +--------------------------------------------------------------------------------------+
 ; Flow Summary                                                                         ;
 +------------------------------------+-------------------------------------------------+
-; Flow Status                        ; Successful - Wed Sep  2 01:51:15 2026           ;
+; Flow Status                        ; Successful - Wed Sep  2 04:34:50 2026           ;
 ; Quartus Prime Version              ; 25.1std.0 Build 1129 10/21/2025 SC Lite Edition ;
 ; Revision Name                      ; System_Bus_Final                                ;
 ; Top-level Entity Name              ; top_bus_system                                  ;
 ; Family                             ; Cyclone IV E                                    ;
-; Device                             ; EP4CE115F29C7                                   ;
+; Device                             ; EP4CE22F17C6                                    ;
 ; Timing Models                      ; Final                                           ;
-; Total logic elements               ; 1,662 / 114,480 ( 1 % )                         ;
-;     Total combinational functions  ; 1,012 / 114,480 ( < 1 % )                       ;
-;     Dedicated logic registers      ; 1,253 / 114,480 ( 1 % )                         ;
-; Total registers                    ; 1253                                            ;
-; Total pins                         ; 70 / 529 ( 13 % )                               ;
+; Total logic elements               ; 229 / 22,320 ( 1 % )                            ;
+;     Total combinational functions  ; 148 / 22,320 ( < 1 % )                          ;
+;     Dedicated logic registers      ; 176 / 22,320 ( < 1 % )                          ;
+; Total registers                    ; 176                                             ;
+; Total pins                         ; 70 / 154 ( 45 % )                               ;
 ; Total virtual pins                 ; 0                                               ;
-; Total memory bits                  ; 512 / 3,981,312 ( < 1 % )                       ;
-; Embedded Multiplier 9-bit elements ; 0 / 532 ( 0 % )                                 ;
+; Total memory bits                  ; 81,920 / 608,256 ( 13 % )                       ;
+; Embedded Multiplier 9-bit elements ; 0 / 132 ( 0 % )                                 ;
 ; Total PLLs                         ; 0 / 4 ( 0 % )                                   ;
 +------------------------------------+-------------------------------------------------+
 
@@ -65,7 +65,7 @@ on the Quartus Prime software download page.
 +-------------------+---------------------+
 ; Option            ; Setting             ;
 +-------------------+---------------------+
-; Start date & time ; 09/02/2026 01:50:40 ;
+; Start date & time ; 09/02/2026 04:34:32 ;
 ; Main task         ; Compilation         ;
 ; Revision Name     ; System_Bus_Final    ;
 +-------------------+---------------------+
@@ -76,7 +76,7 @@ on the Quartus Prime software download page.
 +--------------------------------------+----------------------------------------+------------------+----------------+-----------------------------------+
 ; Assignment Name                      ; Value                                  ; Default Value    ; Entity Name    ; Section Id                        ;
 +--------------------------------------+----------------------------------------+------------------+----------------+-----------------------------------+
-; COMPILER_SIGNATURE_ID                ; 18072576150756.178829404010384         ; --               ; --             ; --                                ;
+; COMPILER_SIGNATURE_ID                ; 18072576150756.178830387224360         ; --               ; --             ; --                                ;
 ; EDA_DESIGN_INSTANCE_NAME             ; NA                                     ; --               ; --             ; tb_address_decoder                ;
 ; EDA_DESIGN_INSTANCE_NAME             ; NA                                     ; --               ; --             ; tb_slave_0_split_4k               ;
 ; EDA_DESIGN_INSTANCE_NAME             ; NA                                     ; --               ; --             ; tb_arbiter_2m_split               ;
@@ -87,8 +87,8 @@ on the Quartus Prime software download page.
 ; EDA_GENERATE_FUNCTIONAL_NETLIST      ; Off                                    ; --               ; --             ; eda_board_design_signal_integrity ;
 ; EDA_GENERATE_FUNCTIONAL_NETLIST      ; Off                                    ; --               ; --             ; eda_board_design_symbol           ;
 ; EDA_NATIVELINK_SIMULATION_TEST_BENCH ; tb_top_bus_system                      ; --               ; --             ; eda_simulation                    ;
-; EDA_OUTPUT_DATA_FORMAT               ; Systemverilog Hdl                      ; --               ; --             ; eda_simulation                    ;
-; EDA_SIMULATION_TOOL                  ; Questa Altera FPGA (SystemVerilog)     ; <None>           ; --             ; --                                ;
+; EDA_OUTPUT_DATA_FORMAT               ; Verilog Hdl                            ; --               ; --             ; eda_simulation                    ;
+; EDA_SIMULATION_TOOL                  ; Questa Altera FPGA (Verilog)           ; <None>           ; --             ; --                                ;
 ; EDA_TEST_BENCH_ENABLE_STATUS         ; TEST_BENCH_MODE                        ; --               ; --             ; eda_simulation                    ;
 ; EDA_TEST_BENCH_FILE                  ; tb_address_decoder.v                   ; --               ; --             ; tb_address_decoder                ;
 ; EDA_TEST_BENCH_FILE                  ; tb_slave_0_split_4k.v                  ; --               ; --             ; tb_slave_0_split_4k               ;
@@ -100,15 +100,12 @@ on the Quartus Prime software download page.
 ; EDA_TEST_BENCH_MODULE_NAME           ; tb_arbiter_2m_split                    ; --               ; --             ; tb_arbiter_2m_split               ;
 ; EDA_TEST_BENCH_MODULE_NAME           ; tb_slave_fast_ram                      ; --               ; --             ; tb_slave_fast_ram                 ;
 ; EDA_TEST_BENCH_MODULE_NAME           ; tb_top_bus_system                      ; --               ; --             ; tb_top_bus_system                 ;
-; EDA_TEST_BENCH_NAME                  ; tb_address_decoder                     ; --               ; --             ; eda_simulation                    ;
-; EDA_TEST_BENCH_NAME                  ; tb_arbiter_2m_split                    ; --               ; --             ; eda_simulation                    ;
-; EDA_TEST_BENCH_NAME                  ; tb_slave_fast_ram                      ; --               ; --             ; eda_simulation                    ;
 ; EDA_TEST_BENCH_NAME                  ; tb_slave_0_split_4k                    ; --               ; --             ; eda_simulation                    ;
+; EDA_TEST_BENCH_NAME                  ; tb_slave_fast_ram                      ; --               ; --             ; eda_simulation                    ;
 ; EDA_TEST_BENCH_NAME                  ; tb_top_bus_system                      ; --               ; --             ; eda_simulation                    ;
 ; EDA_TIME_SCALE                       ; 1 ps                                   ; --               ; --             ; eda_simulation                    ;
 ; MAX_CORE_JUNCTION_TEMP               ; 85                                     ; --               ; --             ; --                                ;
 ; MIN_CORE_JUNCTION_TEMP               ; 0                                      ; --               ; --             ; --                                ;
-; NOMINAL_CORE_SUPPLY_VOLTAGE          ; 1.2V                                   ; --               ; --             ; --                                ;
 ; PARTITION_COLOR                      ; -- (Not supported for targeted family) ; --               ; top_bus_system ; Top                               ;
 ; PARTITION_FITTER_PRESERVATION_LEVEL  ; -- (Not supported for targeted family) ; --               ; top_bus_system ; Top                               ;
 ; PARTITION_NETLIST_TYPE               ; -- (Not supported for targeted family) ; --               ; top_bus_system ; Top                               ;
@@ -124,12 +121,12 @@ on the Quartus Prime software download page.
 +----------------------+--------------+-------------------------+---------------------+------------------------------------+
 ; Module Name          ; Elapsed Time ; Average Processors Used ; Peak Virtual Memory ; Total CPU Time (on all processors) ;
 +----------------------+--------------+-------------------------+---------------------+------------------------------------+
-; Analysis & Synthesis ; 00:00:09     ; 1.0                     ; 4809 MB             ; 00:00:17                           ;
-; Fitter               ; 00:00:17     ; 1.0                     ; 5782 MB             ; 00:00:25                           ;
-; Assembler            ; 00:00:02     ; 1.0                     ; 4987 MB             ; 00:00:02                           ;
-; Timing Analyzer      ; 00:00:02     ; 1.2                     ; 4918 MB             ; 00:00:02                           ;
-; EDA Netlist Writer   ; 00:00:01     ; 1.0                     ; 4678 MB             ; 00:00:01                           ;
-; Total                ; 00:00:31     ; --                      ; --                  ; 00:00:47                           ;
+; Analysis & Synthesis ; 00:00:07     ; 1.0                     ; 4810 MB             ; 00:00:17                           ;
+; Fitter               ; 00:00:05     ; 1.0                     ; 5564 MB             ; 00:00:06                           ;
+; Assembler            ; 00:00:01     ; 1.0                     ; 4765 MB             ; 00:00:01                           ;
+; Timing Analyzer      ; 00:00:01     ; 1.1                     ; 4829 MB             ; 00:00:01                           ;
+; EDA Netlist Writer   ; 00:00:00     ; 1.0                     ; 4673 MB             ; 00:00:00                           ;
+; Total                ; 00:00:14     ; --                      ; --                  ; 00:00:25                           ;
 +----------------------+--------------+-------------------------+---------------------+------------------------------------+
 
 

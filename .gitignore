@@ -1,39 +1,65 @@
+# ============================================================
 # Quartus generated files
+# ============================================================
+
 **/db/
 **/incremental_db/
 **/output_files/
+
+# Quartus reports and generated output
 **/*.rpt
 **/*.summary
 **/*.done
+
+# Quartus workspace / temporary files
 **/*.qws
 **/*.qdf
+**/*.qws.bak
 
-# Quartus temporary files
+
+# ============================================================
+# Quartus temporary / backup files
+# ============================================================
+
 **/*.bak
+**/*.bak*
 **/*.tmp
 **/*.log
 
+
+# ============================================================
 # Questa / ModelSim generated files
-**/simulation/questa/rtl_work/
-**/simulation/questa/work/
-**/*.wlf
-**/msim_transcript
+# ============================================================
 
 # Compiled simulation libraries
+**/simulation/**/rtl_work/
 **/simulation/**/work/
 **/simulation/**/library/
 
-# OS files
+# Questa / ModelSim waveform and transcript files
+**/*.wlf
+**/msim_transcript
+
+# Questa compiled database files
+**/*.qdb
+**/*.qtl
+
+# Additional generated Questa/ModelSim files
+**/*.sft
+**/*.svo
+
+
+# ============================================================
+# Operating system files
+# ============================================================
+
 .DS_Store
 Thumbs.db
 
-# Editor files
+
+# ============================================================
+# IDE / editor files
+# ============================================================
+
 .vscode/
 .idea/
-
-# Additional Questa/ModelSim generated files
-**/*.sft
-**/*.svo
-**/*.bak*
-**/simulation/
-
