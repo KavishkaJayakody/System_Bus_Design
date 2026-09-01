@@ -2,76 +2,30 @@
 # ===========================================================================
 #  issp_bus_test.tcl
 #
-#  Runs the tb_top_bus_system.v test cases against real hardware, driving the
-#  bus through the In-System Sources & Probes instance "BUS0" in
-#  bus_issp_driver.v.
+#  Runs the tb_top_bus_system.v test cases against real hardware through the
+#  In-System Sources & Probes instance "BUS0".
 #
 #  Usage:   quartus_stp -t issp_bus_test.tcl      <-- quartus_stp ONLY
 #           (not quartus_sh, and not the Quartus GUI Tcl console)
 #           quartus_stp -t issp_bus_test.tcl -gap    ;# + decode-gap hang demo
 #
-#  Requires: top_debug programmed onto the board, USB-Blaster connected.
+#  For an interactive session instead, use issp_console.tcl.
+#  Requires: top_debug programmed onto the board, USB-Blaster connected, and
+#  the In-System Sources & Probes Editor tab CLOSED.
 #  Exits 0 if every case passes, 1 otherwise.
 #
-#  Source map (50 bits)            Probe map (38 bits)
-#    [0]      m0_go                  [7:0]    m0_rdata
-#    [1]      m0_we                  [8]      m0_done   (sticky)
-#    [15:2]   m0_addr                [9]      m0_busy
-#    [23:16]  m0_wdata               [17:10]  m1_rdata
-#    [24]     m1_go                  [18]     m1_done   (sticky)
-#    [25]     m1_we                  [19]     m1_busy
-#    [39:26]  m1_addr                [27:20]  m0_lat
-#    [47:40]  m1_wdata               [35:28]  m1_lat
-#    [48]     soft_rst               [36]     collision (sticky)
-#    [49]     reserved               [37]     reserved
+#  Bus plumbing and the source/probe bit map live in issp_bus_lib.tcl.
 # ===========================================================================
 
-set SRC        0      ;# shadow copy of the 50-bit source register
-set ERRORS     0
-set POLL_LIMIT 200    ;# probe reads before declaring a transaction hung
+source [file join [file dirname [file normalize [info script]]] issp_bus_lib.tcl]
+
+set ERRORS 0
 set TEST_DELAY_MS 1000 ;# hold after each test so the LEDs can be read
+
 # The GUI Tcl console has no quartus(args); only quartus_stp passes them.
 set RUN_GAP 0
 if {[info exists quartus(args)]} {
     set RUN_GAP [expr {[lsearch $quartus(args) "-gap"] >= 0}]
-}
-
-# Detect the full Quartus GUI. There, a bare 'exit' would close the whole
-# application, so unwind the script instead.
-set IN_GUI 0
-if {[info exists quartus(nameofexecutable)]} {
-    set IN_GUI [expr {$quartus(nameofexecutable) eq "quartus"}]
-}
-
-# ---------------------------------------------------------------- utilities
-proc script_exit {code} {
-    global IN_GUI
-    if {$IN_GUI} { return -code return } else { exit $code }
-}
-
-proc bits {v hi lo} {
-    expr {($v >> $lo) & ((1 << ($hi - $lo + 1)) - 1)}
-}
-
-proc src_field {lo width val} {
-    global SRC
-    set mask [expr {((1 << $width) - 1) << $lo}]
-    set SRC  [expr {($SRC & ~$mask) | (($val << $lo) & $mask)}]
-}
-
-proc src_flush {} {
-    global SRC ISSP
-    write_source_data -instance_index $ISSP -value [format %x $SRC] -value_in_hex
-}
-
-proc probe {} {
-    global ISSP
-    return [expr 0x[read_probe_data -instance_index $ISSP -value_in_hex]]
-}
-
-# Per-master probe field offsets: {rdata_lo done busy lat_lo}
-proc pfields {m} {
-    if {$m == 0} { return {0 8 9 20} } else { return {10 18 19 28} }
 }
 
 # Hold between tests so the LED display is readable on the board.
@@ -79,66 +33,6 @@ proc pause {} { global TEST_DELAY_MS; if {$TEST_DELAY_MS > 0} { after $TEST_DELA
 
 proc pass {msg} { puts "-> SUCCESS: $msg" }
 proc fail {msg} { global ERRORS; incr ERRORS; puts "-> ERROR:   $msg" }
-
-# ------------------------------------------------------------ bus commands
-# Arm one master's command fields without firing it.
-proc arm {m we addr wdata} {
-    set b [expr {$m * 24}]
-    src_field $b            1 0          ;# go low - clears sticky done
-    src_field [expr {$b+1}] 1 $we
-    src_field [expr {$b+2}] 14 $addr
-    src_field [expr {$b+16}] 8 $wdata
-}
-
-# Wait for a master to report done. Returns {ok rdata latency}.
-proc await {m} {
-    global POLL_LIMIT
-    lassign [pfields $m] rlo dbit bbit llo
-    for {set i 0} {$i < $POLL_LIMIT} {incr i} {
-        set p [probe]
-        if {[bits $p $dbit $dbit] == 1} {
-            return [list 1 [bits $p [expr {$rlo+7}] $rlo] [bits $p [expr {$llo+7}] $llo]]
-        }
-    }
-    set p [probe]
-    return [list 0 [bits $p [expr {$rlo+7}] $rlo] [bits $p [expr {$llo+7}] $llo]]
-}
-
-# Single transaction on one master. Returns {ok rdata latency}.
-proc bus_cmd {m we addr wdata} {
-    arm $m $we $addr $wdata
-    src_flush
-    src_field [expr {$m * 24}] 1 1        ;# rising edge fires it
-    src_flush
-    set r [await $m]
-    src_field [expr {$m * 24}] 1 0        ;# release, clears sticky done
-    src_flush
-    return $r
-}
-
-# Fire BOTH masters on the same clock edge. This is the only way to observe
-# arbitration from JTAG: a single source write updates all 50 bits at once,
-# so both go edges land together. Issuing them as two separate writes would
-# leave milliseconds between them and the first would always finish first.
-proc bus_cmd_pair {we0 a0 d0 we1 a1 d1} {
-    arm 0 $we0 $a0 $d0
-    arm 1 $we1 $a1 $d1
-    src_flush
-    src_field 0  1 1
-    src_field 24 1 1
-    src_flush                              ;# both masters launch together
-    set r0 [await 0]
-    set r1 [await 1]
-    src_field 0  1 0
-    src_field 24 1 0
-    src_flush
-    return [list $r0 $r1]
-}
-
-proc soft_reset {} {
-    src_field 48 1 1 ; src_flush
-    src_field 48 1 0 ; src_flush
-}
 
 proc check {label got want lat} {
     if {$got == $want} {
@@ -152,85 +46,9 @@ proc check {label got want lat} {
 puts "========================================================="
 puts "   IN-SYSTEM BUS VERIFICATION  (ISSP over JTAG)"
 puts "========================================================="
-
-# The JTAG / ISSP Tcl packages exist ONLY in quartus_stp. Verified on Quartus
-# 24.1std: quartus_sh reports them as unavailable, and the GUI Tcl console does
-# not provide them at all - no load_package or package require can help there.
-if {[catch {load_package insystem_source_probe}] || [catch {load_package jtag}]} {
-    puts "FATAL: the JTAG / In-System Sources & Probes Tcl packages are not"
-    puts "       available in this interpreter."
-    puts ""
-    puts "       Run this script from a terminal with quartus_stp:"
-    puts ""
-    puts "           quartus_stp -t issp_bus_test.tcl"
-    puts ""
-    puts "       It cannot run in the Quartus GUI Tcl console, via Tools >"
-    puts "       Tcl Scripts, or under quartus_sh."
-    script_exit 1
-}
-
-if {[catch {set hwlist [get_hardware_names]} err]} {
-    puts "FATAL: could not query programming hardware."
-    puts "       $err"
-    script_exit 1
-}
-if {[llength $hwlist] == 0} {
-    puts "FATAL: no programming hardware found. Is the USB-Blaster plugged in?"
-    script_exit 1
-}
-
-# Pick the first cable that actually has devices on it. get_hardware_names can
-# also list unreachable remote servers, which must be skipped.
-set hw ""; set dev ""
-foreach cand $hwlist {
-    if {[catch {set devs [get_device_names -hardware_name $cand]}]} { continue }
-    if {[llength $devs] > 0} { set hw $cand; set dev [lindex $devs 0]; break }
-    puts "  (skipping \"$cand\" - no devices)"
-}
-if {$hw eq ""} {
-    puts "FATAL: none of these cables had a device on the chain:"
-    foreach cand $hwlist { puts "         $cand" }
-    script_exit 1
-}
-puts "Hardware : $hw"
+bus_connect
 puts "Delay    : ${TEST_DELAY_MS} ms after each test"
-puts "Device   : $dev"
-
-# Enumerate instances BEFORE opening a session: this query opens a transient
-# session of its own, so calling it while one is active fails.
-set ISSP -1
-if {[catch {set insts [get_insystem_source_probe_instance_info \
-                  -hardware_name $hw -device_name $dev]} err]} {
-    puts "FATAL: could not enumerate ISSP instances."
-    puts "       $err"
-    puts ""
-    puts "       If that mentions an active session, the Quartus GUI's In-System"
-    puts "       Sources & Probes Editor has this device open. Close that tab"
-    puts "       (the GUI itself can stay open) and re-run."
-    script_exit 1
-}
-foreach inst $insts {
-    lassign $inst idx swidth pwidth name
-    puts "Instance : index $idx  \"$name\"  source=$swidth probe=$pwidth"
-    if {$swidth == 50 && $pwidth == 38} { set ISSP $idx }
-}
-if {$ISSP < 0} {
-    puts "FATAL: no 50-bit source / 38-bit probe instance found."
-    puts "       Is the current top_debug actually programmed onto this device?"
-    script_exit 1
-}
-
-if {[catch {start_insystem_source_probe \
-              -hardware_name $hw -device_name $dev} err]} {
-    puts "FATAL: could not open an ISSP session."
-    puts "       $err"
-    script_exit 1
-}
 puts ""
-
-set SRC 0
-src_flush
-soft_reset
 
 # ------------------------------------------------------------------- tests
 puts "\[TEST 1\] M0 Fast RAM Write & Read (0x1000)..."
@@ -247,10 +65,19 @@ if {!$ok} { fail "M1 read from 0x2000 never completed (lat=$lat)" } \
      else { check "M1 read 0x2000" $rd 0x3B $lat }
 
 pause
-puts "\n\[TEST 3\] M0 Bridge Reg Read Default (0x3000)..."
-lassign [bus_cmd 0 0 0x3000 0x00] ok rd lat
-if {!$ok} { fail "M0 bridge read never completed (lat=$lat)" } \
-     else { check "M0 bridge default" $rd 0xBE $lat }
+puts "\n\[TEST 3\] UART TX slave staging regs (0x3000-0x3002)..."
+bus_cmd 0 1 0x3000 0xA1
+bus_cmd 0 1 0x3001 0xB2
+bus_cmd 0 1 0x3002 0xC3
+foreach {a want nm} {0x3000 0xA1 byte0 0x3001 0xB2 byte1 0x3002 0xC3 byte2} {
+    lassign [bus_cmd 0 0 $a 0x00] ok rd lat
+    if {!$ok} { fail "read of $a never completed (lat=$lat)" } \
+         else { check "staged $nm" $rd $want $lat }
+}
+# offset 3 reads back the transmitter busy flag; it must be idle here
+lassign [bus_cmd 0 0 0x3003 0x00] ok rd lat
+if {!$ok} { fail "UART status read never completed (lat=$lat)" } \
+     else { check "UART tx idle (status)" $rd 0x00 $lat }
 
 pause
 puts "\n\[TEST 4\] Split Read & Arbitration Interleaving..."
@@ -315,5 +142,5 @@ if {$ERRORS == 0} {
 puts "========================================================="
 puts "LEDs now show the last M0 read data."
 
-end_insystem_source_probe
+bus_disconnect
 script_exit [expr {$ERRORS ? 1 : 0}]
