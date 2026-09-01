@@ -1,6 +1,8 @@
 `timescale 1ns / 1ps
 
-module top_bus_system (
+module top_bus_system #(
+    parameter CLKS_PER_BIT = 434   // 50 MHz / 115200 baud
+)(
     input  wire        clk,
     input  wire        rst_n,
 
@@ -20,8 +22,8 @@ module top_bus_system (
     output wire [7:0]  m1_cmd_rdata,
     output wire        m1_cmd_done,
 
-    // External Bridge Pins for DE0 GPIOs
-    input  wire        ext_rx_serial,
+    // UART transmit pin (slave 3). The receive path lives in top_debug,
+    // ahead of Master 0, not on the slave side.
     output wire        ext_tx_serial
 );
 
@@ -172,17 +174,16 @@ module top_bus_system (
     );
 
     // External Bridge
-    cross_fpga_bridge_dummy bridge_inst (
-        .clk           (clk),
-        .rst_n         (rst_n),
-        .sel           (sel_bridge),
-        .we            (bus_we),
-        .addr          (bus_addr[11:0]),
-        .din           (bus_wdata),
-        .dout          (sb_rdata),
-        .ready         (sb_ready),
-        .ext_rx_serial (ext_rx_serial),
-        .ext_tx_serial (ext_tx_serial)
+    slave_uart_tx #(.CLKS_PER_BIT(CLKS_PER_BIT)) s3_inst (
+        .clk       (clk),
+        .rst_n     (rst_n),
+        .sel       (sel_bridge),
+        .we        (bus_we),
+        .addr      (bus_addr[11:0]),
+        .din       (bus_wdata),
+        .dout      (sb_rdata),
+        .ready     (sb_ready),
+        .tx_serial (ext_tx_serial)
     );
 
 endmodule

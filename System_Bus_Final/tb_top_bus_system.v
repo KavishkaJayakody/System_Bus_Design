@@ -48,7 +48,6 @@ module tb_top_bus_system;
 
     // External Serial Pins
 
-    reg        ext_rx_serial;
 
     wire       ext_tx_serial;
 
@@ -64,7 +63,7 @@ module tb_top_bus_system;
 
     // ------------------------------------------------------------------------
 
-    top_bus_system uut (
+    top_bus_system #(.CLKS_PER_BIT(4)) uut (
 
         .clk           (clk),
 
@@ -94,7 +93,6 @@ module tb_top_bus_system;
 
         .m1_cmd_done  (m1_cmd_done),
 
-        .ext_rx_serial (ext_rx_serial),
 
         .ext_tx_serial (ext_tx_serial)
 
@@ -183,8 +181,6 @@ module tb_top_bus_system;
         m0_cmd_start = 1'b0; m0_cmd_we = 1'b0; m0_cmd_addr = 14'h0; m0_cmd_wdata = 8'h0;
 
         m1_cmd_start = 1'b0; m1_cmd_we = 1'b0; m1_cmd_addr = 14'h0; m1_cmd_wdata = 8'h0;
-
-        ext_rx_serial = 1'b1;
 
 
 
@@ -276,29 +272,61 @@ module tb_top_bus_system;
 
         // ---------------------------------------------------------------
 
-        // TEST 3: External Bridge Register Access (0x3000)
+        // TEST 3: UART TX slave staging registers (slave 3)
 
         // ---------------------------------------------------------------
 
-        $display("\n[TEST 3] M0 Bridge Reg Read Default (0x3000)...");
+        $display("\n[TEST 3] UART TX Slave staging regs (0x3000-0x3002)...");
+
+        execute_m0(1'b1, 14'h3000, 8'hA1);
+
+        @(posedge m0_cmd_done);
+
+        execute_m0(1'b1, 14'h3001, 8'hB2);
+
+        @(posedge m0_cmd_done);
+
+        execute_m0(1'b1, 14'h3002, 8'hC3);
+
+        @(posedge m0_cmd_done);
 
         execute_m0(1'b0, 14'h3000, 8'h00);
 
         @(posedge m0_cmd_done);
 
-        
+        if (m0_cmd_rdata !== 8'hA1) begin
 
-        if (m0_cmd_rdata == 8'hBE)
-
-            $display("-> SUCCESS: M0 read default 0xBE from Bridge Reg");
-
-        else begin
-
-            $display("-> ERROR: Expected 0xBE, got 0x%02X", m0_cmd_rdata);
+            $display("-> ERROR: byte0 expected 0xA1, got 0x%02X", m0_cmd_rdata);
 
             error_count = error_count + 1;
 
         end
+
+        execute_m0(1'b0, 14'h3001, 8'h00);
+
+        @(posedge m0_cmd_done);
+
+        if (m0_cmd_rdata !== 8'hB2) begin
+
+            $display("-> ERROR: byte1 expected 0xB2, got 0x%02X", m0_cmd_rdata);
+
+            error_count = error_count + 1;
+
+        end
+
+        execute_m0(1'b0, 14'h3002, 8'h00);
+
+        @(posedge m0_cmd_done);
+
+        if (m0_cmd_rdata !== 8'hC3) begin
+
+            $display("-> ERROR: byte2 expected 0xC3, got 0x%02X", m0_cmd_rdata);
+
+            error_count = error_count + 1;
+
+        end else
+
+            $display("-> SUCCESS: staged bytes read back as A1 B2 C3");
 
 
 
