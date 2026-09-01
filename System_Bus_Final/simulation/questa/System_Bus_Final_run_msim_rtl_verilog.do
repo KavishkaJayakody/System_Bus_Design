@@ -1,0 +1,23 @@
+transcript on
+if {[file exists rtl_work]} {
+	vdel -lib rtl_work -all
+}
+vlib rtl_work
+vmap work rtl_work
+
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/address_decoder.v}
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/arbiter_2m_split.v}
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/cross_fpga_bridge_dummy.v}
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/master_node.v}
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v}
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v}
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v}
+
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_arbiter_2m_split.v}
+
+vsim -t 1ps -L altera_ver -L lpm_ver -L sgate_ver -L altera_mf_ver -L altera_lnsim_ver -L cycloneive_ver -L rtl_work -L work -voptargs="+acc"  tb_arbiter_2m_split
+
+add wave *
+view structure
+view signals
+run -all

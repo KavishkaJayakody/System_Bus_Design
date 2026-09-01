@@ -1,0 +1,24 @@
+
+State Machine - |top_bus_system|master_node:m1_inst|state
+Name state.DONE state.SPLIT_W state.WAIT state.DRIVE state.REQ state.IDLE 
+state.IDLE 0 0 0 0 0 0 
+state.REQ 0 0 0 0 1 1 
+state.DRIVE 0 0 0 1 0 1 
+state.WAIT 0 0 1 0 0 1 
+state.SPLIT_W 0 1 0 0 0 1 
+state.DONE 1 0 0 0 0 1 
+
+State Machine - |top_bus_system|master_node:m0_inst|state
+Name state.DONE state.SPLIT_W state.WAIT state.DRIVE state.REQ state.IDLE 
+state.IDLE 0 0 0 0 0 0 
+state.REQ 0 0 0 0 1 1 
+state.DRIVE 0 0 0 1 0 1 
+state.WAIT 0 0 1 0 0 1 
+state.SPLIT_W 0 1 0 0 0 1 
+state.DONE 1 0 0 0 0 1 
+
+State Machine - |top_bus_system|arbiter_2m_split:arbiter_inst|state
+Name state.IDLE state.GRANT_M1 state.GRANT_M0 
+state.IDLE 0 0 0 
+state.GRANT_M0 1 0 1 
+state.GRANT_M1 1 1 0 

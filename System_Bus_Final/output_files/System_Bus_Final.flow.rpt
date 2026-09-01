@@ -1,0 +1,125 @@
+Flow report for System_Bus_Final
+Tue Sep  1 15:06:57 2026
+Quartus Prime Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
+
+
+---------------------
+; Table of Contents ;
+---------------------
+  1. Legal Notice
+  2. Flow Summary
+  3. Flow Settings
+  4. Flow Non-Default Global Settings
+  5. Flow Elapsed Time
+  6. Flow OS Summary
+  7. Flow Log
+  8. Flow Messages
+  9. Flow Suppressed Messages
+
+
+
+----------------
+; Legal Notice ;
+----------------
+Copyright (C) 2025  Altera Corporation. All rights reserved.
+Your use of Altera Corporation's design tools, logic functions 
+and other software and tools, and any partner logic 
+functions, and any output files from any of the foregoing 
+(including device programming or simulation files), and any 
+associated documentation or information are expressly subject 
+to the terms and conditions of the Altera Program License 
+Subscription Agreement, the Altera Quartus Prime License Agreement,
+the Altera IP License Agreement, or other applicable license
+agreement, including, without limitation, that your use is for
+the sole purpose of programming logic devices manufactured by
+Altera and sold by Altera or its authorized distributors.  Please
+refer to the Altera Software License Subscription Agreements 
+on the Quartus Prime software download page.
+
+
+
++--------------------------------------------------------------------------------------+
+; Flow Summary                                                                         ;
++------------------------------------+-------------------------------------------------+
+; Flow Status                        ; Successful - Tue Sep  1 15:06:56 2026           ;
+; Quartus Prime Version              ; 25.1std.0 Build 1129 10/21/2025 SC Lite Edition ;
+; Revision Name                      ; System_Bus_Final                                ;
+; Top-level Entity Name              ; top_bus_system                                  ;
+; Family                             ; Cyclone IV E                                    ;
+; Device                             ; EP4CE115F29C7                                   ;
+; Timing Models                      ; Final                                           ;
+; Total logic elements               ; 88,454                                          ;
+;     Total combinational functions  ; 39,158                                          ;
+;     Dedicated logic registers      ; 49,392                                          ;
+; Total registers                    ; 49392                                           ;
+; Total pins                         ; 70                                              ;
+; Total virtual pins                 ; 0                                               ;
+; Total memory bits                  ; 32,768                                          ;
+; Embedded Multiplier 9-bit elements ; 0                                               ;
+; Total PLLs                         ; 0                                               ;
++------------------------------------+-------------------------------------------------+
+
+
++-----------------------------------------+
+; Flow Settings                           ;
++-------------------+---------------------+
+; Option            ; Setting             ;
++-------------------+---------------------+
+; Start date & time ; 09/01/2026 15:01:38 ;
+; Main task         ; Compilation         ;
+; Revision Name     ; System_Bus_Final    ;
++-------------------+---------------------+
+
+
++------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Flow Non-Default Global Settings                                                                                                                     ;
++-------------------------------------+----------------------------------------+------------------+----------------+-----------------------------------+
+; Assignment Name                     ; Value                                  ; Default Value    ; Entity Name    ; Section Id                        ;
++-------------------------------------+----------------------------------------+------------------+----------------+-----------------------------------+
+; COMPILER_SIGNATURE_ID               ; 161009087761635.178825509810628        ; --               ; --             ; --                                ;
+; EDA_GENERATE_FUNCTIONAL_NETLIST     ; Off                                    ; --               ; --             ; eda_board_design_timing           ;
+; EDA_GENERATE_FUNCTIONAL_NETLIST     ; Off                                    ; --               ; --             ; eda_board_design_boundary_scan    ;
+; EDA_GENERATE_FUNCTIONAL_NETLIST     ; Off                                    ; --               ; --             ; eda_board_design_signal_integrity ;
+; EDA_GENERATE_FUNCTIONAL_NETLIST     ; Off                                    ; --               ; --             ; eda_board_design_symbol           ;
+; EDA_OUTPUT_DATA_FORMAT              ; Systemverilog Hdl                      ; --               ; --             ; eda_simulation                    ;
+; EDA_SIMULATION_TOOL                 ; Questa Altera FPGA (SystemVerilog)     ; <None>           ; --             ; --                                ;
+; EDA_TIME_SCALE                      ; 1 ps                                   ; --               ; --             ; eda_simulation                    ;
+; MAX_CORE_JUNCTION_TEMP              ; 85                                     ; --               ; --             ; --                                ;
+; MIN_CORE_JUNCTION_TEMP              ; 0                                      ; --               ; --             ; --                                ;
+; NOMINAL_CORE_SUPPLY_VOLTAGE         ; 1.2V                                   ; --               ; --             ; --                                ;
+; PARTITION_COLOR                     ; -- (Not supported for targeted family) ; --               ; top_bus_system ; Top                               ;
+; PARTITION_FITTER_PRESERVATION_LEVEL ; -- (Not supported for targeted family) ; --               ; top_bus_system ; Top                               ;
+; PARTITION_NETLIST_TYPE              ; -- (Not supported for targeted family) ; --               ; top_bus_system ; Top                               ;
+; POWER_BOARD_THERMAL_MODEL           ; None (CONSERVATIVE)                    ; --               ; --             ; --                                ;
+; POWER_PRESET_COOLING_SOLUTION       ; 23 MM HEAT SINK WITH 200 LFPM AIRFLOW  ; --               ; --             ; --                                ;
+; PROJECT_OUTPUT_DIRECTORY            ; output_files                           ; --               ; --             ; --                                ;
+; TOP_LEVEL_ENTITY                    ; top_bus_system                         ; System_Bus_Final ; --             ; --                                ;
++-------------------------------------+----------------------------------------+------------------+----------------+-----------------------------------+
+
+
++--------------------------------------------------------------------------------------------------------------------------+
+; Flow Elapsed Time                                                                                                        ;
++----------------------+--------------+-------------------------+---------------------+------------------------------------+
+; Module Name          ; Elapsed Time ; Average Processors Used ; Peak Virtual Memory ; Total CPU Time (on all processors) ;
++----------------------+--------------+-------------------------+---------------------+------------------------------------+
+; Analysis & Synthesis ; 00:05:08     ; 1.0                     ; 5322 MB             ; 00:05:13                           ;
+; Total                ; 00:05:08     ; --                      ; --                  ; 00:05:13                           ;
++----------------------+--------------+-------------------------+---------------------+------------------------------------+
+
+
++------------------------------------------------------------------------------------+
+; Flow OS Summary                                                                    ;
++----------------------+------------------+------------+------------+----------------+
+; Module Name          ; Machine Hostname ; OS Name    ; OS Version ; Processor type ;
++----------------------+------------------+------------+------------+----------------+
+; Analysis & Synthesis ; Amoda            ; Windows 10 ; 10.0       ; x86_64         ;
++----------------------+------------------+------------+------------+----------------+
+
+
+------------
+; Flow Log ;
+------------
+quartus_map --read_settings_files=on --write_settings_files=off System_Bus_Final -c System_Bus_Final
+
+
+

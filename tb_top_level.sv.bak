@@ -1,0 +1,97 @@
+// =============================================================================
+// tb_top_level.sv
+// Top-level verification: (a) reset, (b) one master request (write then
+// read back), (c) two simultaneous master requests (priority check), and
+// (d) a split-transaction scenario on Slave 1.
+//
+// KEY[]/SW[] are driven directly here exactly as they would be by the
+// DE2-115 switches/buttons; KEY is active-low, matching the board.
+// =============================================================================
+module tb_top_level;
+
+  logic        CLOCK_50 = 0;
+  logic [3:0]  KEY;      // active-low: idle = 1
+  logic [17:0] SW;
+  logic [17:0] LEDR;
+  logic [8:0]  LEDG;
+
+  top_level dut (.*);
+
+  always #10 CLOCK_50 = ~CLOCK_50;   // 50 MHz-equivalent test clock
+
+  task automatic press(int key_idx);
+    KEY[key_idx] = 1'b0;
+    @(posedge CLOCK_50); @(posedge CLOCK_50);
+    KEY[key_idx] = 1'b1;
+  endtask
+
+  task automatic check(string name, logic cond);
+    if (cond) $display("[PASS] %s", name);
+    else      $display("[FAIL] %s", name);
+  endtask
+
+  initial begin
+    // ---------------- (a) Reset test ----------------
+    KEY  = 4'b1111;
+    SW   = '0;
+    KEY[0] = 1'b0;               // assert reset
+    repeat (3) @(posedge CLOCK_50);
+    check("reset: LEDR all-status bits clear", LEDR[14:8] == 7'b0);
+    KEY[0] = 1'b1;               // release reset
+    repeat (2) @(posedge CLOCK_50);
+
+    // ---------------- (b) One master request: Master1 write then read ----
+    SW[13:0] = 14'h010;   // address 0x010 (Slave 1 range)
+    SW[7:0]  = 8'hA5;     // write data
+    SW[17]   = 1'b1;      // write
+    SW[16]   = 1'b0;      // no forced split
+    press(1);             // Master1 issues the write
+    repeat (4) @(posedge CLOCK_50);
+
+    SW[17] = 1'b0;        // switch to read
+    press(1);
+    repeat (4) @(posedge CLOCK_50);
+    check("single request: Master1 read-back matches write data", LEDR[7:0] == 8'hA5);
+
+    // ---------------- (c) Two master requests: priority check ----------
+    SW[13:0] = 14'h020;   // Slave 1 address, different location
+    SW[7:0]  = 8'h3C;
+    SW[17]   = 1'b1;      // write via Master2 first so we have known data
+    press(2);
+    repeat (4) @(posedge CLOCK_50);
+
+    SW[17] = 1'b0;        // both now attempt a read of the same address
+    KEY[1] = 1'b0;        // Master1 request asserted
+    KEY[2] = 1'b0;        // Master2 request asserted (contention)
+    repeat (2) @(posedge CLOCK_50);
+    check("contention: Master1 granted first (LEDR[13])", LEDR[13] == 1'b1);
+    KEY[1] = 1'b1;
+    KEY[2] = 1'b1;
+    repeat (6) @(posedge CLOCK_50);
+    check("contention: Master2 eventually serviced (LEDG has data)", LEDG[7:0] == 8'h3C);
+
+    // ---------------- (d) Split transaction scenario ----------------
+    SW[13:0] = 14'h030;   // Slave 1 address
+    SW[7:0]  = 8'h77;
+    SW[17]   = 1'b1;      // write this value in first (no split, baseline data)
+    SW[16]   = 1'b0;
+    press(1);
+    repeat (4) @(posedge CLOCK_50);
+
+    SW[17] = 1'b0;        // now read it back, but force a split this time
+    SW[16] = 1'b1;        // force_split = 1
+    press(1);
+    repeat (2) @(posedge CLOCK_50);
+    check("split: Slave1 locked (hsplit_active, LEDR[12])", LEDR[12] == 1'b1);
+    check("split: Master1 shows split_pending (LEDR[10])", LEDR[10] == 1'b1);
+
+    SW[16] = 1'b0;        // drop force_split so the pending access can complete
+    repeat (6) @(posedge CLOCK_50);
+    check("split: resolved, Slave1 unlocked (LEDR[12] low)", LEDR[12] == 1'b0);
+    check("split: Master1 read-back matches pre-split data", LEDR[7:0] == 8'h77);
+
+    $display("tb_top_level complete");
+    $finish;
+  end
+
+endmodule : tb_top_level

@@ -1,0 +1,190 @@
+// =============================================================================
+// top_level.sv
+// Top-level integration for the DE2-115 board.
+//
+// DE2-115 I/O usage (see README_DE2-115_pins.md for the .qsf assignments):
+//   CLOCK_50   : 50 MHz board oscillator -> system clock
+//   KEY[0]     : async active-low system reset               (idle = 1)
+//   KEY[1]     : Master 1 "issue transfer" button
+//   KEY[2]     : Master 2 "issue transfer" button
+//   SW[13:0]   : address entry               (HADDR[15:2], HADDR[1:0]=00)
+//   SW[7:0]    : write-data entry (shares SW[13:0], see note below)
+//   SW[16]     : force_split stimulus into Slave 1 (demo switch)
+//   SW[17]     : write_sel (1 = write, 0 = read)
+//   LEDR[7:0]  : Master 1's last read data
+//   LEDR[8]    : Master 1 busy
+//   LEDR[9]    : Master 2 busy
+//   LEDR[10]   : Master 1 split-pending
+//   LEDR[11]   : Master 2 split-pending
+//   LEDR[12]   : Slave 1 hsplit_active (locked in a split)
+//   LEDR[13]   : HGRANT[0] (Master 1 granted)
+//   LEDR[14]   : HGRANT[1] (Master 2 granted)
+//   LEDG[7:0]  : Master 2's last read data
+//   LEDG[8]    : force_split switch, mirrored for visibility
+//
+// NOTE ON THE SHARED ENTRY PANEL:
+//   With only 18 switches on the board and both address and write data
+//   needed, SW[13:0] doubles as the address bus for every access, and
+//   SW[7:0] (a subset of the same switches) is read as the write data on
+//   a write. Set the address, flip SW[17] for write and press a KEY, or
+//   flip SW[17] off and press a KEY to read that address back on LEDR/LEDG.
+// =============================================================================
+import bus_pkg::*;
+
+module top_level (
+  input  logic        CLOCK_50,
+  input  logic [3:0]  KEY,
+  input  logic [17:0] SW,
+  output logic [17:0] LEDR,
+  output logic [8:0]  LEDG
+);
+
+  logic clk;
+  logic rst_n;
+  assign clk   = CLOCK_50;
+  assign rst_n = KEY[0];               // async active-low reset
+
+  // ---------------------------------------------------------------
+  // Shared stimulus entry (address / data / direction / split trigger)
+  // ---------------------------------------------------------------
+  logic [ADDR_WIDTH-1:0] addr_entry;
+  logic [DATA_WIDTH-1:0] wdata_entry;
+  logic                  write_sel;
+  logic                  force_split;
+
+  assign addr_entry  = {2'b00, SW[13:0]};   // HADDR[1:0] hardwired 00
+  assign wdata_entry = SW[7:0];
+  assign write_sel   = SW[17];
+  assign force_split = SW[16];
+
+  // ---------------------------------------------------------------
+  // Button -> single-cycle pulse
+  // ---------------------------------------------------------------
+  logic m1_req_pulse, m2_req_pulse;
+
+  edge_detect u_ed_m1 (.clk(clk), .rst_n(rst_n), .sig_in(KEY[1]), .pulse_out(m1_req_pulse));
+  edge_detect u_ed_m2 (.clk(clk), .rst_n(rst_n), .sig_in(KEY[2]), .pulse_out(m2_req_pulse));
+
+  // ---------------------------------------------------------------
+  // Master <-> arbiter / mux signals
+  // ---------------------------------------------------------------
+  logic [NUM_MASTERS-1:0]                 hreq, hgrant, hsplit_notify;
+  logic [NUM_MASTERS-1:0][ADDR_WIDTH-1:0] m_haddr;
+  logic [NUM_MASTERS-1:0][DATA_WIDTH-1:0] m_hwdata;
+  logic [NUM_MASTERS-1:0]                 m_hwrite;
+  logic [NUM_MASTERS-1:0]                 m_hvalid;
+
+  logic [DATA_WIDTH-1:0] m1_rdata, m2_rdata;
+  logic                  m1_busy,  m2_busy;
+  logic                  m1_split_pend, m2_split_pend;
+
+  logic [DATA_WIDTH-1:0] mux_hrdata;
+  logic [1:0]            mux_hresp;
+
+  master #(.MASTER_ID(0)) u_master1 (
+    .clk(clk), .rst_n(rst_n),
+    .req_btn(m1_req_pulse), .addr_in(addr_entry), .wdata_in(wdata_entry), .write_in(write_sel),
+    .hreq(hreq[0]), .haddr(m_haddr[0]), .hwdata(m_hwdata[0]), .hwrite(m_hwrite[0]), .hvalid(m_hvalid[0]),
+    .hgrant(hgrant[0]), .hrdata(mux_hrdata), .hresp(mux_hresp), .hsplit_notify(hsplit_notify[0]),
+    .rdata_out(m1_rdata), .busy(m1_busy), .split_pending(m1_split_pend)
+  );
+
+  master #(.MASTER_ID(1)) u_master2 (
+    .clk(clk), .rst_n(rst_n),
+    .req_btn(m2_req_pulse), .addr_in(addr_entry), .wdata_in(wdata_entry), .write_in(write_sel),
+    .hreq(hreq[1]), .haddr(m_haddr[1]), .hwdata(m_hwdata[1]), .hwrite(m_hwrite[1]), .hvalid(m_hvalid[1]),
+    .hgrant(hgrant[1]), .hrdata(mux_hrdata), .hresp(mux_hresp), .hsplit_notify(hsplit_notify[1]),
+    .rdata_out(m2_rdata), .busy(m2_busy), .split_pending(m2_split_pend)
+  );
+
+  // ---------------------------------------------------------------
+  // Arbiter
+  // ---------------------------------------------------------------
+  logic split_pulse;
+  logic hsplit_done;
+  logic hsplit_active;
+  logic hready_unused;
+
+  arbiter u_arbiter (
+    .clk(clk), .rst_n(rst_n),
+    .hreq(hreq),
+    .split_pulse(split_pulse),
+    .hsplit_done(hsplit_done),
+    .hgrant(hgrant),
+    .hsplit_notify(hsplit_notify),
+    .hready(hready_unused)
+  );
+
+  // ---------------------------------------------------------------
+  // Address decoder
+  // ---------------------------------------------------------------
+  logic [NUM_SLAVES-1:0] hsel;
+  logic [ADDR_WIDTH-1:0] s_haddr;
+
+  addr_decoder u_decoder (
+    .haddr(s_haddr),
+    .hsplit_active(hsplit_active),
+    .hsel(hsel)
+  );
+
+  // ---------------------------------------------------------------
+  // Shared multiplexer block
+  // ---------------------------------------------------------------
+  logic [DATA_WIDTH-1:0] s_hwdata;
+  logic                  s_hwrite, s_hvalid;
+
+  logic [NUM_SLAVES-1:0][DATA_WIDTH-1:0] s_hrdata_arr;
+  logic [NUM_SLAVES-1:0][1:0]            s_hresp_arr;
+
+  bus_mux u_mux (
+    .hgrant(hgrant),
+    .m_haddr(m_haddr), .m_hwdata(m_hwdata), .m_hwrite(m_hwrite), .m_hvalid(m_hvalid),
+    .s_haddr(s_haddr), .s_hwdata(s_hwdata), .s_hwrite(s_hwrite), .s_hvalid(s_hvalid),
+    .s_hrdata(s_hrdata_arr), .s_hresp(s_hresp_arr), .hsel(hsel),
+    .m_hrdata(mux_hrdata), .m_hresp(mux_hresp)
+  );
+
+  // ---------------------------------------------------------------
+  // Slaves
+  // ---------------------------------------------------------------
+  slave1_split #(.SPLIT_DELAY(4)) u_slave1 (
+    .clk(clk), .rst_n(rst_n),
+    .hsel(hsel[0]), .haddr(s_haddr), .hwdata(s_hwdata), .hwrite(s_hwrite), .hvalid(s_hvalid),
+    .force_split(force_split),
+    .hrdata(s_hrdata_arr[0]), .hresp(s_hresp_arr[0]),
+    .hsplit_done(hsplit_done), .hsplit_active(hsplit_active)
+  );
+
+  slave_simple #(.SIZE_BYTES(4096)) u_slave2 (
+    .clk(clk), .rst_n(rst_n),
+    .hsel(hsel[1]), .haddr(s_haddr), .hwdata(s_hwdata), .hwrite(s_hwrite), .hvalid(s_hvalid),
+    .hrdata(s_hrdata_arr[1]), .hresp(s_hresp_arr[1])
+  );
+
+  slave_simple #(.SIZE_BYTES(2048)) u_slave3 (
+    .clk(clk), .rst_n(rst_n),
+    .hsel(hsel[2]), .haddr(s_haddr), .hwdata(s_hwdata), .hwrite(s_hwrite), .hvalid(s_hvalid),
+    .hrdata(s_hrdata_arr[2]), .hresp(s_hresp_arr[2])
+  );
+
+  // SPLIT detected: currently selected slave is Slave 1 and it just
+  // returned HRESP_SPLIT on a valid transfer.
+  assign split_pulse = s_hvalid && hsel[0] && (s_hresp_arr[0] == HRESP_SPLIT);
+
+  // ---------------------------------------------------------------
+  // Status LEDs
+  // ---------------------------------------------------------------
+  assign LEDR[7:0]  = m1_rdata;
+  assign LEDR[8]    = m1_busy;
+  assign LEDR[9]    = m2_busy;
+  assign LEDR[10]   = m1_split_pend;
+  assign LEDR[11]   = m2_split_pend;
+  assign LEDR[12]   = hsplit_active;
+  assign LEDR[13]   = hgrant[0];
+  assign LEDR[14]   = hgrant[1];
+  assign LEDR[17:15] = 3'b000;
+
+  assign LEDG[7:0]  = m2_rdata;
+  assign LEDG[8]    = force_split;
+
+endmodule : top_level

@@ -1,0 +1,10 @@
+# Quartus & Simulation build files
+/db/
+/incremental_db/
+/output_files/
+/simulation/
+System_Bus_Final/
+*.qpg
+*.rdr
+*.flock
+.quiproj

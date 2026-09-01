@@ -1,0 +1,281 @@
+{
+	"partitions" : [
+		{
+			"name" : "Top",
+			"pins" : [
+				{
+					"name" : "m0_cmd_rdata[0]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_rdata[1]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_rdata[2]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_rdata[3]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_rdata[4]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_rdata[5]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_rdata[6]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_rdata[7]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_done",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_rdata[0]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_rdata[1]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_rdata[2]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_rdata[3]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_rdata[4]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_rdata[5]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_rdata[6]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_rdata[7]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_done",
+					"strict" : false
+				},
+				{
+					"name" : "clk",
+					"strict" : false
+				},
+				{
+					"name" : "rst_n",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_start",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_start",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[11]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[11]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[12]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[12]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[13]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[13]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[3]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[3]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[4]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[4]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[1]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[1]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[0]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[0]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[6]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[6]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[5]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[5]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[2]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[2]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[7]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[7]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[8]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[8]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[9]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[9]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[10]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[10]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_wdata[0]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_wdata[0]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_we",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_we",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_wdata[1]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_wdata[1]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_wdata[2]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_wdata[2]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_wdata[3]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_wdata[3]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_wdata[4]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_wdata[4]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_wdata[5]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_wdata[5]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_wdata[6]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_wdata[6]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_wdata[7]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_wdata[7]",
+					"strict" : false
+				}
+			]
+		}
+	]
+}
