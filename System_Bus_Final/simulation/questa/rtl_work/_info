@@ -14,10 +14,10 @@ Z1 dC:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/
 T_opt
 !i145 1
 !i144 0
-!s110 1788294138
-Vd[cho8Al@PM7Kn@c<7bQU0
+!s110 1788304775
+Vd4`nV7Ja`5?0oZ;DhS>VV3
 04 17 4 work tb_top_bus_system fast 0
-=1-106fd97b4ce3-6a9733f9-2dd-2658
+=1-106fd97b4ce3-6a975d86-383-5900
 R0
 !s12f OEM100
 !s12b OEM100
@@ -29,7 +29,7 @@ n@_opt
 OL;O;2025.2;82
 vaddress_decoder
 2C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/address_decoder.v
-Z2 !s110 1788294135
+Z2 !s110 1788304773
 !i10b 1
 !s100 CVC?[TOI^B@k3[;09IoQY3
 IN_`<;dbebgQ65]^IY`<SI2
@@ -44,7 +44,7 @@ Z4 OL;L;2025.2;82
 r1
 !s85 0
 31
-Z5 !s108 1788294135.000000
+Z5 !s108 1788304773.000000
 !s107 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/address_decoder.v|
 !s90 -reportprogress|300|-work|work|+incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final|C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/address_decoder.v|
 !i113 0
@@ -77,22 +77,22 @@ R7
 R8
 vbus_interconnect
 2C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v
-Z9 !s110 1788294136
+Z9 !s110 1788304774
 !i10b 1
-!s100 51`cz7F?6:0le]CMb7lMS0
-I@:A4A`UEZ?M=e?Hd[Pn6U2
+!s100 XS9@7JDzW_ckd@kX:o?Tb1
+Ikec^JV?MH980:kNBN93iH0
 R1
-w1788293296
+w1788295193
 8C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v
 FC:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v
 !i122 7
-L0 3 192
+L0 3 115
 R3
 R4
 r1
 !s85 0
 31
-Z10 !s108 1788294136.000000
+Z10 !s108 1788304774.000000
 !s107 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v|
 !s90 -reportprogress|300|-work|work|+incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final|C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/bus_interconnect.v|
 !i113 0
@@ -101,7 +101,7 @@ R7
 R8
 vcross_fpga_bridge_dummy
 2C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/cross_fpga_bridge_dummy.v
-R9
+R2
 !i10b 1
 !s100 :n5H>V<A2HPKD;D2`g_hi2
 I7S@:GU7el>O1TFFYF3F6Q3
@@ -116,7 +116,7 @@ R4
 r1
 !s85 0
 31
-R10
+R5
 !s107 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/cross_fpga_bridge_dummy.v|
 !s90 -reportprogress|300|-work|work|+incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final|C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/cross_fpga_bridge_dummy.v|
 !i113 0
@@ -125,22 +125,22 @@ R7
 R8
 vmaster_node
 2C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/master_node.v
-R9
+R2
 !i10b 1
-!s100 @:WQa[eCcW;4E`zOPYSX^2
-I=F:;Y749<4?bg[dHOI?Cd0
+!s100 g5YZ@f9WQJJ;bJ<US_QGg3
+IL^UKP2;EWXJY[f`h;fAh>0
 R1
-w1788270204
+w1788300903
 8C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/master_node.v
 FC:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/master_node.v
 !i122 3
-L0 3 126
+L0 3 132
 R3
 R4
 r1
 !s85 0
 31
-R10
+R5
 !s107 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/master_node.v|
 !s90 -reportprogress|300|-work|work|+incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final|C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/master_node.v|
 !i113 0
@@ -149,22 +149,22 @@ R7
 R8
 vslave_0_split_4k
 2C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v
-R9
+R2
 !i10b 1
-!s100 G?T^cTQU>WQJgXNU>N1gO3
-IScn5jHYozD@1UT1[cHXT_3
+!s100 ghAg=6oez92Z21e28jYFi3
+I6_aPRdXcmNFDo7Z185mAS1
 R1
-w1788276540
+w1788301522
 8C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v
 FC:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v
 !i122 4
-L0 1 77
+L0 3 136
 R3
 R4
 r1
 !s85 0
 31
-R10
+R5
 !s107 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v|
 !s90 -reportprogress|300|-work|work|+incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final|C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v|
 !i113 0
@@ -173,22 +173,22 @@ R7
 R8
 vslave_fast_ram
 2C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v
-R9
+R2
 !i10b 1
-!s100 lUl]Pc:81FY3OSM4mD12g0
-Ic=<MJ2JSIl]id_i49L[jY2
+!s100 XN0O:RODfbh2?l14N]lTW1
+IZz^hzdL]:BL6=e<R?E06I1
 R1
-w1788276550
+w1788301336
 8C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v
 FC:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v
 !i122 5
-L0 1 49
+L0 3 67
 R3
 R4
 r1
 !s85 0
 31
-R10
+R5
 !s107 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v|
 !s90 -reportprogress|300|-work|work|+incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final|C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v|
 !i113 0
@@ -197,22 +197,22 @@ R7
 R8
 vtb_top_bus_system
 2C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_top_bus_system.v
-!s110 1788294137
+R9
 !i10b 1
-!s100 b1IMDmK2iWdKDm?L5D_eB2
-I:T9T2hR[BL<c=LATjVi9d1
+!s100 aW8`miWo4:cN]=6^5=GVC3
+I^HM`7K>hEMHIVZzRJ4g8>2
 R1
-w1788294036
+w1788304765
 8C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_top_bus_system.v
 FC:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_top_bus_system.v
 !i122 8
-L0 3 199
+L0 3 233
 R3
 R4
 r1
 !s85 0
 31
-!s108 1788294137.000000
+R10
 !s107 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_top_bus_system.v|
 !s90 -reportprogress|300|-work|work|+incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final|C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_top_bus_system.v|
 !i113 0
@@ -223,14 +223,14 @@ vtop_bus_system
 2C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v
 R9
 !i10b 1
-!s100 g;Ka[N?eh2;[>7Lid_`j41
-I`]XjKiLIcn6iRoCNYQagE1
+!s100 9zLGLfY>B[8iVUE[3I;ZT1
+IT>64TDOgTM46F:AJXQP0:0
 R1
-w1788293254
+w1788295212
 8C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v
 FC:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v
 !i122 6
-L0 3 52
+L0 3 186
 R3
 R4
 r1
