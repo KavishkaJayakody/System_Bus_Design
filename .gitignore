@@ -1,10 +1,39 @@
-# Quartus & Simulation build files
-/db/
-/incremental_db/
-/output_files/
-/simulation/
-System_Bus_Final/
-*.qpg
-*.rdr
-*.flock
-.quiproj
+# Quartus generated files
+**/db/
+**/incremental_db/
+**/output_files/
+**/*.rpt
+**/*.summary
+**/*.done
+**/*.qws
+**/*.qdf
+
+# Quartus temporary files
+**/*.bak
+**/*.tmp
+**/*.log
+
+# Questa / ModelSim generated files
+**/simulation/questa/rtl_work/
+**/simulation/questa/work/
+**/*.wlf
+**/msim_transcript
+
+# Compiled simulation libraries
+**/simulation/**/work/
+**/simulation/**/library/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+
+# Additional Questa/ModelSim generated files
+**/*.sft
+**/*.svo
+**/*.bak*
+**/simulation/
+

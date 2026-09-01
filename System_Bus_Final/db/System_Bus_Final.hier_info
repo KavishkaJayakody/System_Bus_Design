@@ -1,4 +1,77 @@
 |top_bus_system
+clk => clk.IN1
+rst_n => rst_n.IN1
+m0_cmd_start => m0_cmd_start.IN1
+m0_cmd_we => m0_cmd_we.IN1
+m0_cmd_addr[0] => m0_cmd_addr[0].IN1
+m0_cmd_addr[1] => m0_cmd_addr[1].IN1
+m0_cmd_addr[2] => m0_cmd_addr[2].IN1
+m0_cmd_addr[3] => m0_cmd_addr[3].IN1
+m0_cmd_addr[4] => m0_cmd_addr[4].IN1
+m0_cmd_addr[5] => m0_cmd_addr[5].IN1
+m0_cmd_addr[6] => m0_cmd_addr[6].IN1
+m0_cmd_addr[7] => m0_cmd_addr[7].IN1
+m0_cmd_addr[8] => m0_cmd_addr[8].IN1
+m0_cmd_addr[9] => m0_cmd_addr[9].IN1
+m0_cmd_addr[10] => m0_cmd_addr[10].IN1
+m0_cmd_addr[11] => m0_cmd_addr[11].IN1
+m0_cmd_addr[12] => m0_cmd_addr[12].IN1
+m0_cmd_addr[13] => m0_cmd_addr[13].IN1
+m0_cmd_wdata[0] => m0_cmd_wdata[0].IN1
+m0_cmd_wdata[1] => m0_cmd_wdata[1].IN1
+m0_cmd_wdata[2] => m0_cmd_wdata[2].IN1
+m0_cmd_wdata[3] => m0_cmd_wdata[3].IN1
+m0_cmd_wdata[4] => m0_cmd_wdata[4].IN1
+m0_cmd_wdata[5] => m0_cmd_wdata[5].IN1
+m0_cmd_wdata[6] => m0_cmd_wdata[6].IN1
+m0_cmd_wdata[7] => m0_cmd_wdata[7].IN1
+m0_cmd_rdata[0] << bus_interconnect:interconnect_inst.m0_cmd_rdata
+m0_cmd_rdata[1] << bus_interconnect:interconnect_inst.m0_cmd_rdata
+m0_cmd_rdata[2] << bus_interconnect:interconnect_inst.m0_cmd_rdata
+m0_cmd_rdata[3] << bus_interconnect:interconnect_inst.m0_cmd_rdata
+m0_cmd_rdata[4] << bus_interconnect:interconnect_inst.m0_cmd_rdata
+m0_cmd_rdata[5] << bus_interconnect:interconnect_inst.m0_cmd_rdata
+m0_cmd_rdata[6] << bus_interconnect:interconnect_inst.m0_cmd_rdata
+m0_cmd_rdata[7] << bus_interconnect:interconnect_inst.m0_cmd_rdata
+m0_cmd_done << bus_interconnect:interconnect_inst.m0_cmd_done
+m1_cmd_start => m1_cmd_start.IN1
+m1_cmd_we => m1_cmd_we.IN1
+m1_cmd_addr[0] => m1_cmd_addr[0].IN1
+m1_cmd_addr[1] => m1_cmd_addr[1].IN1
+m1_cmd_addr[2] => m1_cmd_addr[2].IN1
+m1_cmd_addr[3] => m1_cmd_addr[3].IN1
+m1_cmd_addr[4] => m1_cmd_addr[4].IN1
+m1_cmd_addr[5] => m1_cmd_addr[5].IN1
+m1_cmd_addr[6] => m1_cmd_addr[6].IN1
+m1_cmd_addr[7] => m1_cmd_addr[7].IN1
+m1_cmd_addr[8] => m1_cmd_addr[8].IN1
+m1_cmd_addr[9] => m1_cmd_addr[9].IN1
+m1_cmd_addr[10] => m1_cmd_addr[10].IN1
+m1_cmd_addr[11] => m1_cmd_addr[11].IN1
+m1_cmd_addr[12] => m1_cmd_addr[12].IN1
+m1_cmd_addr[13] => m1_cmd_addr[13].IN1
+m1_cmd_wdata[0] => m1_cmd_wdata[0].IN1
+m1_cmd_wdata[1] => m1_cmd_wdata[1].IN1
+m1_cmd_wdata[2] => m1_cmd_wdata[2].IN1
+m1_cmd_wdata[3] => m1_cmd_wdata[3].IN1
+m1_cmd_wdata[4] => m1_cmd_wdata[4].IN1
+m1_cmd_wdata[5] => m1_cmd_wdata[5].IN1
+m1_cmd_wdata[6] => m1_cmd_wdata[6].IN1
+m1_cmd_wdata[7] => m1_cmd_wdata[7].IN1
+m1_cmd_rdata[0] << bus_interconnect:interconnect_inst.m1_cmd_rdata
+m1_cmd_rdata[1] << bus_interconnect:interconnect_inst.m1_cmd_rdata
+m1_cmd_rdata[2] << bus_interconnect:interconnect_inst.m1_cmd_rdata
+m1_cmd_rdata[3] << bus_interconnect:interconnect_inst.m1_cmd_rdata
+m1_cmd_rdata[4] << bus_interconnect:interconnect_inst.m1_cmd_rdata
+m1_cmd_rdata[5] << bus_interconnect:interconnect_inst.m1_cmd_rdata
+m1_cmd_rdata[6] << bus_interconnect:interconnect_inst.m1_cmd_rdata
+m1_cmd_rdata[7] << bus_interconnect:interconnect_inst.m1_cmd_rdata
+m1_cmd_done << bus_interconnect:interconnect_inst.m1_cmd_done
+ext_rx_serial => ext_rx_serial.IN1
+ext_tx_serial << bus_interconnect:interconnect_inst.ext_tx_serial
+
+
+|top_bus_system|bus_interconnect:interconnect_inst
 clk => clk.IN7
 rst_n => rst_n.IN7
 m0_cmd_start => m0_cmd_start.IN1
@@ -25,15 +98,15 @@ m0_cmd_wdata[4] => m0_cmd_wdata[4].IN1
 m0_cmd_wdata[5] => m0_cmd_wdata[5].IN1
 m0_cmd_wdata[6] => m0_cmd_wdata[6].IN1
 m0_cmd_wdata[7] => m0_cmd_wdata[7].IN1
-m0_cmd_rdata[0] << master_node:m0_inst.cmd_rdata
-m0_cmd_rdata[1] << master_node:m0_inst.cmd_rdata
-m0_cmd_rdata[2] << master_node:m0_inst.cmd_rdata
-m0_cmd_rdata[3] << master_node:m0_inst.cmd_rdata
-m0_cmd_rdata[4] << master_node:m0_inst.cmd_rdata
-m0_cmd_rdata[5] << master_node:m0_inst.cmd_rdata
-m0_cmd_rdata[6] << master_node:m0_inst.cmd_rdata
-m0_cmd_rdata[7] << master_node:m0_inst.cmd_rdata
-m0_cmd_done << master_node:m0_inst.cmd_done
+m0_cmd_rdata[0] <= master_node:m0_inst.cmd_rdata
+m0_cmd_rdata[1] <= master_node:m0_inst.cmd_rdata
+m0_cmd_rdata[2] <= master_node:m0_inst.cmd_rdata
+m0_cmd_rdata[3] <= master_node:m0_inst.cmd_rdata
+m0_cmd_rdata[4] <= master_node:m0_inst.cmd_rdata
+m0_cmd_rdata[5] <= master_node:m0_inst.cmd_rdata
+m0_cmd_rdata[6] <= master_node:m0_inst.cmd_rdata
+m0_cmd_rdata[7] <= master_node:m0_inst.cmd_rdata
+m0_cmd_done <= master_node:m0_inst.cmd_done
 m1_cmd_start => m1_cmd_start.IN1
 m1_cmd_we => m1_cmd_we.IN1
 m1_cmd_addr[0] => m1_cmd_addr[0].IN1
@@ -58,20 +131,20 @@ m1_cmd_wdata[4] => m1_cmd_wdata[4].IN1
 m1_cmd_wdata[5] => m1_cmd_wdata[5].IN1
 m1_cmd_wdata[6] => m1_cmd_wdata[6].IN1
 m1_cmd_wdata[7] => m1_cmd_wdata[7].IN1
-m1_cmd_rdata[0] << master_node:m1_inst.cmd_rdata
-m1_cmd_rdata[1] << master_node:m1_inst.cmd_rdata
-m1_cmd_rdata[2] << master_node:m1_inst.cmd_rdata
-m1_cmd_rdata[3] << master_node:m1_inst.cmd_rdata
-m1_cmd_rdata[4] << master_node:m1_inst.cmd_rdata
-m1_cmd_rdata[5] << master_node:m1_inst.cmd_rdata
-m1_cmd_rdata[6] << master_node:m1_inst.cmd_rdata
-m1_cmd_rdata[7] << master_node:m1_inst.cmd_rdata
-m1_cmd_done << master_node:m1_inst.cmd_done
+m1_cmd_rdata[0] <= master_node:m1_inst.cmd_rdata
+m1_cmd_rdata[1] <= master_node:m1_inst.cmd_rdata
+m1_cmd_rdata[2] <= master_node:m1_inst.cmd_rdata
+m1_cmd_rdata[3] <= master_node:m1_inst.cmd_rdata
+m1_cmd_rdata[4] <= master_node:m1_inst.cmd_rdata
+m1_cmd_rdata[5] <= master_node:m1_inst.cmd_rdata
+m1_cmd_rdata[6] <= master_node:m1_inst.cmd_rdata
+m1_cmd_rdata[7] <= master_node:m1_inst.cmd_rdata
+m1_cmd_done <= master_node:m1_inst.cmd_done
 ext_rx_serial => ext_rx_serial.IN1
-ext_tx_serial << cross_fpga_bridge_dummy:bridge_inst.ext_tx_serial
+ext_tx_serial <= cross_fpga_bridge_dummy:bridge_inst.ext_tx_serial
 
 
-|top_bus_system|arbiter_2m_split:arbiter_inst
+|top_bus_system|bus_interconnect:interconnect_inst|arbiter_2m_split:arbiter_inst
 clk => split_data_ready.CLK
 clk => m0_split_pending.CLK
 clk => state~1.DATAIN
@@ -106,7 +179,7 @@ m0_split_notify <= m0_split_notify.DB_MAX_OUTPUT_PORT_TYPE
 m1_split_notify <= <GND>
 
 
-|top_bus_system|master_node:m0_inst
+|top_bus_system|bus_interconnect:interconnect_inst|master_node:m0_inst
 clk => reg_we.CLK
 clk => reg_wdata[0].CLK
 clk => reg_wdata[1].CLK
@@ -396,7 +469,7 @@ bus_ready => cmd_done.DATAA
 bus_ready => state.DATAA
 
 
-|top_bus_system|master_node:m1_inst
+|top_bus_system|bus_interconnect:interconnect_inst|master_node:m1_inst
 clk => reg_we.CLK
 clk => reg_wdata[0].CLK
 clk => reg_wdata[1].CLK
@@ -686,7 +759,7 @@ bus_ready => cmd_done.DATAA
 bus_ready => state.DATAA
 
 
-|top_bus_system|address_decoder:decoder_inst
+|top_bus_system|bus_interconnect:interconnect_inst|address_decoder:decoder_inst
 addr[0] => ~NO_FANOUT~
 addr[1] => ~NO_FANOUT~
 addr[2] => ~NO_FANOUT~
@@ -719,7 +792,7 @@ sel_bridge <= sel_bridge.DB_MAX_OUTPUT_PORT_TYPE
 decode_err <= decode_err.DB_MAX_OUTPUT_PORT_TYPE
 
 
-|top_bus_system|slave_0_split_4k:s0_inst
+|top_bus_system|bus_interconnect:interconnect_inst|slave_0_split_4k:s0_inst
 clk => mem.we_a.CLK
 clk => mem.waddr_a[5].CLK
 clk => mem.waddr_a[4].CLK
@@ -938,7 +1011,7 @@ split_req <= split_req~reg0.DB_MAX_OUTPUT_PORT_TYPE
 split_done <= split_done~reg0.DB_MAX_OUTPUT_PORT_TYPE
 
 
-|top_bus_system|slave_fast_ram:s1_inst
+|top_bus_system|bus_interconnect:interconnect_inst|slave_fast_ram:s1_inst
 clk => mem.we_a.CLK
 clk => mem.waddr_a[5].CLK
 clk => mem.waddr_a[4].CLK
@@ -1052,7 +1125,7 @@ dout[7] <= dout[7]~reg0.DB_MAX_OUTPUT_PORT_TYPE
 ready <= ready~reg0.DB_MAX_OUTPUT_PORT_TYPE
 
 
-|top_bus_system|slave_fast_ram:s2_inst
+|top_bus_system|bus_interconnect:interconnect_inst|slave_fast_ram:s2_inst
 clk => mem.we_a.CLK
 clk => mem.waddr_a[5].CLK
 clk => mem.waddr_a[4].CLK
@@ -1165,7 +1238,7 @@ dout[7] <= dout[7]~reg0.DB_MAX_OUTPUT_PORT_TYPE
 ready <= ready~reg0.DB_MAX_OUTPUT_PORT_TYPE
 
 
-|top_bus_system|cross_fpga_bridge_dummy:bridge_inst
+|top_bus_system|bus_interconnect:interconnect_inst|cross_fpga_bridge_dummy:bridge_inst
 clk => ready~reg0.CLK
 clk => dout[0]~reg0.CLK
 clk => dout[1]~reg0.CLK
