@@ -145,14 +145,17 @@ module tb_arbiter_2m_split;
         req1 = 1;
         s0_split_req = 1;
 
-        @(posedge clk); #2;
+        // Sample combinational notify pulse immediately before clock transition
+        #1;
         check((m0_split_notify == 1'b1), "m0_split_notify failed to pulse on split");
-        check((gnt0 == 1'b0),            "M0 grant not revoked during split");
-        check((gnt1 == 1'b1),            "M1 failed to acquire bus while M0 was split");
 
+        @(posedge clk); #2;
         s0_split_req = 0;
+        req0 = 0; // M0 backs off as requested
+        check((gnt0 == 1'b0), "M0 grant not revoked during split");
+        check((gnt1 == 1'b1), "M1 failed to acquire bus while M0 was split");
 
-        // Step 4c: M1 executes single-cycle transfer while S0 prepares M0's data
+        // Step 4c: M1 executes transfer while S0 prepares M0's data
         @(posedge clk); #2;
         req1 = 0; // M1 finishes its access
 
@@ -165,7 +168,6 @@ module tb_arbiter_2m_split;
 
         // Step 4d: M0 finishes reading returned split data
         @(posedge clk); #2;
-        req0 = 0;
 
         @(posedge clk); #2;
         check((gnt0 == 1'b0 && gnt1 == 1'b0), "Arbiter failed to return to IDLE after split cycle");

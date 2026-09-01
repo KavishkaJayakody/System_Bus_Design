@@ -1,2 +1,9 @@
-1 16 arbiter_2m_split 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 0 0 152 0
-1 19 tb_arbiter_2m_split 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 180224 0 456 0
+1 16 arbiter_2m_split 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 0 0 167 0
+1 11 master_node 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 131072 0 204 0
+1 15 address_decoder 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 0 0 64 0
+1 16 slave_0_split_4k 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 0 0 135 0
+1 14 slave_fast_ram 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 0 0 95 0
+1 14 slave_fast_ram 7 fast__1 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 0 0 95 0
+1 23 cross_fpga_bridge_dummy 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 0 0 54 0
+1 14 top_bus_system 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 0 0 261 0
+1 17 tb_top_bus_system 4 fast 102 C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/simulation/questa/rtl_work 0 0 180224 0 375 0

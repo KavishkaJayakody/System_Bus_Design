@@ -22,27 +22,37 @@ module arbiter_2m_split (
     localparam GRANT_M1 = 2'b10;
 
     reg [1:0] state, next_state;
-    reg       m0_waiting_for_split;
+    reg       m0_split_pending;
+    reg       split_data_ready;
 
-    // Sequential State & Split History Register
+    // 1. Sequential State and Status Tracking
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            state                <= IDLE;
-            m0_waiting_for_split <= 1'b0;
+            state            <= IDLE;
+            m0_split_pending <= 1'b0;
+            split_data_ready <= 1'b0;
         end else begin
             state <= next_state;
 
-            // Track split status
-            if (state == GRANT_M0 && s0_split_req)
-                m0_waiting_for_split <= 1'b1;
-            else if (state == GRANT_M0 && !s0_split_req && s0_split_done)
-                m0_waiting_for_split <= 1'b0;
-            else if (state == GRANT_M0 && !s0_split_req && !m0_waiting_for_split)
-                m0_waiting_for_split <= 1'b0;
+            // Set when split occurs
+            if (state == GRANT_M0 && s0_split_req) begin
+                m0_split_pending <= 1'b1;
+            end
+
+            // Latch background completion pulse
+            if (s0_split_done) begin
+                split_data_ready <= 1'b1;
+            end
+
+            // Clear split flags when M0 successfully re-acquires the bus and completes
+            if (state == GRANT_M0 && !s0_split_req && split_data_ready) begin
+                m0_split_pending <= 1'b0;
+                split_data_ready <= 1'b0;
+            end
         end
     end
 
-    // Combinational Next-State & Output Logic
+    // 2. Combinational Next-State Logic
     always @(*) begin
         next_state      = state;
         gnt0            = 1'b0;
@@ -52,12 +62,17 @@ module arbiter_2m_split (
 
         case (state)
             IDLE: begin
-                if (m0_waiting_for_split && s0_split_done) begin
-                    next_state = GRANT_M0; // Priority re-grant to resume split transaction
-                end else if (req0) begin
-                    next_state = GRANT_M0; // Master 0 Priority
-                end else if (req1) begin
-                    next_state = GRANT_M1; // Master 1 Lower Priority
+                // Priority 1: Service pending split completion
+                if (m0_split_pending && (split_data_ready || s0_split_done)) begin
+                    next_state = GRANT_M0;
+                end
+                // Priority 2: Standard Master 0 request
+                else if (req0 && !m0_split_pending) begin
+                    next_state = GRANT_M0;
+                end
+                // Priority 3: Master 1 request
+                else if (req1) begin
+                    next_state = GRANT_M1;
                 end
             end
 
@@ -65,18 +80,21 @@ module arbiter_2m_split (
                 gnt0 = 1'b1;
                 if (s0_split_req) begin
                     m0_split_notify = 1'b1;
-                    next_state      = req1 ? GRANT_M1 : IDLE; // Relinquish bus immediately
-                end else if (!req0) begin
                     next_state      = req1 ? GRANT_M1 : IDLE;
+                end else if (!req0) begin
+                    if (req1)
+                        next_state = GRANT_M1;
+                    else
+                        next_state = IDLE;
                 end
             end
 
             GRANT_M1: begin
                 gnt1 = 1'b1;
                 if (!req1) begin
-                    if (m0_waiting_for_split && s0_split_done)
+                    if (m0_split_pending && (split_data_ready || s0_split_done))
                         next_state = GRANT_M0;
-                    else if (req0)
+                    else if (req0 && !m0_split_pending)
                         next_state = GRANT_M0;
                     else
                         next_state = IDLE;

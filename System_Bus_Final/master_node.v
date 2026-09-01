@@ -4,7 +4,7 @@ module master_node (
     input  wire        clk,
     input  wire        rst_n,
     
-    // Command Interface (Testbench / Upper Layer)
+    // Command Interface
     input  wire        cmd_start,
     input  wire        cmd_we,
     input  wire [13:0] cmd_addr,
@@ -78,7 +78,7 @@ module master_node (
                 DRIVE: begin
                     if (bus_split) begin
                         m_valid <= 1'b0;
-                        bus_req <= 1'b1; // Keep request active to queue re-grant
+                        bus_req <= 1'b1; // Keep requesting for when data becomes ready
                         state   <= SPLIT_W;
                     end else if (bus_ready) begin
                         m_valid   <= 1'b0;
@@ -94,7 +94,7 @@ module master_node (
                 WAIT: begin
                     if (bus_split) begin
                         m_valid <= 1'b0;
-                        bus_req <= 1'b1; // Keep request active to queue re-grant
+                        bus_req <= 1'b1;
                         state   <= SPLIT_W;
                     end else if (bus_ready) begin
                         m_valid   <= 1'b0;
@@ -109,7 +109,8 @@ module master_node (
                     bus_req <= 1'b1;
                     if (bus_gnt) begin
                         m_addr  <= reg_addr;
-                        m_we    <= 1'b0; // Re-issue address for split read data
+                        m_wdata <= 8'h00;
+                        m_we    <= 1'b0;
                         m_valid <= 1'b1;
                         state   <= DRIVE;
                     end

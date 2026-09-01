@@ -1,5 +1,5 @@
 Analysis & Synthesis report for System_Bus_Final
-Tue Sep  1 15:06:57 2026
+Tue Sep  1 21:29:22 2026
 Quartus Prime Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
 
 
@@ -22,7 +22,7 @@ Quartus Prime Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
  14. Inverted Register Statistics
  15. Registers Added for RAM Pass-Through Logic
  16. Multiplexer Restructuring Statistics (Restructuring Performed)
- 17. Source assignments for slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_jii1:auto_generated
+ 17. Source assignments for slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated
  18. Parameter Settings for User Entity Instance: slave_fast_ram:s1_inst
  19. Parameter Settings for User Entity Instance: slave_fast_ram:s2_inst
  20. Parameter Settings for Inferred Entity Instance: slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0
@@ -57,18 +57,18 @@ on the Quartus Prime software download page.
 +--------------------------------------------------------------------------------------+
 ; Analysis & Synthesis Summary                                                         ;
 +------------------------------------+-------------------------------------------------+
-; Analysis & Synthesis Status        ; Successful - Tue Sep  1 15:06:55 2026           ;
+; Analysis & Synthesis Status        ; Successful - Tue Sep  1 21:29:22 2026           ;
 ; Quartus Prime Version              ; 25.1std.0 Build 1129 10/21/2025 SC Lite Edition ;
 ; Revision Name                      ; System_Bus_Final                                ;
 ; Top-level Entity Name              ; top_bus_system                                  ;
 ; Family                             ; Cyclone IV E                                    ;
-; Total logic elements               ; 88,454                                          ;
-;     Total combinational functions  ; 39,158                                          ;
-;     Dedicated logic registers      ; 49,392                                          ;
-; Total registers                    ; 49392                                           ;
+; Total logic elements               ; 2,158                                           ;
+;     Total combinational functions  ; 1,010                                           ;
+;     Dedicated logic registers      ; 1,253                                           ;
+; Total registers                    ; 1253                                            ;
 ; Total pins                         ; 70                                              ;
 ; Total virtual pins                 ; 0                                               ;
-; Total memory bits                  ; 32,768                                          ;
+; Total memory bits                  ; 512                                             ;
 ; Embedded Multiplier 9-bit elements ; 0                                               ;
 ; Total PLLs                         ; 0                                               ;
 +------------------------------------+-------------------------------------------------+
@@ -168,14 +168,14 @@ on the Quartus Prime software download page.
 ; Number detected on machine ; 8           ;
 ; Maximum allowed            ; 4           ;
 ;                            ;             ;
-; Average used               ; 1.01        ;
+; Average used               ; 1.00        ;
 ; Maximum used               ; 4           ;
 ;                            ;             ;
 ; Usage by Processor         ; % Time Used ;
 ;     Processor 1            ; 100.0%      ;
-;     Processor 2            ;   0.3%      ;
-;     Processor 3            ;   0.3%      ;
-;     Processor 4            ;   0.3%      ;
+;     Processor 2            ;   0.1%      ;
+;     Processor 3            ;   0.1%      ;
+;     Processor 4            ;   0.1%      ;
 +----------------------------+-------------+
 
 
@@ -200,7 +200,7 @@ on the Quartus Prime software download page.
 ; altrom.inc                       ; yes             ; Megafunction                 ; c:/altera_lite/25.1std/quartus/libraries/megafunctions/altrom.inc                                     ;         ;
 ; altram.inc                       ; yes             ; Megafunction                 ; c:/altera_lite/25.1std/quartus/libraries/megafunctions/altram.inc                                     ;         ;
 ; altdpram.inc                     ; yes             ; Megafunction                 ; c:/altera_lite/25.1std/quartus/libraries/megafunctions/altdpram.inc                                   ;         ;
-; db/altsyncram_jii1.tdf           ; yes             ; Auto-Generated Megafunction  ; C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/db/altsyncram_jii1.tdf    ;         ;
+; db/altsyncram_45k1.tdf           ; yes             ; Auto-Generated Megafunction  ; C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/db/altsyncram_45k1.tdf    ;         ;
 +----------------------------------+-----------------+------------------------------+-------------------------------------------------------------------------------------------------------+---------+
 
 
@@ -209,31 +209,31 @@ on the Quartus Prime software download page.
 +---------------------------------------------+-----------+
 ; Resource                                    ; Usage     ;
 +---------------------------------------------+-----------+
-; Estimated Total logic elements              ; 88,454    ;
+; Estimated Total logic elements              ; 2,158     ;
 ;                                             ;           ;
-; Total combinational functions               ; 39158     ;
+; Total combinational functions               ; 1010      ;
 ; Logic element usage by number of LUT inputs ;           ;
-;     -- 4 input functions                    ; 37031     ;
-;     -- 3 input functions                    ; 2093      ;
-;     -- <=2 input functions                  ; 34        ;
+;     -- 4 input functions                    ; 923       ;
+;     -- 3 input functions                    ; 45        ;
+;     -- <=2 input functions                  ; 42        ;
 ;                                             ;           ;
 ; Logic elements by mode                      ;           ;
-;     -- normal mode                          ; 39158     ;
+;     -- normal mode                          ; 1010      ;
 ;     -- arithmetic mode                      ; 0         ;
 ;                                             ;           ;
-; Total registers                             ; 49392     ;
-;     -- Dedicated logic registers            ; 49392     ;
+; Total registers                             ; 1253      ;
+;     -- Dedicated logic registers            ; 1253      ;
 ;     -- I/O registers                        ; 0         ;
 ;                                             ;           ;
 ; I/O pins                                    ; 70        ;
-; Total memory bits                           ; 32768     ;
+; Total memory bits                           ; 512       ;
 ;                                             ;           ;
 ; Embedded Multiplier 9-bit elements          ; 0         ;
 ;                                             ;           ;
 ; Maximum fan-out node                        ; clk~input ;
-; Maximum fan-out                             ; 49400     ;
-; Total fan-out                               ; 352210    ;
-; Average fan-out                             ; 3.97      ;
+; Maximum fan-out                             ; 1261      ;
+; Total fan-out                               ; 8019      ;
+; Average fan-out                             ; 3.33      ;
 +---------------------------------------------+-----------+
 
 
@@ -242,28 +242,28 @@ on the Quartus Prime software download page.
 +-------------------------------------------+---------------------+---------------------------+-------------+--------------+---------+-----------+------+--------------+----------------------------------------------------------------------------------------------+-------------------------+--------------+
 ; Compilation Hierarchy Node                ; Combinational ALUTs ; Dedicated Logic Registers ; Memory Bits ; DSP Elements ; DSP 9x9 ; DSP 18x18 ; Pins ; Virtual Pins ; Full Hierarchy Name                                                                          ; Entity Name             ; Library Name ;
 +-------------------------------------------+---------------------+---------------------------+-------------+--------------+---------+-----------+------+--------------+----------------------------------------------------------------------------------------------+-------------------------+--------------+
-; |top_bus_system                           ; 39158 (44)          ; 49392 (0)                 ; 32768       ; 0            ; 0       ; 0         ; 70   ; 0            ; |top_bus_system                                                                              ; top_bus_system          ; work         ;
+; |top_bus_system                           ; 1010 (44)           ; 1253 (0)                  ; 512         ; 0            ; 0       ; 0         ; 70   ; 0            ; |top_bus_system                                                                              ; top_bus_system          ; work         ;
 ;    |address_decoder:decoder_inst|         ; 4 (4)               ; 0 (0)                     ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|address_decoder:decoder_inst                                                 ; address_decoder         ; work         ;
-;    |arbiter_2m_split:arbiter_inst|        ; 7 (7)               ; 3 (3)                     ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|arbiter_2m_split:arbiter_inst                                                ; arbiter_2m_split        ; work         ;
+;    |arbiter_2m_split:arbiter_inst|        ; 8 (8)               ; 4 (4)                     ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|arbiter_2m_split:arbiter_inst                                                ; arbiter_2m_split        ; work         ;
 ;    |cross_fpga_bridge_dummy:bridge_inst|  ; 13 (13)             ; 17 (17)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|cross_fpga_bridge_dummy:bridge_inst                                          ; cross_fpga_bridge_dummy ; work         ;
-;    |master_node:m0_inst|                  ; 23 (23)             ; 63 (63)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|master_node:m0_inst                                                          ; master_node             ; work         ;
-;    |master_node:m1_inst|                  ; 18 (18)             ; 62 (62)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|master_node:m1_inst                                                          ; master_node             ; work         ;
-;    |slave_0_split_4k:s0_inst|             ; 47 (47)             ; 77 (77)                   ; 32768       ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_0_split_4k:s0_inst                                                     ; slave_0_split_4k        ; work         ;
-;       |altsyncram:mem_rtl_0|              ; 0 (0)               ; 0 (0)                     ; 32768       ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0                                ; altsyncram              ; work         ;
-;          |altsyncram_jii1:auto_generated| ; 0 (0)               ; 0 (0)                     ; 32768       ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_jii1:auto_generated ; altsyncram_jii1         ; work         ;
-;    |slave_fast_ram:s1_inst|               ; 25993 (25993)       ; 32777 (32777)             ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_fast_ram:s1_inst                                                       ; slave_fast_ram          ; work         ;
-;    |slave_fast_ram:s2_inst|               ; 13009 (13009)       ; 16393 (16393)             ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_fast_ram:s2_inst                                                       ; slave_fast_ram          ; work         ;
+;    |master_node:m0_inst|                  ; 30 (30)             ; 63 (63)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|master_node:m0_inst                                                          ; master_node             ; work         ;
+;    |master_node:m1_inst|                  ; 19 (19)             ; 62 (62)                   ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|master_node:m1_inst                                                          ; master_node             ; work         ;
+;    |slave_0_split_4k:s0_inst|             ; 42 (42)             ; 65 (65)                   ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_0_split_4k:s0_inst                                                     ; slave_0_split_4k        ; work         ;
+;       |altsyncram:mem_rtl_0|              ; 0 (0)               ; 0 (0)                     ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0                                ; altsyncram              ; work         ;
+;          |altsyncram_45k1:auto_generated| ; 0 (0)               ; 0 (0)                     ; 512         ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated ; altsyncram_45k1         ; work         ;
+;    |slave_fast_ram:s1_inst|               ; 425 (425)           ; 521 (521)                 ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_fast_ram:s1_inst                                                       ; slave_fast_ram          ; work         ;
+;    |slave_fast_ram:s2_inst|               ; 425 (425)           ; 521 (521)                 ; 0           ; 0            ; 0       ; 0         ; 0    ; 0            ; |top_bus_system|slave_fast_ram:s2_inst                                                       ; slave_fast_ram          ; work         ;
 +-------------------------------------------+---------------------+---------------------------+-------------+--------------+---------+-----------+------+--------------+----------------------------------------------------------------------------------------------+-------------------------+--------------+
 Note: For table entries with two numbers listed, the numbers in parentheses indicate the number of resources of the given type used by the specific entity alone. The numbers listed outside of parentheses indicate the total resources of the given type used by the specific entity and all of its sub-entities in the hierarchy.
 
 
-+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-; Analysis & Synthesis RAM Summary                                                                                                                                                             ;
-+-----------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+-------+------+
-; Name                                                                                    ; Type ; Mode             ; Port A Depth ; Port A Width ; Port B Depth ; Port B Width ; Size  ; MIF  ;
-+-----------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+-------+------+
-; slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_jii1:auto_generated|ALTSYNCRAM ; AUTO ; Simple Dual Port ; 4096         ; 8            ; 4096         ; 8            ; 32768 ; None ;
-+-----------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+-------+------+
++---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Analysis & Synthesis RAM Summary                                                                                                                                                            ;
++-----------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+------+------+
+; Name                                                                                    ; Type ; Mode             ; Port A Depth ; Port A Width ; Port B Depth ; Port B Width ; Size ; MIF  ;
++-----------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+------+------+
+; slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated|ALTSYNCRAM ; M9K  ; Simple Dual Port ; 64           ; 8            ; 64           ; 8            ; 512  ; None ;
++-----------------------------------------------------------------------------------------+------+------------------+--------------+--------------+--------------+--------------+------+------+
 
 
 Encoding Type:  One-Hot
@@ -331,12 +331,12 @@ Encoding Type:  One-Hot
 +----------------------------------------------+-------+
 ; Statistic                                    ; Value ;
 +----------------------------------------------+-------+
-; Total registers                              ; 49392 ;
+; Total registers                              ; 1253  ;
 ; Number of registers using Synchronous Clear  ; 0     ;
-; Number of registers using Synchronous Load   ; 24    ;
-; Number of registers using Asynchronous Clear ; 49363 ;
+; Number of registers using Synchronous Load   ; 17    ;
+; Number of registers using Asynchronous Clear ; 206   ;
 ; Number of registers using Asynchronous Load  ; 0     ;
-; Number of registers using Clock Enable       ; 49343 ;
+; Number of registers using Clock Enable       ; 1209  ;
 ; Number of registers using Preset             ; 0     ;
 +----------------------------------------------+-------+
 
@@ -382,18 +382,6 @@ Encoding Type:  One-Hot
 ; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[18] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
 ; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[19] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
 ; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[20] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[21] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[22] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[23] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[24] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[25] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[26] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[27] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[28] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[29] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[30] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[31] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
-; slave_0_split_4k:s0_inst|mem_rtl_0_bypass[32] ; slave_0_split_4k:s0_inst|mem_rtl_0 ;
 +-----------------------------------------------+------------------------------------+
 
 
@@ -402,27 +390,27 @@ Encoding Type:  One-Hot
 +--------------------+-----------+---------------+----------------------+------------------------+------------+------------------------------------------------------------+
 ; Multiplexer Inputs ; Bus Width ; Baseline Area ; Area if Restructured ; Saving if Restructured ; Registered ; Example Multiplexer Output                                 ;
 +--------------------+-----------+---------------+----------------------+------------------------+------------+------------------------------------------------------------+
-; 3:1                ; 14 bits   ; 28 LEs        ; 0 LEs                ; 28 LEs                 ; Yes        ; |top_bus_system|master_node:m0_inst|m_addr[12]             ;
-; 3:1                ; 14 bits   ; 28 LEs        ; 0 LEs                ; 28 LEs                 ; Yes        ; |top_bus_system|master_node:m1_inst|m_addr[5]              ;
-; 3:1                ; 8 bits    ; 16 LEs        ; 0 LEs                ; 16 LEs                 ; Yes        ; |top_bus_system|master_node:m1_inst|cmd_rdata[0]           ;
-; 3:1                ; 8 bits    ; 16 LEs        ; 0 LEs                ; 16 LEs                 ; Yes        ; |top_bus_system|master_node:m0_inst|cmd_rdata[0]           ;
-; 3:1                ; 8 bits    ; 16 LEs        ; 8 LEs                ; 8 LEs                  ; Yes        ; |top_bus_system|slave_0_split_4k:s0_inst|dout[0]           ;
+; 3:1                ; 14 bits   ; 28 LEs        ; 0 LEs                ; 28 LEs                 ; Yes        ; |top_bus_system|master_node:m0_inst|m_addr[6]              ;
+; 3:1                ; 14 bits   ; 28 LEs        ; 0 LEs                ; 28 LEs                 ; Yes        ; |top_bus_system|master_node:m1_inst|m_addr[7]              ;
+; 3:1                ; 8 bits    ; 16 LEs        ; 0 LEs                ; 16 LEs                 ; Yes        ; |top_bus_system|master_node:m1_inst|cmd_rdata[4]           ;
+; 3:1                ; 8 bits    ; 16 LEs        ; 0 LEs                ; 16 LEs                 ; Yes        ; |top_bus_system|master_node:m0_inst|cmd_rdata[2]           ;
+; 3:1                ; 8 bits    ; 16 LEs        ; 8 LEs                ; 8 LEs                  ; Yes        ; |top_bus_system|slave_0_split_4k:s0_inst|dout[3]           ;
 ; 3:1                ; 8 bits    ; 16 LEs        ; 16 LEs               ; 0 LEs                  ; Yes        ; |top_bus_system|slave_0_split_4k:s0_inst|split_data_reg[7] ;
-; 4:1                ; 3 bits    ; 6 LEs         ; 6 LEs                ; 0 LEs                  ; Yes        ; |top_bus_system|slave_0_split_4k:s0_inst|latency_cnt[0]    ;
-; 2049:1             ; 8 bits    ; 10928 LEs     ; 10928 LEs            ; 0 LEs                  ; Yes        ; |top_bus_system|slave_fast_ram:s2_inst|dout[5]             ;
-; 4097:1             ; 8 bits    ; 21848 LEs     ; 21848 LEs            ; 0 LEs                  ; Yes        ; |top_bus_system|slave_fast_ram:s1_inst|dout[0]             ;
-; 3:1                ; 24 bits   ; 48 LEs        ; 48 LEs               ; 0 LEs                  ; No         ; |top_bus_system|bus_addr[10]                               ;
+; 4:1                ; 3 bits    ; 6 LEs         ; 6 LEs                ; 0 LEs                  ; Yes        ; |top_bus_system|slave_0_split_4k:s0_inst|latency_cnt[2]    ;
+; 5:1                ; 9 bits    ; 27 LEs        ; 9 LEs                ; 18 LEs                 ; Yes        ; |top_bus_system|master_node:m0_inst|m_wdata[0]             ;
+; 5:1                ; 9 bits    ; 27 LEs        ; 9 LEs                ; 18 LEs                 ; Yes        ; |top_bus_system|master_node:m1_inst|m_wdata[3]             ;
+; 3:1                ; 24 bits   ; 48 LEs        ; 48 LEs               ; 0 LEs                  ; No         ; |top_bus_system|bus_addr[13]                               ;
 ; 5:1                ; 9 bits    ; 27 LEs        ; 18 LEs               ; 9 LEs                  ; No         ; |top_bus_system|bus_rdata[0]                               ;
 ; 7:1                ; 2 bits    ; 8 LEs         ; 6 LEs                ; 2 LEs                  ; No         ; |top_bus_system|master_node:m1_inst|Selector3              ;
 ; 8:1                ; 2 bits    ; 10 LEs        ; 6 LEs                ; 4 LEs                  ; No         ; |top_bus_system|master_node:m0_inst|Selector3              ;
-; 8:1                ; 2 bits    ; 10 LEs        ; 4 LEs                ; 6 LEs                  ; No         ; |top_bus_system|master_node:m1_inst|Selector5              ;
-; 8:1                ; 2 bits    ; 10 LEs        ; 6 LEs                ; 4 LEs                  ; No         ; |top_bus_system|master_node:m1_inst|Selector6              ;
+; 8:1                ; 2 bits    ; 10 LEs        ; 4 LEs                ; 6 LEs                  ; No         ; |top_bus_system|master_node:m1_inst|Selector1              ;
+; 8:1                ; 2 bits    ; 10 LEs        ; 6 LEs                ; 4 LEs                  ; No         ; |top_bus_system|master_node:m1_inst|Selector4              ;
 ; 9:1                ; 2 bits    ; 12 LEs        ; 8 LEs                ; 4 LEs                  ; No         ; |top_bus_system|master_node:m0_inst|Selector5              ;
 +--------------------+-----------+---------------+----------------------+------------------------+------------+------------------------------------------------------------+
 
 
 +-----------------------------------------------------------------------------------------------------+
-; Source assignments for slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_jii1:auto_generated ;
+; Source assignments for slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0|altsyncram_45k1:auto_generated ;
 +---------------------------------+--------------------+------+---------------------------------------+
 ; Assignment                      ; Value              ; From ; To                                    ;
 +---------------------------------+--------------------+------+---------------------------------------+
@@ -463,8 +451,8 @@ Note: In order to hide this table in the UI and the text report file, please set
 ; WIDTH_BYTEENA                      ; 1                    ; Untyped                            ;
 ; OPERATION_MODE                     ; DUAL_PORT            ; Untyped                            ;
 ; WIDTH_A                            ; 8                    ; Untyped                            ;
-; WIDTHAD_A                          ; 12                   ; Untyped                            ;
-; NUMWORDS_A                         ; 4096                 ; Untyped                            ;
+; WIDTHAD_A                          ; 6                    ; Untyped                            ;
+; NUMWORDS_A                         ; 64                   ; Untyped                            ;
 ; OUTDATA_REG_A                      ; UNREGISTERED         ; Untyped                            ;
 ; ADDRESS_ACLR_A                     ; NONE                 ; Untyped                            ;
 ; OUTDATA_ACLR_A                     ; NONE                 ; Untyped                            ;
@@ -472,8 +460,8 @@ Note: In order to hide this table in the UI and the text report file, please set
 ; INDATA_ACLR_A                      ; NONE                 ; Untyped                            ;
 ; BYTEENA_ACLR_A                     ; NONE                 ; Untyped                            ;
 ; WIDTH_B                            ; 8                    ; Untyped                            ;
-; WIDTHAD_B                          ; 12                   ; Untyped                            ;
-; NUMWORDS_B                         ; 4096                 ; Untyped                            ;
+; WIDTHAD_B                          ; 6                    ; Untyped                            ;
+; NUMWORDS_B                         ; 64                   ; Untyped                            ;
 ; INDATA_REG_B                       ; CLOCK1               ; Untyped                            ;
 ; WRCONTROL_WRADDRESS_REG_B          ; CLOCK1               ; Untyped                            ;
 ; RDCONTROL_REG_B                    ; CLOCK1               ; Untyped                            ;
@@ -488,7 +476,7 @@ Note: In order to hide this table in the UI and the text report file, please set
 ; BYTEENA_ACLR_B                     ; NONE                 ; Untyped                            ;
 ; WIDTH_BYTEENA_A                    ; 1                    ; Untyped                            ;
 ; WIDTH_BYTEENA_B                    ; 1                    ; Untyped                            ;
-; RAM_BLOCK_TYPE                     ; AUTO                 ; Untyped                            ;
+; RAM_BLOCK_TYPE                     ; M9K                  ; Untyped                            ;
 ; BYTE_SIZE                          ; 8                    ; Untyped                            ;
 ; READ_DURING_WRITE_MODE_MIXED_PORTS ; OLD_DATA             ; Untyped                            ;
 ; READ_DURING_WRITE_MODE_PORT_A      ; NEW_DATA_NO_NBE_READ ; Untyped                            ;
@@ -506,7 +494,7 @@ Note: In order to hide this table in the UI and the text report file, please set
 ; ECC_PIPELINE_STAGE_ENABLED         ; FALSE                ; Untyped                            ;
 ; WIDTH_ECCSTATUS                    ; 3                    ; Untyped                            ;
 ; DEVICE_FAMILY                      ; Cyclone IV E         ; Untyped                            ;
-; CBXI_PARAMETER                     ; altsyncram_jii1      ; Untyped                            ;
+; CBXI_PARAMETER                     ; altsyncram_45k1      ; Untyped                            ;
 +------------------------------------+----------------------+------------------------------------+
 Note: In order to hide this table in the UI and the text report file, please set the "Show Parameter Settings in Synthesis Report" option in "Analysis and Synthesis Settings -> More Settings" to "Off".
 
@@ -520,13 +508,13 @@ Note: In order to hide this table in the UI and the text report file, please set
 ; Entity Instance                           ; slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0 ;
 ;     -- OPERATION_MODE                     ; DUAL_PORT                                     ;
 ;     -- WIDTH_A                            ; 8                                             ;
-;     -- NUMWORDS_A                         ; 4096                                          ;
+;     -- NUMWORDS_A                         ; 64                                            ;
 ;     -- OUTDATA_REG_A                      ; UNREGISTERED                                  ;
 ;     -- WIDTH_B                            ; 8                                             ;
-;     -- NUMWORDS_B                         ; 4096                                          ;
+;     -- NUMWORDS_B                         ; 64                                            ;
 ;     -- ADDRESS_REG_B                      ; CLOCK0                                        ;
 ;     -- OUTDATA_REG_B                      ; UNREGISTERED                                  ;
-;     -- RAM_BLOCK_TYPE                     ; AUTO                                          ;
+;     -- RAM_BLOCK_TYPE                     ; M9K                                           ;
 ;     -- READ_DURING_WRITE_MODE_MIXED_PORTS ; OLD_DATA                                      ;
 +-------------------------------------------+-----------------------------------------------+
 
@@ -546,23 +534,24 @@ Note: In order to hide this table in the UI and the text report file, please set
 ; Type                  ; Count                       ;
 +-----------------------+-----------------------------+
 ; boundary_port         ; 70                          ;
-; cycloneiii_ff         ; 49392                       ;
+; cycloneiii_ff         ; 1253                        ;
 ;     CLR               ; 28                          ;
-;     ENA               ; 8                           ;
-;     ENA CLR           ; 49311                       ;
-;     ENA CLR SLD       ; 24                          ;
-;     plain             ; 21                          ;
-; cycloneiii_lcell_comb ; 39159                       ;
-;     normal            ; 39159                       ;
+;     CLR SLD           ; 1                           ;
+;     ENA               ; 1032                        ;
+;     ENA CLR           ; 161                         ;
+;     ENA CLR SLD       ; 16                          ;
+;     plain             ; 15                          ;
+; cycloneiii_lcell_comb ; 1011                        ;
+;     normal            ; 1011                        ;
 ;         0 data inputs ; 1                           ;
 ;         1 data inputs ; 14                          ;
-;         2 data inputs ; 20                          ;
-;         3 data inputs ; 2093                        ;
-;         4 data inputs ; 37031                       ;
+;         2 data inputs ; 28                          ;
+;         3 data inputs ; 45                          ;
+;         4 data inputs ; 923                         ;
 ; cycloneiii_ram_block  ; 8                           ;
 ;                       ;                             ;
-; Max LUT depth         ; 13.00                       ;
-; Average LUT depth     ; 9.05                        ;
+; Max LUT depth         ; 8.00                        ;
+; Average LUT depth     ; 4.87                        ;
 +-----------------------+-----------------------------+
 
 
@@ -571,7 +560,7 @@ Note: In order to hide this table in the UI and the text report file, please set
 +----------------+--------------+
 ; Partition Name ; Elapsed Time ;
 +----------------+--------------+
-; Top            ; 00:04:48     ;
+; Top            ; 00:00:02     ;
 +----------------+--------------+
 
 
@@ -581,7 +570,7 @@ Note: In order to hide this table in the UI and the text report file, please set
 Info: *******************************************************************
 Info: Running Quartus Prime Analysis & Synthesis
     Info: Version 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
-    Info: Processing started: Tue Sep  1 15:01:38 2026
+    Info: Processing started: Tue Sep  1 21:29:13 2026
 Info: Command: quartus_map --read_settings_files=on --write_settings_files=off System_Bus_Final -c System_Bus_Final
 Warning (18236): Number of processors has not been specified which may cause overloading on shared machines.  Set the global assignment NUM_PARALLEL_PROCESSORS in your QSF to an appropriate value for best performance.
 Info (20030): Parallel compilation is enabled and will use 4 of the 4 processors detected
@@ -591,12 +580,10 @@ Info (12021): Found 1 design units, including 1 entities, in source file tb_arbi
     Info (12023): Found entity 1: tb_arbiter_2m_split File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_arbiter_2m_split.v Line: 3
 Info (12021): Found 1 design units, including 1 entities, in source file tb_master_node.v
     Info (12023): Found entity 1: tb_master_node File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_master_node.v Line: 23
-Info (12021): Found 1 design units, including 1 entities, in source file tb_ram_4k.v
-    Info (12023): Found entity 1: tb_ram_4k File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_ram_4k.v Line: 25
 Info (12021): Found 1 design units, including 1 entities, in source file tb_slave_0_split_4k.v
     Info (12023): Found entity 1: tb_slave_0_split_4k File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_slave_0_split_4k.v Line: 3
 Info (12021): Found 1 design units, including 1 entities, in source file tb_top_bus_system.v
-    Info (12023): Found entity 1: tb_top_bus_system File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_top_bus_system.v Line: 25
+    Info (12023): Found entity 1: tb_top_bus_system File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_top_bus_system.v Line: 3
 Info (12021): Found 1 design units, including 1 entities, in source file address_decoder.v
     Info (12023): Found entity 1: address_decoder File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/address_decoder.v Line: 25
 Info (12021): Found 1 design units, including 1 entities, in source file arbiter_2m_split.v
@@ -605,34 +592,35 @@ Info (12021): Found 1 design units, including 1 entities, in source file cross_f
     Info (12023): Found entity 1: cross_fpga_bridge_dummy File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/cross_fpga_bridge_dummy.v Line: 25
 Info (12021): Found 1 design units, including 1 entities, in source file master_node.v
     Info (12023): Found entity 1: master_node File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/master_node.v Line: 3
-Info (12021): Found 1 design units, including 1 entities, in source file ram_4k.v
-    Info (12023): Found entity 1: ram_4k File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/ram_4k.v Line: 25
 Info (12021): Found 1 design units, including 1 entities, in source file slave_0_split_4k.v
-    Info (12023): Found entity 1: slave_0_split_4k File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v Line: 3
+    Info (12023): Found entity 1: slave_0_split_4k File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_0_split_4k.v Line: 1
 Info (12021): Found 1 design units, including 1 entities, in source file slave_fast_ram.v
-    Info (12023): Found entity 1: slave_fast_ram File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 3
+    Info (12023): Found entity 1: slave_fast_ram File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 1
 Info (12021): Found 1 design units, including 1 entities, in source file top_bus_system.v
     Info (12023): Found entity 1: top_bus_system File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 25
+Info (12021): Found 1 design units, including 1 entities, in source file tb_slave_fast_ram.v
+    Info (12023): Found entity 1: tb_slave_fast_ram File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_slave_fast_ram.v Line: 3
 Info (12127): Elaborating entity "top_bus_system" for the top level hierarchy
 Info (12128): Elaborating entity "arbiter_2m_split" for hierarchy "arbiter_2m_split:arbiter_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 83
 Info (12128): Elaborating entity "master_node" for hierarchy "master_node:m0_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 93
 Info (12128): Elaborating entity "address_decoder" for hierarchy "address_decoder:decoder_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 119
 Info (12128): Elaborating entity "slave_0_split_4k" for hierarchy "slave_0_split_4k:s0_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 127
 Info (12128): Elaborating entity "slave_fast_ram" for hierarchy "slave_fast_ram:s1_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 134
-Warning (10240): Verilog HDL Always Construct warning at slave_fast_ram.v(19): inferring latch(es) for variable "i", which holds its previous value in one or more paths through the always construct File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 19
 Info (12128): Elaborating entity "slave_fast_ram" for hierarchy "slave_fast_ram:s2_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 141
-Warning (10240): Verilog HDL Always Construct warning at slave_fast_ram.v(19): inferring latch(es) for variable "i", which holds its previous value in one or more paths through the always construct File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 19
 Info (12128): Elaborating entity "cross_fpga_bridge_dummy" for hierarchy "cross_fpga_bridge_dummy:bridge_inst" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 149
 Warning (276020): Inferred RAM node "slave_0_split_4k:s0_inst|mem_rtl_0" from synchronous design logic.  Pass-through logic has been added to match the read-during-write behavior of the original design.
+Info (276014): Found 2 instances of uninferred RAM logic
+    Info (276007): RAM logic "slave_fast_ram:s1_inst|mem" is uninferred due to asynchronous read logic File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 16
+    Info (276007): RAM logic "slave_fast_ram:s2_inst|mem" is uninferred due to asynchronous read logic File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v Line: 16
 Info (19000): Inferred 1 megafunctions from design logic
     Info (276029): Inferred altsyncram megafunction from the following design logic: "slave_0_split_4k:s0_inst|mem_rtl_0" 
         Info (286033): Parameter OPERATION_MODE set to DUAL_PORT
         Info (286033): Parameter WIDTH_A set to 8
-        Info (286033): Parameter WIDTHAD_A set to 12
-        Info (286033): Parameter NUMWORDS_A set to 4096
+        Info (286033): Parameter WIDTHAD_A set to 6
+        Info (286033): Parameter NUMWORDS_A set to 64
         Info (286033): Parameter WIDTH_B set to 8
-        Info (286033): Parameter WIDTHAD_B set to 12
-        Info (286033): Parameter NUMWORDS_B set to 4096
+        Info (286033): Parameter WIDTHAD_B set to 6
+        Info (286033): Parameter NUMWORDS_B set to 64
         Info (286033): Parameter ADDRESS_ACLR_A set to NONE
         Info (286033): Parameter OUTDATA_REG_B set to UNREGISTERED
         Info (286033): Parameter ADDRESS_ACLR_B set to NONE
@@ -640,16 +628,17 @@ Info (19000): Inferred 1 megafunctions from design logic
         Info (286033): Parameter ADDRESS_REG_B set to CLOCK0
         Info (286033): Parameter INDATA_ACLR_A set to NONE
         Info (286033): Parameter WRCONTROL_ACLR_A set to NONE
+        Info (286033): Parameter RAM_BLOCK_TYPE set to M9K
         Info (286033): Parameter READ_DURING_WRITE_MODE_MIXED_PORTS set to OLD_DATA
 Info (12130): Elaborated megafunction instantiation "slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0"
 Info (12133): Instantiated megafunction "slave_0_split_4k:s0_inst|altsyncram:mem_rtl_0" with the following parameter:
     Info (12134): Parameter "OPERATION_MODE" = "DUAL_PORT"
     Info (12134): Parameter "WIDTH_A" = "8"
-    Info (12134): Parameter "WIDTHAD_A" = "12"
-    Info (12134): Parameter "NUMWORDS_A" = "4096"
+    Info (12134): Parameter "WIDTHAD_A" = "6"
+    Info (12134): Parameter "NUMWORDS_A" = "64"
     Info (12134): Parameter "WIDTH_B" = "8"
-    Info (12134): Parameter "WIDTHAD_B" = "12"
-    Info (12134): Parameter "NUMWORDS_B" = "4096"
+    Info (12134): Parameter "WIDTHAD_B" = "6"
+    Info (12134): Parameter "NUMWORDS_B" = "64"
     Info (12134): Parameter "ADDRESS_ACLR_A" = "NONE"
     Info (12134): Parameter "OUTDATA_REG_B" = "UNREGISTERED"
     Info (12134): Parameter "ADDRESS_ACLR_B" = "NONE"
@@ -657,9 +646,10 @@ Info (12133): Instantiated megafunction "slave_0_split_4k:s0_inst|altsyncram:mem
     Info (12134): Parameter "ADDRESS_REG_B" = "CLOCK0"
     Info (12134): Parameter "INDATA_ACLR_A" = "NONE"
     Info (12134): Parameter "WRCONTROL_ACLR_A" = "NONE"
+    Info (12134): Parameter "RAM_BLOCK_TYPE" = "M9K"
     Info (12134): Parameter "READ_DURING_WRITE_MODE_MIXED_PORTS" = "OLD_DATA"
-Info (12021): Found 1 design units, including 1 entities, in source file db/altsyncram_jii1.tdf
-    Info (12023): Found entity 1: altsyncram_jii1 File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/db/altsyncram_jii1.tdf Line: 28
+Info (12021): Found 1 design units, including 1 entities, in source file db/altsyncram_45k1.tdf
+    Info (12023): Found entity 1: altsyncram_45k1 File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/db/altsyncram_45k1.tdf Line: 28
 Info (13000): Registers with preset signals will power-up high File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/cross_fpga_bridge_dummy.v Line: 50
 Info (13003): DEV_CLRn pin will set, and not reset, register with preset signal due to NOT Gate Push-Back
 Warning (13024): Output pins are stuck at VCC or GND
@@ -670,15 +660,15 @@ Info (16010): Generating hard_block partition "hard_block:auto_generated_inst"
     Info (16011): Adding 0 node(s), including 0 DDIO, 0 PLL, 0 transceiver and 0 LCELL
 Warning (21074): Design contains 1 input pin(s) that do not drive logic
     Warning (15610): No output dependent on input pin "ext_rx_serial" File: C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v Line: 46
-Info (21057): Implemented 88569 device resources after synthesis - the final resource count might be different
+Info (21057): Implemented 2273 device resources after synthesis - the final resource count might be different
     Info (21058): Implemented 51 input pins
     Info (21059): Implemented 19 output pins
-    Info (21061): Implemented 88491 logic cells
+    Info (21061): Implemented 2195 logic cells
     Info (21064): Implemented 8 RAM segments
-Info: Quartus Prime Analysis & Synthesis was successful. 0 errors, 8 warnings
-    Info: Peak virtual memory: 5322 megabytes
-    Info: Processing ended: Tue Sep  1 15:06:57 2026
-    Info: Elapsed time: 00:05:19
-    Info: Total CPU time (on all processors): 00:05:24
+Info: Quartus Prime Analysis & Synthesis was successful. 0 errors, 6 warnings
+    Info: Peak virtual memory: 4809 megabytes
+    Info: Processing ended: Tue Sep  1 21:29:22 2026
+    Info: Elapsed time: 00:00:09
+    Info: Total CPU time (on all processors): 00:00:19
 
 

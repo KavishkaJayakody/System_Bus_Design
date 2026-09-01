@@ -116,43 +116,11 @@
 					"strict" : false
 				},
 				{
-					"name" : "m0_cmd_addr[3]",
+					"name" : "m1_cmd_wdata[0]",
 					"strict" : false
 				},
 				{
-					"name" : "m1_cmd_addr[3]",
-					"strict" : false
-				},
-				{
-					"name" : "m0_cmd_addr[4]",
-					"strict" : false
-				},
-				{
-					"name" : "m1_cmd_addr[4]",
-					"strict" : false
-				},
-				{
-					"name" : "m0_cmd_addr[1]",
-					"strict" : false
-				},
-				{
-					"name" : "m1_cmd_addr[1]",
-					"strict" : false
-				},
-				{
-					"name" : "m0_cmd_addr[0]",
-					"strict" : false
-				},
-				{
-					"name" : "m1_cmd_addr[0]",
-					"strict" : false
-				},
-				{
-					"name" : "m0_cmd_addr[6]",
-					"strict" : false
-				},
-				{
-					"name" : "m1_cmd_addr[6]",
+					"name" : "m0_cmd_wdata[0]",
 					"strict" : false
 				},
 				{
@@ -161,14 +129,6 @@
 				},
 				{
 					"name" : "m1_cmd_addr[5]",
-					"strict" : false
-				},
-				{
-					"name" : "m0_cmd_addr[2]",
-					"strict" : false
-				},
-				{
-					"name" : "m1_cmd_addr[2]",
 					"strict" : false
 				},
 				{
@@ -188,6 +148,14 @@
 					"strict" : false
 				},
 				{
+					"name" : "m0_cmd_addr[6]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[6]",
+					"strict" : false
+				},
+				{
 					"name" : "m0_cmd_addr[9]",
 					"strict" : false
 				},
@@ -204,19 +172,51 @@
 					"strict" : false
 				},
 				{
-					"name" : "m1_cmd_wdata[0]",
-					"strict" : false
-				},
-				{
-					"name" : "m0_cmd_wdata[0]",
-					"strict" : false
-				},
-				{
 					"name" : "m0_cmd_we",
 					"strict" : false
 				},
 				{
 					"name" : "m1_cmd_we",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[0]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[0]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[1]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[1]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[2]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[2]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[3]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[3]",
+					"strict" : false
+				},
+				{
+					"name" : "m0_cmd_addr[4]",
+					"strict" : false
+				},
+				{
+					"name" : "m1_cmd_addr[4]",
 					"strict" : false
 				},
 				{

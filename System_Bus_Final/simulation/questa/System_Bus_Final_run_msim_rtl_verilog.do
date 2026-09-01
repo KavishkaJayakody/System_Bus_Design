@@ -13,9 +13,9 @@ vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Des
 vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/slave_fast_ram.v}
 vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/top_bus_system.v}
 
-vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_arbiter_2m_split.v}
+vlog  -work work +incdir+C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final {C:/Users/amoda/OneDrive/Documents/GitHub/System_Bus_Design/System_Bus_Final/tb_top_bus_system.v}
 
-vsim -t 1ps -L altera_ver -L lpm_ver -L sgate_ver -L altera_mf_ver -L altera_lnsim_ver -L cycloneive_ver -L rtl_work -L work -voptargs="+acc"  tb_arbiter_2m_split
+vsim -t 1ps -L altera_ver -L lpm_ver -L sgate_ver -L altera_mf_ver -L altera_lnsim_ver -L cycloneive_ver -L rtl_work -L work -voptargs="+acc"  tb_top_bus_system
 
 add wave *
 view structure

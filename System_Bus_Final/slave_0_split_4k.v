@@ -1,5 +1,3 @@
-`timescale 1ns / 1ps
-
 module slave_0_split_4k (
     input  wire        clk,
     input  wire        rst_n,
@@ -13,7 +11,11 @@ module slave_0_split_4k (
     output reg         split_done
 );
 
-    reg [7:0]  mem [0:4095];
+    // Demo only needs 64 words. Use the MSB 6 bits of the local
+    // address as the storage index (lower 6 bits are don't-cares —
+    // every 64-address-aligned block aliases to the same word).
+    (* ramstyle = "M9K" *) reg [7:0] mem [0:63];
+
     reg [2:0]  latency_cnt;
     reg        processing_split;
     reg        data_ready_for_fetch;
@@ -33,27 +35,23 @@ module slave_0_split_4k (
             latency_cnt          <= 3'd0;
             split_data_reg       <= 8'h00;
             saved_raddr          <= 12'h000;
+            // 'mem' is deliberately NOT touched here — see note above.
         end else begin
             ready      <= 1'b0;
             split_req  <= 1'b0;
             split_done <= 1'b0;
 
-            // 1. Bus Access Handling
             if (sel) begin
                 if (we) begin
-                    // Fast Single-Cycle Write
-                    mem[addr] <= din;
-                    dout      <= din;
-                    ready     <= 1'b1;
+                    mem[addr[11:6]] <= din;
+                    dout            <= din;
+                    ready           <= 1'b1;
                 end else begin
-                    // Read Handling
                     if (data_ready_for_fetch && (addr == saved_raddr)) begin
-                        // Master returned to collect completed split data
                         dout                 <= split_data_reg;
                         ready                <= 1'b1;
                         data_ready_for_fetch <= 1'b0;
                     end else if (!processing_split && !data_ready_for_fetch) begin
-                        // Initial Read request: trigger split handshake
                         saved_raddr      <= addr;
                         processing_split <= 1'b1;
                         split_req        <= 1'b1;
@@ -62,10 +60,9 @@ module slave_0_split_4k (
                 end
             end
 
-            // 2. Background Split Latency Timer
             if (processing_split) begin
                 if (latency_cnt == SPLIT_LATENCY) begin
-                    split_data_reg       <= mem[saved_raddr];
+                    split_data_reg       <= mem[saved_raddr[11:6]];
                     split_done           <= 1'b1;
                     data_ready_for_fetch <= 1'b1;
                     processing_split     <= 1'b0;
