@@ -83,7 +83,10 @@ module master_node (
                     end else if (bus_ready) begin
                         m_valid   <= 1'b0;
                         bus_req   <= 1'b0;
-                        cmd_rdata <= bus_rdata;
+                        // Reads only. Slaves echo din onto dout during a
+                        // write, so capturing unconditionally would clobber
+                        // the last read value with the byte just written.
+                        if (!reg_we) cmd_rdata <= bus_rdata;
                         cmd_done  <= 1'b1;
                         state     <= DONE;
                     end else begin
@@ -99,7 +102,10 @@ module master_node (
                     end else if (bus_ready) begin
                         m_valid   <= 1'b0;
                         bus_req   <= 1'b0;
-                        cmd_rdata <= bus_rdata;
+                        // Reads only. Slaves echo din onto dout during a
+                        // write, so capturing unconditionally would clobber
+                        // the last read value with the byte just written.
+                        if (!reg_we) cmd_rdata <= bus_rdata;
                         cmd_done  <= 1'b1;
                         state     <= DONE;
                     end

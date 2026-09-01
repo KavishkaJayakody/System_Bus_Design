@@ -21,6 +21,7 @@ module slave_0_split_4k (
     reg        data_ready_for_fetch;
     reg [11:0] saved_raddr;
     reg [7:0]  split_data_reg;
+    reg        sel_d;          // sel from the previous cycle
 
     localparam SPLIT_LATENCY = 3'd3;
 
@@ -35,8 +36,10 @@ module slave_0_split_4k (
             latency_cnt          <= 3'd0;
             split_data_reg       <= 8'h00;
             saved_raddr          <= 12'h000;
+            sel_d                <= 1'b0;
             // 'mem' is deliberately NOT touched here — see note above.
         end else begin
+            sel_d      <= sel;
             ready      <= 1'b0;
             split_req  <= 1'b0;
             split_done <= 1'b0;
@@ -51,7 +54,13 @@ module slave_0_split_4k (
                         dout                 <= split_data_reg;
                         ready                <= 1'b1;
                         data_ready_for_fetch <= 1'b0;
-                    end else if (!processing_split && !data_ready_for_fetch) begin
+                    // Only the FIRST cycle of an access may open a split. The
+                    // master holds m_valid through DRIVE and WAIT, so without
+                    // the !sel_d guard the cycle after the split data is served
+                    // would open a second, phantom split for the same address -
+                    // which then deadlocks any later read to a different one.
+                    end else if (!sel_d && !processing_split
+                                 && !data_ready_for_fetch) begin
                         saved_raddr      <= addr;
                         processing_split <= 1'b1;
                         split_req        <= 1'b1;
