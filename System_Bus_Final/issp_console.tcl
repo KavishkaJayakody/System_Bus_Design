@@ -101,7 +101,7 @@ proc do_write {sl off data} {
     lassign [bus_cmd $MASTER 1 $a $data $REMOTE] ok rd lat err
     if {$err} {
         puts "  -> REMOTE TIMEOUT: the other board did not answer."
-        puts "     check the UART wiring (our C3 -> their D3, their C3 -> our D3, common ground)"
+        puts "     check the UART wiring (our AC15 -> their AB22, their AC15 -> our AB22, common gnd)"
         return
     }
     if {!$ok} {
@@ -131,7 +131,7 @@ proc do_read {sl off} {
     }
     if {$err} {
         puts "  -> REMOTE TIMEOUT: the other board did not answer."
-        puts "     check the UART wiring (our C3 -> their D3, their C3 -> our D3, common ground)"
+        puts "     check the UART wiring (our AC15 -> their AB22, their AC15 -> our AB22, common gnd)"
         return
     }
     puts [format "  M%d %sread 0x%04X = 0x%02X   (%d clks, slave %d %s, word %d)" \

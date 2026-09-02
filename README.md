@@ -1,6 +1,6 @@
 # System Bus Design
 
-A shared system bus for the Cyclone IV E (`EP4CE22F17C6`, DE0-Nano), written in Verilog-2001: 14-bit address, 8-bit data, two masters, four slaves, arbitration with a **split-transaction** protocol. The whole design is driven and observed over JTAG — no pins, no board wiring — using Altera In-System Sources & Probes.
+A shared system bus for the Cyclone IV E (`EP4CE115F29C7`, DE2-115), written in Verilog-2001: 14-bit address, 8-bit data, two masters, four slaves, arbitration with a **split-transaction** protocol. The whole design is driven and observed over JTAG — no pins, no board wiring — using Altera In-System Sources & Probes.
 
 **Verified on hardware.** All four integration cases pass on the board, including split-transaction interleaving.
 
@@ -164,8 +164,8 @@ Framing is 115200 baud from a 50 MHz clock (`CLKS_PER_BIT = 434`). Both that and
 `RESP_TIMEOUT` are parameters on `top_debug`, `top_bus_system` and
 `master_node_uart`, so testbenches can shrink them.
 
-Wiring between two boards: `ext_tx_serial` (GPIO_0[1], `C3`) of each to
-`ext_rx_serial` (GPIO_0[0], `D3`) of the other, plus a common ground.
+Wiring between two boards: `ext_tx_serial` (GPIO[1], `AC15`) of each to
+`ext_rx_serial` (GPIO[0], `AB22`) of the other, plus a common ground.
 
 `tb_uart_remote.v` runs two complete bus systems with a crossed link and checks
 remote write, remote read, both directions, a remote read of the far board's
@@ -227,19 +227,47 @@ The GUI interpreter has `exec` even though it lacks the ISSP packages, so the wr
 
 `TEST_DELAY_MS` at the top of `issp_bus_test.tcl` holds 1 s after each test so the LEDs can be read; set it to `0` for fast scripted runs.
 
-## Board pin assignments (DE0-Nano)
+## Board pin assignments (DE2-115)
 
-| Signal | Pin | Board net |
-|---|---|---|
-| `clk` | `R8` | CLOCK_50, 50 MHz oscillator |
-| `rst_n` | `J15` | KEY[0], active low with pull-up |
-| `ext_rx_serial` | `D3` | GPIO_0[0], JP1 pin 1 — UART RX into Master 0 |
-| `ext_tx_serial` | `C3` | GPIO_0[1], JP1 pin 2 — UART TX out of Master 0 |
-| `led[0..7]` | `A15 A13 B13 A11 D1 F3 B1 L3` | LED[7:0], active high |
+Top level is `top_debug`. Only these twelve pins leave the device — everything
+else is driven over JTAG.
 
-All 3.3-V LVTTL. Unused pins are reserved **as input tri-stated** — the board wires SDRAM, EPCS, ADC and the accelerometer to pins this design does not use, and Quartus' default of "as output driving ground" would fight those devices.
+| Port | FPGA pin | DE2-115 net | Dir | Bank |
+|---|---|---|---|---|
+| `clk` | `Y2` | `CLOCK_50` — 50 MHz oscillator | in | 2 |
+| `rst_n` | `M23` | `KEY[0]` — push button, active low with pull-up | in | 6 |
+| `ext_rx_serial` | `AB22` | `GPIO[0]` — header JP5, UART RX from the other board | in | 4 |
+| `ext_tx_serial` | `AC15` | `GPIO[1]` — header JP5, UART TX to the other board | out | 4 |
+| `led[0]` | `G19` | `LEDR[0]` | out | 7 |
+| `led[1]` | `F19` | `LEDR[1]` | out | 7 |
+| `led[2]` | `E19` | `LEDR[2]` | out | 7 |
+| `led[3]` | `F21` | `LEDR[3]` | out | 7 |
+| `led[4]` | `F18` | `LEDR[4]` | out | 7 |
+| `led[5]` | `E18` | `LEDR[5]` | out | 7 |
+| `led[6]` | `J19` | `LEDR[6]` | out | 7 |
+| `led[7]` | `H19` | `LEDR[7]` | out | 7 |
 
-`led[7:0]` shows the byte from the last Master 0 **read**; writes leave the display unchanged.
+Plus the four JTAG pins Quartus adds automatically
+(`altera_reserved_tck/tms/tdi/tdo`) for the In-System Sources & Probes link.
+
+`Y2` is a dedicated clock input (`CLK2` / `DIFFCLK_1p`) and is promoted onto a
+global clock network by the fitter.
+
+`KEY[0]` idles high and pulls low when pressed, which matches the active-low
+asynchronous `rst_n` — pressing it resets the whole design, and it is the only
+way to recover a bus that has been wedged by an access to the unmapped
+`0x2800–0x2FFF` gap.
+
+`LEDR[7:0]` shows the byte from the last Master 0 **read**; writes leave the
+display unchanged. Bit 0 is the rightmost LED in the table above.
+
+All twelve are **3.3-V LVTTL** (`STRATIX_DEVICE_IO_STANDARD`), since Quartus
+would otherwise default the banks to 2.5 V.
+
+Unused pins are reserved **as input tri-stated**. This matters on a DE2-115:
+SDRAM, SRAM, flash, ethernet, audio, VGA and the HSMC connector all hang off
+pins this design does not use, and Quartus' default of *"as output driving
+ground"* would have the FPGA actively driving into them.
 
 ## Simulation
 
@@ -269,7 +297,7 @@ Testbenches exit `0` regardless of result — grep for `ERROR` / `FAILED` rather
 Synthesis and bitstream with Quartus Prime Lite:
 
 ```bash
-quartus_map System_Bus_Final --part=EP4CE22F17C6
+quartus_map System_Bus_Final --part=EP4CE115F29C7
 quartus_fit System_Bus_Final
 quartus_asm System_Bus_Final
 ```

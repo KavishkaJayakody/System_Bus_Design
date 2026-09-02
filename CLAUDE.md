@@ -13,7 +13,7 @@ This repo holds **two independent implementations** of the same system bus. They
 
 `src/` and `tb/` contain earlier `.v` copies of the `System_Bus_Final/` modules. They have **diverged** — `src/slave_fast_ram.v` and `src/slave_0_split_4k.v` still use full-depth memories with a reset loop over all 4096 words (which forces LUT/FF memory instead of M9K). Treat `System_Bus_Final/` as the only source of truth.
 
-The root `System_Bus_Design.qsf` targets `EP4CE115F29C7`; `System_Bus_Final/System_Bus_Final.qsf` targets **`EP4CE22F17C6`** (a DE0-Nano) with top **`top_debug`**. Only the latter matters.
+The root `System_Bus_Design.qsf` targets `EP4CE115F29C7`; `System_Bus_Final/System_Bus_Final.qsf` targets **`EP4CE115F29C7`** (a DE2-115) with top **`top_debug`**. Only the latter matters.
 
 ## Critical: `System_Bus_Final/` is gitignored
 
@@ -78,7 +78,7 @@ vvp /tmp/top.vvp | grep -E "ERROR|FAILED|PASSED"
 Synthesis / fit / bitstream (Quartus Prime Lite 24.1std at `~/programs/intelFPGA_lite/24.1std/`):
 
 ```bash
-quartus_map System_Bus_Final --part=EP4CE22F17C6
+quartus_map System_Bus_Final --part=EP4CE115F29C7
 quartus_fit System_Bus_Final
 quartus_asm System_Bus_Final
 ```
@@ -179,8 +179,8 @@ reports a failure instead of hanging the bus. `CLKS_PER_BIT` (default 434) and
 ISSP wiring: `src[49]` drives `cmd_remote`, `prb[37]` reports the sticky
 `cmd_error`. Widths stay 50/38.
 
-Board-to-board: `ext_tx_serial` (`C3`) of each to `ext_rx_serial` (`D3`) of the
-other, plus common ground.
+Board-to-board: `ext_tx_serial` (`AC15`) of each to `ext_rx_serial` (`AB22`) of
+the other, plus common ground.
 
 `tb_uart_remote.v` instantiates two complete bus systems with a crossed link and
 checks remote write, remote read, both directions, a remote read of the split
@@ -200,10 +200,36 @@ Deliberate or known-broken.
 
 `slave_0_split_4k` used to start a **phantom split** after every split read: the master holds `m_valid` (hence `sel`) through both `DRIVE` and `WAIT`, so the cycle after the slave served the split data and cleared `data_ready_for_fetch`, the `else if` fired again and opened a second split for the same address. A repeat read of that address was then served in 5 clks without splitting, and a read of any *different* slave-0 address matched neither branch — no `ready`, no `split_req` — and deadlocked the bus permanently. The `!sel_d` guard at `slave_0_split_4k.v:62` restricts split-start to the first cycle of an access. Simulation missed this for a long time because the testbench only ever reads `0x0010`.
 
-## Board bring-up (DE0-Nano)
+## Board bring-up (DE2-115)
 
-Pin assignments live in the `.qsf`. `STRATIX_DEVICE_IO_STANDARD` is `3.3-V LVTTL` (Quartus otherwise defaults the banks to 2.5 V), and `RESERVE_ALL_UNUSED_PINS` is `AS INPUT TRI-STATED` — the board wires SDRAM, EPCS, ADC and the accelerometer to unused pins, and Quartus' default of "as output driving ground" would fight those devices.
+Top level `top_debug`. Twelve pins leave the device; everything else goes over
+JTAG. Assignments live in `System_Bus_Final.qsf`.
 
-`led[7:0]` shows `m0_cmd_rdata`. `master_node` captures that **only on reads** (`master_node.v:89` and `:108` are gated on `!reg_we`), so writes leave the display unchanged. Without that gate the slaves' `dout <= din` write echo would clobber it; the bridge would additionally lag by one because it does `dout <= dummy_reg` while `dummy_reg <= din`.
+| Port | Pin | DE2-115 net | Bank |
+|---|---|---|---|
+| `clk` | `Y2` | `CLOCK_50` (dedicated clock, CLK2/DIFFCLK_1p) | 2 |
+| `rst_n` | `M23` | `KEY[0]`, active low with pull-up | 6 |
+| `ext_rx_serial` | `AB22` | `GPIO[0]`, JP5 — UART RX | 4 |
+| `ext_tx_serial` | `AC15` | `GPIO[1]`, JP5 — UART TX | 4 |
+| `led[0]`..`led[7]` | `G19 F19 E19 F21 F18 E18 J19 H19` | `LEDR[0]`..`LEDR[7]` | 7 |
 
-The full source/probe bit map is in `README.md` and in the header comment of `bus_issp_driver.v` — keep those in sync when changing the bit layout.
+`STRATIX_DEVICE_IO_STANDARD` is `3.3-V LVTTL` (Quartus otherwise defaults the
+banks to 2.5 V), and `RESERVE_ALL_UNUSED_PINS` is `AS INPUT TRI-STATED` — the
+DE2-115 hangs SDRAM, SRAM, flash, ethernet, audio, VGA and HSMC off pins this
+design does not use, and the default of "as output driving ground" would drive
+into them.
+
+`led[7:0]` drives `LEDR[7:0]` from `m0_cmd_rdata`. `master_node` captures that
+**only on reads** (`master_node.v:89` and `:108` are gated on `!reg_we`), so
+writes leave the display unchanged. Without that gate the slaves' `dout <= din`
+write echo would clobber it after every write.
+
+`KEY[0]` is the only recovery from a wedged bus — `soft_rst` (`src[48]`) clears
+the ISSP driver's status flags but not the fabric.
+
+Board-to-board UART: `ext_tx_serial` (`AC15`) of each board to
+`ext_rx_serial` (`AB22`) of the other, plus a common ground. Pin choices need
+not match between boards; only the baud rate and frame format do.
+
+The full source/probe bit map is in `README.md` and in the header comment of
+`bus_issp_driver.v` — keep those in sync when changing the bit layout.
