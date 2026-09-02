@@ -65,19 +65,12 @@ if {!$ok} { fail "M1 read from 0x2000 never completed (lat=$lat)" } \
      else { check "M1 read 0x2000" $rd 0x3B $lat }
 
 pause
-puts "\n\[TEST 3\] UART TX slave staging regs (0x3000-0x3002)..."
-bus_cmd 0 1 0x3000 0xA1
-bus_cmd 0 1 0x3001 0xB2
-bus_cmd 0 1 0x3002 0xC3
-foreach {a want nm} {0x3000 0xA1 byte0 0x3001 0xB2 byte1 0x3002 0xC3 byte2} {
+puts "\n\[TEST 3\] Unmapped slave-3 slot must ack, not hang (0x3000)..."
+foreach a {0x3000 0x3001 0x3555 0x3FFF} {
     lassign [bus_cmd 0 0 $a 0x00] ok rd lat
-    if {!$ok} { fail "read of $a never completed (lat=$lat)" } \
-         else { check "staged $nm" $rd $want $lat }
+    if {!$ok} { fail "read of $a never completed (lat=$lat) - the slot is hanging" } \
+         else { check "unmapped $a" $rd 0x00 $lat }
 }
-# offset 3 reads back the transmitter busy flag; it must be idle here
-lassign [bus_cmd 0 0 0x3003 0x00] ok rd lat
-if {!$ok} { fail "UART status read never completed (lat=$lat)" } \
-     else { check "UART tx idle (status)" $rd 0x00 $lat }
 
 pause
 puts "\n\[TEST 4\] Split Read & Arbitration Interleaving..."

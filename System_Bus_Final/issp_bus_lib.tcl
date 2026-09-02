@@ -15,7 +15,7 @@
 #    [39:26]  m1_addr                [27:20]  m0_lat
 #    [47:40]  m1_wdata               [35:28]  m1_lat
 #    [48]     soft_rst               [36]     collision (sticky)
-#    [49]     reserved               [37]     reserved
+#    [49]     m0_remote              [37]     m0_error  (sticky, remote timeout)
 # ===========================================================================
 
 set SRC        0      ;# shadow copy of the 50-bit source register
@@ -60,36 +60,44 @@ proc pfields {m} {
 }
 
 # ---------------------------------------------------------------- bus commands
-proc arm {m we addr wdata} {
+# remote applies to Master 0 only: src[49] routes the command over the UART
+# link to the other board instead of onto our own bus.
+proc arm {m we addr wdata {remote 0}} {
     set b [expr {$m * 24}]
     src_field $b             1 0          ;# go low - clears sticky done
     src_field [expr {$b+1}]  1 $we
     src_field [expr {$b+2}] 14 $addr
     src_field [expr {$b+16}] 8 $wdata
+    if {$m == 0} { src_field 49 1 $remote }
 }
 
-# Wait for a master to report done. Returns {ok rdata latency}.
+# Wait for a master to report done. Returns {ok rdata latency err}.
+# err is the sticky remote-timeout flag and is meaningful for Master 0 only.
 proc await {m} {
     global POLL_LIMIT
     lassign [pfields $m] rlo dbit bbit llo
     for {set i 0} {$i < $POLL_LIMIT} {incr i} {
         set p [probe]
         if {[bits $p $dbit $dbit] == 1} {
-            return [list 1 [bits $p [expr {$rlo+7}] $rlo] [bits $p [expr {$llo+7}] $llo]]
+            return [list 1 [bits $p [expr {$rlo+7}] $rlo] \
+                           [bits $p [expr {$llo+7}] $llo] \
+                           [expr {$m == 0 ? [bits $p 37 37] : 0}]]
         }
     }
     set p [probe]
-    return [list 0 [bits $p [expr {$rlo+7}] $rlo] [bits $p [expr {$llo+7}] $llo]]
+    return [list 0 [bits $p [expr {$rlo+7}] $rlo] [bits $p [expr {$llo+7}] $llo] 0]
 }
 
-# One transaction on one master. Returns {ok rdata latency}.
-proc bus_cmd {m we addr wdata} {
-    arm $m $we $addr $wdata
+# One transaction on one master. Returns {ok rdata latency err}.
+# remote=1 (Master 0 only) sends it to the other board over UART.
+proc bus_cmd {m we addr wdata {remote 0}} {
+    arm $m $we $addr $wdata $remote
     src_flush
     src_field [expr {$m * 24}] 1 1        ;# rising edge fires it
     src_flush
     set r [await $m]
     src_field [expr {$m * 24}] 1 0        ;# release, clears sticky done
+    if {$m == 0} { src_field 49 1 0 }
     src_flush
     return $r
 }

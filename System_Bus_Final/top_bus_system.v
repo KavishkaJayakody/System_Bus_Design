@@ -1,7 +1,8 @@
 `timescale 1ns / 1ps
 
 module top_bus_system #(
-    parameter CLKS_PER_BIT = 434   // 50 MHz / 115200 baud
+    parameter CLKS_PER_BIT = 434,  // 50 MHz / 115200 baud
+    parameter RESP_TIMEOUT = 500000 // remote reply timeout, clocks
 )(
     input  wire        clk,
     input  wire        rst_n,
@@ -9,6 +10,8 @@ module top_bus_system #(
     // Master 0 Interface
     input  wire        m0_cmd_start,
     input  wire        m0_cmd_we,
+    input  wire        m0_cmd_remote,   // 1 = run this on the OTHER board
+    output wire        m0_cmd_error,    // remote transaction timed out
     input  wire [13:0] m0_cmd_addr,
     input  wire [7:0]  m0_cmd_wdata,
     output wire [7:0]  m0_cmd_rdata,
@@ -22,8 +25,9 @@ module top_bus_system #(
     output wire [7:0]  m1_cmd_rdata,
     output wire        m1_cmd_done,
 
-    // UART transmit pin (slave 3). The receive path lives in top_debug,
-    // ahead of Master 0, not on the slave side.
+    // UART link to the other board. Both directions belong to Master 0 now:
+    // it is the client for our remote transactions and the server for theirs.
+    input  wire        ext_rx_serial,
     output wire        ext_tx_serial
 );
 
@@ -53,16 +57,24 @@ module top_bus_system #(
     // ------------------------------------------------------------------------
     // Master Nodes
     // ------------------------------------------------------------------------
-    master_node m0_inst (
+    master_node_uart #(
+        .CLKS_PER_BIT (CLKS_PER_BIT),
+        .RESP_TIMEOUT (RESP_TIMEOUT)
+    ) m0_inst (
         .clk       (clk),            .rst_n    (rst_n),
-        .cmd_start (m0_cmd_start),   .cmd_we   (m0_cmd_we), 
+        .cmd_start (m0_cmd_start),   .cmd_we   (m0_cmd_we),
+        .cmd_remote(m0_cmd_remote),
         .cmd_addr  (m0_cmd_addr),    .cmd_wdata(m0_cmd_wdata),
         .cmd_rdata (m0_cmd_rdata),   .cmd_done (m0_cmd_done),
-        .bus_req   (req0),           .bus_gnt  (gnt0), 
+        .cmd_error (m0_cmd_error),
+        .bus_req   (req0),           .bus_gnt  (gnt0),
         .bus_split (m0_split_notify),
-        .m_addr    (m0_addr),        .m_wdata  (m0_wdata), 
+        .m_addr    (m0_addr),        .m_wdata  (m0_wdata),
         .m_we      (m0_we),          .m_valid  (m0_valid),
-        .bus_rdata (bus_rdata),      .bus_ready(bus_ready)
+        .bus_rdata (bus_rdata),      .bus_ready(bus_ready),
+        .uart_rx_serial(ext_rx_serial),
+        .uart_tx_serial(ext_tx_serial),
+        .remote_busy(), .srv_busy()
     );
 
     master_node m1_inst (
@@ -174,16 +186,14 @@ module top_bus_system #(
     );
 
     // External Bridge
-    slave_uart_tx #(.CLKS_PER_BIT(CLKS_PER_BIT)) s3_inst (
-        .clk       (clk),
-        .rst_n     (rst_n),
-        .sel       (sel_bridge),
-        .we        (bus_we),
-        .addr      (bus_addr[11:0]),
-        .din       (bus_wdata),
-        .dout      (sb_rdata),
-        .ready     (sb_ready),
-        .tx_serial (ext_tx_serial)
-    );
-
+    // The UART now lives inside Master 0, so this decoder slot is unused.
+    // Acknowledge with zero rather than leaving it dangling: an unanswered
+    // select would hang the bus exactly like the 0x2800-0x2FFF gap.
+    reg sb_ready_r;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) sb_ready_r <= 1'b0;
+        else        sb_ready_r <= sel_bridge;
+    end
+    assign sb_rdata = 8'h00;
+    assign sb_ready = sb_ready_r;
 endmodule

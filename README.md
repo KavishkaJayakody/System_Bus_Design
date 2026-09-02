@@ -13,19 +13,17 @@ top_debug                     synthesis top; only clk, rst_n, led[7:0] and the
  |                            two bridge pins leave the device
  +- bus_issp_driver           JTAG source/probe front-end (instance "BUS0")
  +- top_bus_system
-     +- master_node m0/m1     command FSM per master
+     +- master_node_uart m0   command FSM + UART client/server
+     +- master_node      m1   command FSM, local only
      +- bus_interconnect      arbiter + address decoder + both muxes
      |    +- arbiter_2m_split
      |    +- address_decoder
      +- slave_0_split_4k      0x0000-0x0FFF
      +- slave_fast_ram #12    0x1000-0x1FFF
      +- slave_fast_ram #11    0x2000-0x27FF
-     +- slave_uart_tx         0x3000-0x3FFF  UART command transmitter
+     (0x3000-0x3FFF unmapped, acknowledged with 0x00)
 ```
 
-The Master 0 command path runs **through `uart_cmd_inject`**: it passes the JTAG
-command straight through until three bytes arrive over UART, then injects that
-24-bit command for exactly one clock before reverting to JTAG.
 
 `bus_interconnect` owns the granted-master mux, the one-hot slave selects and the response return mux. `top_bus_system` holds the masters and slaves and wires them together.
 
@@ -35,7 +33,7 @@ command straight through until three bytes arrive over UART, then injects that
 | `0x1000–0x1FFF` | `slave_fast_ram` (12-bit) | Single cycle |
 | `0x2000–0x27FF` | `slave_fast_ram` (11-bit) | Single cycle |
 | `0x2800–0x2FFF` | *unmapped* | Decode gap — see [Known limitations](#known-limitations) |
-| `0x3000–0x3FFF` | `slave_uart_tx` | Stage 3 bytes, then trigger to transmit — see below |
+| `0x3000–0x3FFF` | *(unmapped)* | UART moved into Master 0; reads `0x00`, never hangs |
 
 Arbitration is fixed priority **M0 > M1**, with one override: an M0 split transaction whose data has arrived jumps ahead of a pending M1 request.
 
@@ -60,12 +58,12 @@ Open the **In-System Sources & Probes Editor** in Quartus and select instance ID
 | `src[39:26]` | 14 | `m1_cmd_addr` | Bus address |
 | `src[47:40]` | 8 | `m1_cmd_wdata` | Write data |
 | `src[48]` | 1 | `soft_rst` | Clears the sticky `done`/`collision` flags |
-| `src[49]` | 1 | — | Reserved, unused |
+| `src[49]` | 1 | `m0_remote` | 1 = run this Master 0 command on the **other board** |
 
 ```
  49   48   47........40 39..........26 25   24   23........16 15...........2  1    0
 ┌────┬────┬────────────┬──────────────┬────┬────┬────────────┬──────────────┬────┬────┐
-│rsvd│srst│ m1_wdata   │  m1_addr     │m1we│m1go│ m0_wdata   │  m0_addr     │m0we│m0go│
+│rem │srst│ m1_wdata   │  m1_addr     │m1we│m1go│ m0_wdata   │  m0_addr     │m0we│m0go│
 └────┴────┴────────────┴──────────────┴────┴────┴────────────┴──────────────┴────┴────┘
                     └──────── Master 1 ────────┘└──────── Master 0 ────────┘
 ```
@@ -85,12 +83,12 @@ Each master occupies a 24-bit slice: `go` at the bottom, then `we`, `addr`, `wda
 | `prb[27:20]` | 8 | `m0_lat` | Master 0 latency in clocks, saturating at `0xFF` |
 | `prb[35:28]` | 8 | `m1_lat` | Master 1 latency in clocks, saturating at `0xFF` |
 | `prb[36]` | 1 | `collision` | Sticky: both masters were in flight at once |
-| `prb[37]` | 1 | — | Reserved, reads `0` |
+| `prb[37]` | 1 | `m0_error` | Sticky: last remote command timed out |
 
 ```
  37   36   35........28 27........20 19   18   17........10  9    8    7.........0
 ┌────┬────┬────────────┬────────────┬────┬────┬────────────┬────┬────┬────────────┐
-│rsvd│coll│  m1_lat    │  m0_lat    │m1by│m1dn│  m1_rdata  │m0by│m0dn│  m0_rdata  │
+│err │coll│  m1_lat    │  m0_lat    │m1by│m1dn│  m1_rdata  │m0by│m0dn│  m0_rdata  │
 └────┴────┴────────────┴────────────┴────┴────┴────────────┴────┴────┴────────────┘
 ```
 
@@ -112,7 +110,6 @@ src[15:2] = 0x1000      src[1] = 0      src[0] = 0 → 1
 
 `0x00004000` to arm, `0x00004001` to fire. The result appears in `prb[7:0]` — expect `0xC5`, in about 6 clocks.
 
-**Read the bridge register.** *(removed — `0x3000` is now the UART transmitter.)*
 
 **Demonstrate a split transaction.** Read `0x0010` (Slave 0) on M0 and `0x1000` (Slave 1) on M1 *in the same source write*, so both `go` edges land on one clock. Slave 0 splits, the arbiter hands the bus to M1, and both complete. `prb[36]` (`collision`) latches high, proving they overlapped.
 
@@ -124,26 +121,28 @@ src[15:2] = 0x1000      src[1] = 0      src[0] = 0 → 1
 
 ---
 
-## Cross-board UART command link
+## Remote access over UART
 
-`cross_fpga_bridge_dummy` has been replaced by a real UART path, so one board can
-drive another board's bus.
+Master 0 is `master_node_uart`: an ordinary `master_node` core wrapped with a
+UART client and server. Set `cmd_remote` and the same address and data are
+carried to the **other board** and executed on its bus — reads bring the data
+back, writes bring an acknowledgement. The block is symmetric, so each board
+also serves the other's requests through its own core.
 
-**Transmit — `slave_uart_tx` at `0x3000`.** Stage three bytes, then trigger:
+```
+   Board A                                  Board B
+   master_node_uart  --- C3 --> D3 ---  master_node_uart
+        (client)     <-- D3 --  C3 --      (server)
+```
 
-| Offset | Write | Read |
-|---|---|---|
-| `0x3000` | command byte 0 | staged byte 0 |
-| `0x3001` | command byte 1 | staged byte 1 |
-| `0x3002` | command byte 2 | staged byte 2 |
-| `0x3003` | **any value starts the transfer** | bit 0 = busy |
+Wire format, 8N1, tagged so the two frame kinds cannot be confused:
 
-**Receive — `uart_cmd_inject`,** sitting between the JTAG driver and Master 0 on
-the far board. It normally passes the JTAG command through. When three bytes have
-arrived it assembles them, issues that command to Master 0 for one clock, clears
-its holding register on the next clock, and returns to the JTAG path.
+```
+REQUEST   0xA5, b0, b1, b2      b2:b1:b0 = the 24-bit command
+RESPONSE  0x5A, data            read data, or 0x00 acknowledging a write
+```
 
-**24-bit command format** — the same field order as one ISSP source slice:
+24-bit command — the same field order as one ISSP source slice:
 
 ```
  23........16 15...........2  1    0
@@ -152,24 +151,25 @@ its holding register on the next clock, and returns to the JTAG path.
 └────────────┴──────────────┴────┴────┘
 ```
 
-Bytes go out least-significant first, so the byte written to `0x3000` is the byte
-the receiver reassembles as `cmd[7:0]`.
+Because the command carries the full 14-bit address, a remote transaction can
+reach **any** slave on the far board, not just one window.
 
-*Example — make the far board write `0x5A` to its `0x1000`:*
-`(0x5A<<16) | (0x1000<<2) | (1<<1)` = `0x5A4002`, so write `0x02`, `0x40`, `0x5A`
-to `0x3000..0x3002` and then trigger at `0x3003`.
+If the far board does not answer within `RESP_TIMEOUT` clocks (default 500000,
+~10 ms) the transaction completes with `cmd_error` set, so an unplugged cable
+reports a failure instead of hanging the bus. Responses take priority over
+requests in the shared transmitter, so two boards issuing remote commands at the
+same instant still service each other rather than deadlocking.
 
-Framing is 8N1 at 115200 baud from a 50 MHz clock (`CLKS_PER_BIT = 434`). The
-parameter is threaded through `top_debug`, `top_bus_system`, `slave_uart_tx` and
-`uart_cmd_inject`, so testbenches can shorten the bit period.
+Framing is 115200 baud from a 50 MHz clock (`CLKS_PER_BIT = 434`). Both that and
+`RESP_TIMEOUT` are parameters on `top_debug`, `top_bus_system` and
+`master_node_uart`, so testbenches can shrink them.
 
-Wiring between two boards: `ext_tx_serial` (GPIO_0[1], `C3`) of one to
+Wiring between two boards: `ext_tx_serial` (GPIO_0[1], `C3`) of each to
 `ext_rx_serial` (GPIO_0[0], `D3`) of the other, plus a common ground.
 
-`tb_uart_link.v` verifies the whole loop in simulation by tying `ext_tx_serial`
-straight back to the receiver — it stages a command, transmits it, receives it,
-and confirms the bus was actually written. It passes at both a shortened bit
-period and the real 115200 setting.
+`tb_uart_remote.v` runs two complete bus systems with a crossed link and checks
+remote write, remote read, both directions, a remote read of the far board's
+split slave, and that cutting the link yields `cmd_error` rather than a hang.
 
 ## Running the hardware test
 
@@ -182,6 +182,38 @@ quartus_stp -t issp_bus_test.tcl -gap     # + decode-gap deadlock demo
 ```
 
 **`quartus_stp` is the only interpreter that works.** The `::quartus::jtag` and `::quartus::insystem_source_probe` packages are rejected by `quartus_sh` and absent from the Quartus GUI's Tcl console — no `load_package` can help there.
+
+### Interactive console
+
+For poking the bus by hand, `issp_console.tcl` gives you a prompt:
+
+```bash
+quartus_stp -t issp_console.tcl
+```
+
+```
+bus> w 1 40 5A                 write 0x5A to slave 1, offset 0x40
+bus> r 1 40                    read it back
+bus> both 1 80 C1 2 20 D2      BOTH masters write on the same clock edge
+bus> sweep 1                   write+read 8 words across a slave
+bus> rem on                    send M0 commands to the OTHER board
+bus> m 1                       switch to Master 1
+bus> map                       show the address map
+bus> h                         help          q  quit
+```
+
+`w`, `r` and `both` prompt for slave / offset / data when given no arguments.
+Offsets are hex and relative to the slave base, and every result reports the
+latency plus which of the 64 physical words the address actually landed on.
+
+`both` is the one that shows arbitration: a single JTAG source write sets both
+`go` bits, so the two requests reach the arbiter on the same clock, and the
+sticky `collision` probe bit confirms they really contended. Issuing two
+separate commands could never overlap — JTAG round trips are milliseconds
+apart while a bus transaction takes nanoseconds.
+
+Shared plumbing for both scripts (connection, the source/probe bit map,
+`bus_cmd`) lives in `issp_bus_lib.tcl`.
 
 To launch it **from the Quartus GUI**, use the wrapper instead:
 
@@ -201,8 +233,8 @@ The GUI interpreter has `exec` even though it lacks the ISSP packages, so the wr
 |---|---|---|
 | `clk` | `R8` | CLOCK_50, 50 MHz oscillator |
 | `rst_n` | `J15` | KEY[0], active low with pull-up |
-| `ext_rx_serial` | `D3` | GPIO_0[0], JP1 pin 1 — UART RX into `uart_cmd_inject` |
-| `ext_tx_serial` | `C3` | GPIO_0[1], JP1 pin 2 — UART TX out of `slave_uart_tx` |
+| `ext_rx_serial` | `D3` | GPIO_0[0], JP1 pin 1 — UART RX into Master 0 |
+| `ext_tx_serial` | `C3` | GPIO_0[1], JP1 pin 2 — UART TX out of Master 0 |
 | `led[0..7]` | `A15 A13 B13 A11 D1 F3 B1 L3` | LED[7:0], active high |
 
 All 3.3-V LVTTL. Unused pins are reserved **as input tri-stated** — the board wires SDRAM, EPCS, ADC and the accelerometer to pins this design does not use, and Quartus' default of "as output driving ground" would fight those devices.
@@ -219,14 +251,14 @@ cd System_Bus_Final
 # Full integration test
 iverilog -g2005 -o /tmp/top.vvp tb_top_bus_system.v top_bus_system.v bus_interconnect.v \
   address_decoder.v arbiter_2m_split.v master_node.v slave_0_split_4k.v \
-  slave_fast_ram.v slave_uart_tx.v uart_tx.v uart_rx.v
+  slave_fast_ram.v master_node_uart.v uart_tx.v uart_rx.v
 vvp /tmp/top.vvp
 
-# End-to-end UART command link (loopback)
-iverilog -g2005 -o /tmp/link.vvp tb_uart_link.v top_bus_system.v bus_interconnect.v \
-  address_decoder.v arbiter_2m_split.v master_node.v slave_0_split_4k.v \
-  slave_fast_ram.v slave_uart_tx.v uart_tx.v uart_rx.v uart_cmd_inject.v
-vvp /tmp/link.vvp
+# Two-board remote access
+iverilog -g2005 -o /tmp/rem.vvp tb_uart_remote.v top_bus_system.v bus_interconnect.v \
+  address_decoder.v arbiter_2m_split.v master_node.v master_node_uart.v \
+  slave_0_split_4k.v slave_fast_ram.v uart_tx.v uart_rx.v
+vvp /tmp/rem.vvp
 
 # A single unit test
 iverilog -g2005 -o /tmp/arb.vvp tb_arbiter_2m_split.v arbiter_2m_split.v && vvp /tmp/arb.vvp
@@ -248,7 +280,6 @@ Run these on a copy: compiling in place rewrites ~100 tracked Quartus build file
 
 ## Known limitations
 
-- **Memories hold 64 words, not 4K/2K, and addresses alias.** Both slave types index on the upper 6 address bits, so `0x1000` and `0x1001` are the same word — only every 64th address is distinct. This is deliberate: it keeps the arrays small enough to infer M9K blocks. Module names still advertise the full sizes.
 - **An access to the `0x2800–0x2FFF` gap deadlocks the bus.** `decode_err` is generated but never connected, so no slave select asserts, `bus_ready` never rises, and the master waits forever. There is no timeout, and only `rst_n` recovers it.
 - **Slave 0 only works for Master 0.** `m1_split_notify` is never asserted, so an M1 read of `0x0000–0x0FFF` splits and then hangs. The slave also tracks only one outstanding split, with no master ID.
 - **No `.sdc` file**, so `clk` is unconstrained and Fmax is never verified.

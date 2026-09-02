@@ -18,7 +18,7 @@
 //   src[39:26] m1_cmd_addr
 //   src[47:40] m1_cmd_wdata
 //   src[48]    soft_rst     clears the sticky done/collision flags
-//   src[49]    reserved
+//   src[49]    m0_remote    1 = send this command over UART
 //
 // PROBE map (38 bits, read back by the host):
 //   prb[7:0]   m0_rl        last read data captured for Master 0
@@ -30,7 +30,7 @@
 //   prb[27:20] m0_lat       cycles from launch to done, saturating at 0xFF
 //   prb[35:28] m1_lat
 //   prb[36]    collision    sticky: both masters were in flight at once
-//   prb[37]    reserved
+//   prb[37]    m0_error     sticky: last M0 remote command timed out
 //
 // A latency reading of 0xFF with busy still high means the transaction never
 // completed - e.g. an address in the 0x2800-0x2FFF decode gap, which asserts
@@ -42,10 +42,12 @@ module bus_issp_driver (
 
     output reg         m0_cmd_start,
     output wire        m0_cmd_we,
+    output wire        m0_cmd_remote,   // src[49]: run on the OTHER board
     output wire [13:0] m0_cmd_addr,
     output wire [7:0]  m0_cmd_wdata,
     input  wire [7:0]  m0_cmd_rdata,
     input  wire        m0_cmd_done,
+    input  wire        m0_cmd_error,    // remote transaction timed out
 
     output reg         m1_cmd_start,
     output wire        m1_cmd_we,
@@ -77,6 +79,8 @@ module bus_issp_driver (
     assign {m0_cmd_wdata, m0_cmd_addr, m0_cmd_we} = src[23:1];
     assign {m1_cmd_wdata, m1_cmd_addr, m1_cmd_we} = src[47:25];
 
+    assign m0_cmd_remote = src[49];
+
     wire m0_go    = src[0];
     wire m1_go    = src[24];
     wire soft_rst = src[48];
@@ -85,6 +89,7 @@ module bus_issp_driver (
     reg        m0_busy,   m1_busy;
     reg        m0_done_s, m1_done_s;
     reg        collision;
+    reg        m0_err_s;
     reg  [7:0] m0_rl,  m1_rl;
     reg  [7:0] m0_lat, m1_lat;
 
@@ -97,6 +102,7 @@ module bus_issp_driver (
             {m0_busy,   m1_busy}      <= 2'b0;
             {m0_done_s, m1_done_s}    <= 2'b0;
             collision                 <= 1'b0;
+            m0_err_s                  <= 1'b0;
             {m0_cmd_start, m1_cmd_start} <= 2'b0;
             {m0_rl,  m1_rl}           <= 16'b0;
             {m0_lat, m1_lat}          <= 16'b0;
@@ -120,6 +126,7 @@ module bus_issp_driver (
                     m0_busy   <= 1'b0;
                     m0_done_s <= 1'b1;
                     m0_rl     <= m0_cmd_rdata;
+                    m0_err_s  <= m0_cmd_error;
                 end
             end
 
@@ -145,6 +152,7 @@ module bus_issp_driver (
             if (!m1_go) m1_done_s <= 1'b0;
 
             if (soft_rst) begin
+                m0_err_s  <= 1'b0;
                 m0_done_s <= 1'b0;
                 m1_done_s <= 1'b0;
                 collision <= 1'b0;
@@ -152,7 +160,7 @@ module bus_issp_driver (
         end
     end
 
-    assign prb = {1'b0, collision,
+    assign prb = {m0_err_s, collision,
                   m1_lat, m0_lat,
                   m1_busy, m1_done_s, m1_rl,
                   m0_busy, m0_done_s, m0_rl};

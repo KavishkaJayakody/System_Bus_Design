@@ -37,6 +37,8 @@ module tb_top_bus_system;
     // External Serial Pin (UART transmit, slave 3)
     wire       ext_tx_serial;
 
+    wire       m0_cmd_error;
+
     integer error_count = 0;
     integer i;
 
@@ -46,6 +48,8 @@ module tb_top_bus_system;
         .rst_n         (rst_n),
         .m0_cmd_start (m0_cmd_start),
         .m0_cmd_we    (m0_cmd_we),
+        .m0_cmd_remote(1'b0),
+        .m0_cmd_error (m0_cmd_error),
         .m0_cmd_addr  (m0_cmd_addr),
         .m0_cmd_wdata (m0_cmd_wdata),
         .m0_cmd_rdata (m0_cmd_rdata),
@@ -56,6 +60,7 @@ module tb_top_bus_system;
         .m1_cmd_wdata (m1_cmd_wdata),
         .m1_cmd_rdata (m1_cmd_rdata),
         .m1_cmd_done  (m1_cmd_done),
+        .ext_rx_serial (1'b1),
         .ext_tx_serial (ext_tx_serial)
     );
 
@@ -154,52 +159,27 @@ module tb_top_bus_system;
         end
 
         // ---------------------------------------------------------------
-        // TEST 3: Randomized UART TX Staging Registers (Slave 3)
+        // TEST 3: Randomized probe of the unmapped slave-3 slot
         // ---------------------------------------------------------------
-        // slave_uart_tx decodes only addr[1:0], so every 4-byte block in
-        // 0x3000-0x3FFF aliases onto the same three staging registers. The
-        // random upper offset below is deliberate: it checks that aliasing.
-        $display("\n[TEST 3] UART TX Staging Registers (%0d Randomized Trials)...", NUM_RANDOM_TRIALS);
+        // The UART moved inside Master 0, so 0x3000-0x3FFF now decodes to
+        // nothing. top_bus_system acknowledges that range with zero instead of
+        // leaving the select dangling, which would hang the bus exactly like
+        // the 0x2800-0x2FFF gap. These trials prove it always answers.
+        $display("\n[TEST 3] Unmapped Slave-3 Slot (%0d Randomized Trials)...", NUM_RANDOM_TRIALS);
         for (i = 0; i < NUM_RANDOM_TRIALS; i = i + 1) begin : test3_loop
-            reg [13:0] blk;
-            reg [7:0]  b0, b1, b2;
+            reg [13:0] a3;
 
-            blk = BRIDGE_ADDR + (($random & 12'hFFF) & ~14'h3);
-            b0  = $random & 8'hFF;
-            b1  = $random & 8'hFF;
-            b2  = $random & 8'hFF;
+            a3 = BRIDGE_ADDR + ($random & 12'hFFF);
 
-            execute_m0(1'b1, blk + 14'd0, b0);
+            execute_m0(1'b0, a3, 8'h00);
             @(posedge m0_cmd_done);
-            execute_m0(1'b1, blk + 14'd1, b1);
-            @(posedge m0_cmd_done);
-            execute_m0(1'b1, blk + 14'd2, b2);
-            @(posedge m0_cmd_done);
-
-            execute_m0(1'b0, blk + 14'd0, 8'h00);
-            @(posedge m0_cmd_done);
-            if (m0_cmd_rdata !== b0) begin
-                $display("-> ERROR [Test 3 Iter %0d]: byte0 @ 0x%04X expected 0x%02X, got 0x%02X",
-                         i, blk, b0, m0_cmd_rdata);
-                error_count = error_count + 1;
-            end
-
-            execute_m0(1'b0, blk + 14'd1, 8'h00);
-            @(posedge m0_cmd_done);
-            if (m0_cmd_rdata !== b1) begin
-                $display("-> ERROR [Test 3 Iter %0d]: byte1 @ 0x%04X expected 0x%02X, got 0x%02X",
-                         i, blk, b1, m0_cmd_rdata);
-                error_count = error_count + 1;
-            end
-
-            execute_m0(1'b0, blk + 14'd2, 8'h00);
-            @(posedge m0_cmd_done);
-            if (m0_cmd_rdata !== b2) begin
-                $display("-> ERROR [Test 3 Iter %0d]: byte2 @ 0x%04X expected 0x%02X, got 0x%02X",
-                         i, blk, b2, m0_cmd_rdata);
+            if (m0_cmd_rdata !== 8'h00) begin
+                $display("-> ERROR [Test 3 Iter %0d]: 0x%04X expected 0x00, got 0x%02X",
+                         i, a3, m0_cmd_rdata);
                 error_count = error_count + 1;
             end
         end
+        $display("-> SUCCESS: unmapped slot always acknowledged with 0x00 (no hang)");
 
         // ---------------------------------------------------------------
         // TEST 4: Randomized Split Transaction & Bus Interleaving

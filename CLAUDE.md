@@ -19,7 +19,7 @@ The root `System_Bus_Design.qsf` targets `EP4CE115F29C7`; `System_Bus_Final/Syst
 
 `.gitignore:6` contains `System_Bus_Final/`. Files there are tracked only because they were committed *before* that rule was added. **Any new file added to that directory is silently ignored by git** — it will not show in `git status` and will never be committed.
 
-Currently untracked-and-invisible: `bus_issp_driver.v`, `top_debug.v`, `bus_interconnect.v`, `tb_slave_fast_ram.v`, `issp_bus_test.tcl`, `run_issp_test.tcl`, `uart_tx.v`, `uart_rx.v`, `uart_cmd_inject.v`, `slave_uart_tx.v`, `tb_uart_link.v`.
+Currently untracked-and-invisible: `bus_issp_driver.v`, `top_debug.v`, `bus_interconnect.v`, `tb_slave_fast_ram.v`, `issp_bus_test.tcl`, `issp_bus_lib.tcl`, `issp_console.tcl`, `run_issp_test.tcl`, `uart_tx.v`, `uart_rx.v`, `master_node_uart.v`, `tb_uart_remote.v`.
 
 To add a file there, either `git add -f <path>`, or fix the root cause by narrowing the rule to build artifacts:
 
@@ -42,18 +42,21 @@ Full integration testbench:
 cd System_Bus_Final
 iverilog -g2005 -o /tmp/top.vvp tb_top_bus_system.v top_bus_system.v bus_interconnect.v \
   address_decoder.v arbiter_2m_split.v master_node.v slave_0_split_4k.v \
-  slave_fast_ram.v slave_uart_tx.v uart_tx.v uart_rx.v
+  slave_fast_ram.v master_node_uart.v uart_tx.v uart_rx.v
 vvp /tmp/top.vvp
 ```
 
-End-to-end UART link (loops `ext_tx_serial` back into the receiver):
+Two-board remote access (crossed UART between two bus systems):
 
 ```bash
-iverilog -g2005 -o /tmp/link.vvp tb_uart_link.v top_bus_system.v bus_interconnect.v \
-  address_decoder.v arbiter_2m_split.v master_node.v slave_0_split_4k.v \
-  slave_fast_ram.v slave_uart_tx.v uart_tx.v uart_rx.v uart_cmd_inject.v
-vvp /tmp/link.vvp
+iverilog -g2005 -o /tmp/rem.vvp tb_uart_remote.v top_bus_system.v bus_interconnect.v \
+  address_decoder.v arbiter_2m_split.v master_node.v master_node_uart.v \
+  slave_0_split_4k.v slave_fast_ram.v uart_tx.v uart_rx.v
+vvp /tmp/rem.vvp
 ```
+
+The slaves instantiate `altsyncram`, which Quartus's own `altera_mf.v` cannot
+provide to iverilog (it does not parse). Use a behavioural stub for it.
 
 Single unit testbenches (each prints its own banner and error count):
 
@@ -96,6 +99,11 @@ quartus_stp -t issp_bus_test.tcl -gap     # + decode-gap deadlock demo
 
 **`quartus_stp` is the only interpreter that works.** Verified on 24.1std: `::quartus::jtag` and `::quartus::insystem_source_probe` are rejected outright by `quartus_sh` and absent entirely from the Quartus GUI's Tcl console — no `load_package` or `package require` can load them there. The script gates on this and fails fast with that message.
 
+`issp_console.tcl` is the interactive counterpart: `w` / `r` / `both` / `sweep`
+against any slave+offset. `both` fires both masters from one source write so
+they reach the arbiter on the same clock. Connection and the bit map are shared
+via `issp_bus_lib.tcl` — change the bit layout there, not in the two callers.
+
 To launch it *from* the GUI, use `run_issp_test.tcl` (Tools > Tcl Scripts, or `source` it in the console). The GUI interpreter has `exec` even though it lacks the ISSP packages, so that wrapper shells out to `quartus_stp` and echoes the output back into the console.
 
 **Close the In-System Sources & Probes Editor tab before any run** — an open editor holds the JTAG session and the test cannot claim it.
@@ -113,24 +121,18 @@ Single-master-at-a-time shared bus: 14-bit address, 8-bit data, 2 masters, 4 sla
 top_debug                     synthesis top; only clk, rst_n, led[7:0] and the
  |                            two bridge pins leave the device
  +- bus_issp_driver           JTAG source/probe front-end (instance "BUS0")
- +- uart_cmd_inject           UART RX; injects a received command into Master 0,
- |                            otherwise passes the JTAG command through
  +- top_bus_system
-     +- master_node m0/m1     command FSM per master
+     +- master_node_uart m0   command FSM + UART client/server (remote access)
+     +- master_node      m1   command FSM, local only
      +- bus_interconnect      arbiter + decoder + both muxes
      |    +- arbiter_2m_split
      |    +- address_decoder
      +- slave_0_split_4k      0x0000-0x0FFF  splits every read
      +- slave_fast_ram #12    0x1000-0x1FFF  single cycle
      +- slave_fast_ram #11    0x2000-0x27FF  single cycle
-     +- slave_uart_tx         0x3000-0x3FFF  UART command transmitter
+     (0x3000-0x3FFF unmapped: acknowledged with 0x00, never hangs)
 ```
 
-`top_debug` also carries **`uart_cmd_inject`** between `bus_issp_driver` and
-Master 0. It passes the JTAG command through until three bytes arrive over UART,
-then drives Master 0 with that 24-bit command for exactly one clock and clears
-its holding register the next clock. `ext_rx_serial` terminates there, not in
-`top_bus_system`.
 
 `0x2800-0x2FFF` is an unmapped gap. `bus_interconnect` owns the granted-master mux onto `bus_addr/bus_wdata/bus_we`, the one-hot slave selects, and the `bus_rdata`/`bus_ready` return mux; `top_bus_system` keeps the masters and slaves and wires them together.
 
@@ -142,41 +144,53 @@ its holding register the next clock. `ext_rx_serial` terminates there, not in
 
 Measured on hardware: fast read 6 clocks, uncontended split read 12 clocks.
 
-## UART command link
+## Remote access over UART
 
-`cross_fpga_bridge_dummy` is **deleted**. Slave 3 (`0x3000-0x3FFF`) is now
-`slave_uart_tx`, and the receive side is `uart_cmd_inject` in `top_debug`.
+`uart_cmd_inject` and `slave_uart_tx` are **deleted**. Master 0 is now
+`master_node_uart`, which wraps the ordinary `master_node` core and adds a UART
+client and server. Master 1 stays a plain `master_node`.
 
-24-bit command, same field order as one ISSP source slice:
-`cmd[23:16]`=wdata, `cmd[15:2]`=addr, `cmd[1]`=we, `cmd[0]` reserved.
-Bytes go out least-significant first.
+A transaction is local (`cmd_remote = 0`) or remote (`cmd_remote = 1`). A remote
+one is carried to the other board and executed on ITS bus; reads bring data
+back, writes bring an acknowledgement, so `cmd_done` means the far side really
+did it. The same block is also the server for the other board's requests, which
+it runs through the same core — so one core serves both, and `srv_active` muxes
+the command inputs.
 
-`slave_uart_tx` register map on `addr[1:0]`: 0/1/2 stage the command bytes,
-3 triggers on write and reads back the busy flag. **Writes are gated on the
-first cycle of an access (`sel & ~sel_d`)** — the master holds `m_valid` through
-`DRIVE` and `WAIT`, so an ungated trigger fires three or four times. This is the
-same hazard that caused the `slave_0_split_4k` phantom-split bug; any new slave
-with side-effecting writes needs the same guard.
+Wire format, 8N1, tagged so the two frame kinds cannot be confused:
 
-`CLKS_PER_BIT` (default 434 = 50 MHz / 115200, 8N1) is a parameter on
-`top_debug`, `top_bus_system`, `slave_uart_tx` and `uart_cmd_inject` so
-testbenches can shorten the bit period. `tb_uart_link.v` uses 4; it also passes
-at 434.
+```
+REQUEST   0xA5, b0, b1, b2      b2:b1:b0 = the 24-bit command
+RESPONSE  0x5A, data            read data, or 0x00 acknowledging a write
+```
 
-Board-to-board wiring: `ext_tx_serial` (`C3`) of one board to `ext_rx_serial`
-(`D3`) of the other, plus common ground.
+24-bit command: `cmd[23:16]`=wdata, `cmd[15:2]`=addr, `cmd[1]`=we, `cmd[0]` reserved.
 
-**A UART command is a single-cycle pulse into Master 0.** If Master 0 is not in
-`IDLE` when it lands, the command is dropped — `master_node` only accepts
-`cmd_start` from `IDLE`. This matches the "clear the register on the next clock"
-requirement, but means a UART command arriving during a JTAG transaction is lost
-rather than queued.
+**Responses take priority over requests** in the shared transmitter. Without
+that, two boards issuing remote commands on the same instant would both sit in
+`C_WAIT` and neither would answer.
+
+**`RESP_TIMEOUT`** (default 500000 clocks, ~10 ms) completes a remote
+transaction with `cmd_error` set if no answer arrives, so an unplugged cable
+reports a failure instead of hanging the bus. `CLKS_PER_BIT` (default 434) and
+`RESP_TIMEOUT` are parameters on `top_debug`, `top_bus_system` and
+`master_node_uart` so testbenches can shrink both.
+
+ISSP wiring: `src[49]` drives `cmd_remote`, `prb[37]` reports the sticky
+`cmd_error`. Widths stay 50/38.
+
+Board-to-board: `ext_tx_serial` (`C3`) of each to `ext_rx_serial` (`D3`) of the
+other, plus common ground.
+
+`tb_uart_remote.v` instantiates two complete bus systems with a crossed link and
+checks remote write, remote read, both directions, a remote read of the split
+slave, and that cutting the link produces `cmd_error` rather than a hang.
 
 ## Known quirks
 
-Deliberate or known-broken. Do not "fix" the first one without asking — it is load-bearing for M9K inference.
+Deliberate or known-broken.
 
-- **Memories are 64 words, not 4K/2K, and they alias.** Both slave types index with the *upper* 6 address bits (`slave_fast_ram.v:19`, `slave_0_split_4k.v:49`), so `0x1000` and `0x1001` are the same storage word — only every 64th address is distinct. Module names and the address map still advertise the full sizes. Testbenches respect this.
+- **Memories are full-depth `altsyncram` blocks** (4K / 4K / 2K) inferred into M9K. An earlier revision used 64-word arrays indexed on the upper address bits, so offsets aliased in blocks of 0x40 — that is gone; every offset is now its own word.
 - **A decode-gap access deadlocks the bus.** `decode_err` is driven by `address_decoder` but left unconnected in `bus_interconnect`. An access to `0x2800-0x2FFF` asserts no slave select, so `bus_ready` never rises and the master waits forever holding `bus_req`. There is no timeout, and nothing but `rst_n` recovers it — `soft_rst` (`src[48]`) only clears the ISSP driver's status flags, not the fabric.
 - **Slave 0 is effectively M0-only.** `m1_split_notify` is declared but never assigned 1 (`arbiter_2m_split.v:61` is its only write) — the arbiter reacts to `s0_split_req` solely in the `GRANT_M0` state. M1 reading `0x0000-0x0FFF` will split and hang. The slave also tracks a single outstanding split with no master ID.
 - **`ram_4k.v` is dead code** — nothing instantiates it, and it is not in the `.qsf` file list (though `tb_ram_4k.v` is).
