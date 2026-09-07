@@ -1,36 +1,29 @@
 //==========================================================================
 // bus_top.v
 //
-// Integration of the complete SERIAL shared bus: N_MASTERS masters, the
-// arbiter, the address decoder, the two-wire data path, three memory slaves
-// and the default slave.  Board-independent - de2_top wraps this with
-// clocking, switches and displays, and the testbenches drive these same
-// command ports directly.
+// The system: masters, the bus, slaves.  Three kinds of module, wired
+// together by serial wires and nothing else.
 //
-//   master[i] --+                              +-- slave_mem 0 (4K, split)
-//               |  arbiter --> gnt             |
-//               +->bus_mux --> bus_astream ----+-- slave_mem 1 (4K)
-//                             bus_dstream -----+-- slave_mem 2 (2K)
-//                                  |           |
-//                                  |           +-- default_slave
-//                                  v
-//                          shift_deser(16) --> addr_decoder --> sel
+//   master  x2  ---+
+//                  |   bus_astream   ONE wire, the address
+//   system_bus  ---+   bus_dstream   ONE wire, the data
+//                  |
+//   slave   x3  ---+
 //
-// THE ADDRESS ARRIVES ONE BIT AT A TIME, so the decoder cannot decide
-// anything until the frame is over.  The central deserialiser collects the
-// whole address while bus_valid is high; `addr_done' - the falling edge of
-// bus_valid - then enables the (still purely combinational) decoder for
-// exactly one cycle, producing the one-cycle `sel' pulse the slaves act on.
+// This module is only integration - it contains no logic of its own beyond
+// wiring and one OR gate.  Everything a bus does lives in `system_bus';
+// everything a peripheral does lives in `master' and `slave'.  Board
+// concerns (clocking, switches, displays) live one level up in `de2_top',
+// and the testbenches drive the command ports here directly.
 //
-// Deriving addr_done from bus_valid rather than adding an "end of frame"
-// wire keeps the shared bus at eight wires and means the frame length lives
-// in exactly one place: the master's counter.
-//
-// Everything below runs on one clock with one asynchronous active-low reset.
-// No clock gating, no second domain.
+// Splitting it this way is what makes the bus testable on its own:
+// `tb_system_bus' drives the master-side and slave-side interfaces below
+// with no real master or memory attached at all.
 //
 // The master command interfaces are flattened vectors (Verilog-2001 has no
-// arrays of ports): master i occupies bits [i*W +: W].
+// arrays of ports): master i occupies bits [i*W +: W].  Those are PARALLEL -
+// a whole address and a whole data word - because they face the sequencer,
+// not the bus.  The serialisation boundary is inside `master'.
 //
 //--------------------------------------------------------------------------
 // Port              Dir  Width              Meaning
@@ -55,15 +48,12 @@
 // split_mask        out  N_MASTERS          Arbiter split mask (status).
 // sel_q             out  N_SLAVES+1         Latched responder select (status).
 // bus_valid         out  1                  Address frame active (status).
-// bus_astream       out  1                  The shared address wire (status).
-// bus_dstream       out  1                  The shared data wire (status).
-// bus_addr          out  ADDR_W             The reassembled address, valid
-//                                           from addr_done onwards (status,
-//                                           and what the board displays).
-// addr_done         out  1                  One-cycle end-of-frame / decode
-//                                           strobe (status).
-// bus_ready         out  1                  Return completion strobe (status).
-// bus_resp          out  RESP_W             Return response (status).
+// bus_astream       out  1                  THE address wire (status).
+// bus_dstream       out  1                  THE data wire (status).
+// bus_addr          out  ADDR_W             Reassembled address (status).
+// addr_done         out  1                  Decode strobe (status).
+// bus_ready         out  1                  Completion strobe (status).
+// bus_resp          out  RESP_W             Response (status).
 // s0_busy           out  1                  Slave 0 has a split in flight.
 //==========================================================================
 `include "bus_defs.vh"
@@ -112,20 +102,29 @@ module bus_top #(
     output wire                            s0_busy
 );
 
-    //----------------------------------------------------------------------
-    // Master <-> forward-mux wiring.  One bit per master per stream.
-    //----------------------------------------------------------------------
+    //======================================================================
+    // Serial wires between the masters and the bus.
+    // One bit per master per stream - these are the CANDIDATES; the bus
+    // picks one with the grant.
+    //======================================================================
     wire [N_MASTERS-1:0]  m_req;
     wire [N_MASTERS-1:0]  m_valid;
     wire [N_MASTERS-1:0]  m_we;
     wire [N_MASTERS-1:0]  m_astream;
     wire [N_MASTERS-1:0]  m_dstream;
 
-    wire                  bus_we;
+    //======================================================================
+    // Serial wires between the bus and the slaves.
+    //======================================================================
+    wire                            bus_we;
+    wire [N_SLAVES-1:0]             s_sel;
+    wire [N_SLAVES-1:0]             s_ready;
+    wire [N_SLAVES*RESP_W-1:0]      s_resp_flat;
+    wire [N_SLAVES-1:0]             s_dstream;
 
-    //----------------------------------------------------------------------
-    // Masters
-    //----------------------------------------------------------------------
+    //======================================================================
+    // 1. MASTERS
+    //======================================================================
     genvar gi;
     generate
     for (gi = 0; gi < N_MASTERS; gi = gi + 1) begin : g_master
@@ -136,6 +135,7 @@ module bus_top #(
         ) u_master (
             .clk         (clk),
             .rst_n       (rst_n),
+            // parallel, facing the command source
             .cmd_valid   (cmd_valid[gi]),
             .cmd_we      (cmd_we[gi]),
             .cmd_addr    (cmd_addr_flat  [gi*ADDR_W +: ADDR_W]),
@@ -148,121 +148,83 @@ module bus_top #(
             .split_count (split_count_flat[gi*8 +: 8]),
             .busy        (mst_busy[gi]),
             .state       (),                     // waveform only
+            // serial, facing the bus
             .bus_req     (m_req[gi]),
             .bus_gnt     (gnt[gi]),
             .m_valid     (m_valid[gi]),
             .m_we        (m_we[gi]),
-            .m_astream   (m_astream[gi]),
-            .m_dstream   (m_dstream[gi]),
+            .m_astream   (m_astream[gi]),        // ADDRESS, one wire
+            .m_dstream   (m_dstream[gi]),        // WRITE DATA, one wire
             .bus_ready   (bus_ready),
             .bus_resp    (bus_resp),
-            .bus_dstream (bus_dstream)
+            .bus_dstream (bus_dstream)           // READ DATA, the shared wire
         );
     end
     endgenerate
 
-    //----------------------------------------------------------------------
-    // Arbiter.  Unchanged from the parallel bus - it only ever looked at
-    // req, ready and resp, none of which were serialised.
-    //----------------------------------------------------------------------
+    //======================================================================
+    // 2. THE BUS
+    //======================================================================
     wire [N_MASTERS-1:0] s0_split_complete;
-    wire [N_MASTERS-1:0] split_complete = s0_split_complete;
 
-    arbiter #(
+    // Wake-up pulses from every split-capable slave, OR-ed per master.  Only
+    // slave 0 can raise one today; a second split-capable slave joins here.
+    wire [N_MASTERS-1:0] s_split_complete = s0_split_complete;
+
+    system_bus #(
         .N_MASTERS (N_MASTERS),
         .ID_W      (ID_W),
-        .RESP_W    (RESP_W)
-    ) u_arbiter (
-        .clk            (clk),
-        .rst_n          (rst_n),
-        .req            (m_req),
-        .bus_ready      (bus_ready),
-        .bus_resp       (bus_resp),
-        .split_complete (split_complete),
-        .gnt            (gnt),
-        .gnt_valid      (gnt_valid),
-        .master_id      (master_id),
-        .split_mask     (split_mask),
-        .locked         ()
-    );
-
-    //----------------------------------------------------------------------
-    // The two-wire data path
-    //----------------------------------------------------------------------
-    wire [N_SLAVES-1:0]              slv_sel;
-    wire                             def_sel;
-    wire [N_SLAVES:0]                sel = {def_sel, slv_sel};
-
-    wire [N_SLAVES:0]                s_ready;
-    wire [(N_SLAVES+1)*RESP_W-1:0]   s_resp_flat;
-    wire [N_SLAVES:0]                s_dstream;
-
-    bus_mux #(
-        .N_MASTERS (N_MASTERS),
         .N_SLAVES  (N_SLAVES),
+        .ADDR_W    (ADDR_W),
         .RESP_W    (RESP_W)
-    ) u_bus_mux (
-        .clk         (clk),
-        .rst_n       (rst_n),
-        .gnt         (gnt),
-        .m_valid     (m_valid),
-        .m_we        (m_we),
-        .m_astream   (m_astream),
-        .m_dstream   (m_dstream),
-        .bus_valid   (bus_valid),
-        .bus_we      (bus_we),
-        .bus_astream (bus_astream),
-        .bus_dstream (bus_dstream),
-        .sel         (sel),
-        .s_ready     (s_ready),
-        .s_resp_flat (s_resp_flat),
-        .s_dstream   (s_dstream),
-        .bus_ready   (bus_ready),
-        .bus_resp    (bus_resp),
-        .sel_q       (sel_q)
+    ) u_system_bus (
+        .clk              (clk),
+        .rst_n            (rst_n),
+
+        // master side
+        .m_req            (m_req),
+        .m_gnt            (gnt),
+        .m_valid          (m_valid),
+        .m_we             (m_we),
+        .m_astream        (m_astream),
+        .m_dstream        (m_dstream),
+        .bus_ready        (bus_ready),
+        .bus_resp         (bus_resp),
+
+        // slave side
+        .bus_valid        (bus_valid),
+        .bus_we           (bus_we),
+        .bus_master_id    (master_id),
+        .s_sel            (s_sel),
+        .s_ready          (s_ready),
+        .s_resp_flat      (s_resp_flat),
+        .s_dstream        (s_dstream),
+        .s_split_complete (s_split_complete),
+
+        // the two shared wires
+        .bus_astream      (bus_astream),
+        .bus_dstream      (bus_dstream),
+
+        // status
+        .gnt_valid        (gnt_valid),
+        .split_mask       (split_mask),
+        .sel_q            (sel_q),
+        .bus_addr         (bus_addr),
+        .addr_done        (addr_done)
     );
 
-    //----------------------------------------------------------------------
-    // Central address deserialiser and the end-of-frame strobe.
+    //======================================================================
+    // 3. SLAVES
     //
-    // The decoder is combinational and needs the whole address at once, so
-    // one deserialiser here collects the frame off the shared wire.  The
-    // slaves each collect their own low bits off the same wire in parallel -
-    // nothing is broadcast back out in parallel form.
-    //----------------------------------------------------------------------
-    shift_deser #(.W(ADDR_W)) u_addr_deser (
-        .clk(clk), .rst_n(rst_n),
-        .shift(bus_valid), .din(bus_astream), .dout(bus_addr)
-    );
+    // Instantiated one by one rather than in a generate loop, because they
+    // differ in size and in whether they can split - and those differences
+    // are worth reading at a glance.
+    //
+    // All three tap the SAME bus_astream and bus_dstream.
+    //======================================================================
 
-    reg bus_valid_d;
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) bus_valid_d <= 1'b0;
-        else        bus_valid_d <= bus_valid;
-    end
-
-    // Falling edge of the frame: the address is complete this cycle.
-    assign addr_done = bus_valid_d & ~bus_valid;
-
-    //----------------------------------------------------------------------
-    // Address decoder.  Still purely combinational; it is simply enabled one
-    // cycle per frame instead of one cycle per parallel access.
-    //----------------------------------------------------------------------
-    addr_decoder #(
-        .ADDR_W   (ADDR_W),
-        .N_SLAVES (N_SLAVES)
-    ) u_decoder (
-        .en      (addr_done),
-        .addr    (bus_addr),
-        .slv_sel (slv_sel),
-        .def_sel (def_sel),
-        .hit     ()
-    );
-
-    //----------------------------------------------------------------------
-    // Slave 0 - 4K words at 0x0000, split capable
-    //----------------------------------------------------------------------
-    slave_mem #(
+    // Slave 0 - 4 KB at 0x0000, split capable
+    slave #(
         .DATA_W        (DATA_W),
         .LADDR_W       (`S0_LADDR_W),
         .WORDS         (`S0_WORDS),
@@ -277,7 +239,7 @@ module bus_top #(
         .frame          (bus_valid),
         .astream        (bus_astream),
         .dstream_in     (bus_dstream),
-        .sel            (slv_sel[`SEL_S0]),
+        .sel            (s_sel[`SEL_S0]),
         .we             (bus_we),
         .master_id      (master_id),
         .split_en       (s0_split_en),
@@ -288,10 +250,8 @@ module bus_top #(
         .busy           (s0_busy)
     );
 
-    //----------------------------------------------------------------------
-    // Slave 1 - 4K words at 0x1000
-    //----------------------------------------------------------------------
-    slave_mem #(
+    // Slave 1 - 4 KB at 0x1000
+    slave #(
         .DATA_W        (DATA_W),
         .LADDR_W       (`S1_LADDR_W),
         .WORDS         (`S1_WORDS),
@@ -305,7 +265,7 @@ module bus_top #(
         .frame          (bus_valid),
         .astream        (bus_astream),
         .dstream_in     (bus_dstream),
-        .sel            (slv_sel[`SEL_S1]),
+        .sel            (s_sel[`SEL_S1]),
         .we             (bus_we),
         .master_id      (master_id),
         .split_en       (1'b0),
@@ -316,10 +276,8 @@ module bus_top #(
         .busy           ()
     );
 
-    //----------------------------------------------------------------------
-    // Slave 2 - 2K words at 0x2000
-    //----------------------------------------------------------------------
-    slave_mem #(
+    // Slave 2 - 2 KB at 0x2000
+    slave #(
         .DATA_W        (DATA_W),
         .LADDR_W       (`S2_LADDR_W),
         .WORDS         (`S2_WORDS),
@@ -333,7 +291,7 @@ module bus_top #(
         .frame          (bus_valid),
         .astream        (bus_astream),
         .dstream_in     (bus_dstream),
-        .sel            (slv_sel[`SEL_S2]),
+        .sel            (s_sel[`SEL_S2]),
         .we             (bus_we),
         .master_id      (master_id),
         .split_en       (1'b0),
@@ -342,21 +300,6 @@ module bus_top #(
         .resp           (s_resp_flat[`SEL_S2*RESP_W +: RESP_W]),
         .split_complete (),
         .busy           ()
-    );
-
-    //----------------------------------------------------------------------
-    // Default slave - everything unmapped, answers ERROR so the bus never
-    // stalls on a bad address.
-    //----------------------------------------------------------------------
-    default_slave #(
-        .RESP_W (RESP_W)
-    ) u_default (
-        .clk         (clk),
-        .rst_n       (rst_n),
-        .sel         (def_sel),
-        .dstream_out (s_dstream[`SEL_DEF]),
-        .ready       (s_ready[`SEL_DEF]),
-        .resp        (s_resp_flat[`SEL_DEF*RESP_W +: RESP_W])
     );
 
 endmodule

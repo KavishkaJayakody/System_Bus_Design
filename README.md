@@ -1,10 +1,77 @@
 # System Bus Design
 
-A shared system bus for the Cyclone IV E (`EP4CE115F29C7`, DE2-115), written in Verilog-2001: 14-bit address, 8-bit data, two masters, four slaves, arbitration with a **split-transaction** protocol. The whole design is driven and observed over JTAG — no pins, no board wiring — using Altera In-System Sources & Probes.
+Shared-bus interconnects for the Cyclone IV E (`EP4CE115F29C7`, DE2-115),
+Verilog-2001, Quartus Prime Lite 24.1std.
 
-**Verified on hardware.** All four integration cases pass on the board, including split-transaction interleaving.
+The repo holds **three independent designs**. They share no files.
 
-The active project is [`System_Bus_Final/`](System_Bus_Final/). The `.sv` files at the repo root, plus `src/` and `tb/`, are an earlier superseded attempt.
+| Location | What it is | Status |
+|---|---|---|
+| [`Serial_System_Bus/`](Serial_System_Bus/) | **Serial** shared bus — address and data each on a single wire | **Active.** New work goes here. |
+| [`System_Bus_Final/`](System_Bus_Final/) | Parallel shared bus, driven over JTAG, with a UART link between two boards | Complete and hardware-verified. Kept as-is. |
+| Repo root `*.sv`, `src/`, `tb/` | Earlier SystemVerilog attempt and stale `.v` copies | Legacy. Superseded; do not extend. |
+
+Both working designs implement the same idea — two masters, priority
+arbitration with bus lock, address decoding, and AHB-style split transactions
+— but they wire it up completely differently, and the second is the
+interesting one.
+
+---
+
+# Serial_System_Bus — the active design
+
+Two masters, three memory slaves plus a default slave. **The address and the
+data each travel on a single wire**, MSB first, one bit per clock, shared by
+every master and every slave.
+
+The whole shared bus is **8 wires**:
+
+```
+bus_astream  1   serial address, 16 bits per frame
+bus_dstream  1   serial data, 8 bits, half duplex
+bus_valid    1   frame marker, high for 16 clocks
+bus_we       1   1 = write; also the data wire's direction control
+bus_ready    1   completion strobe
+bus_resp     2   OKAY / ERROR / SPLIT
+master_id    1   tag of the granted master
+```
+
+16-bit word address, 8-bit data, so the slaves are 4 KB / 4 KB / 2 KB at
+`0x0000`, `0x1000` and `0x2000`. `addr[15] == 1` is reserved and unmapped.
+
+| | |
+|---|---|
+| Write | 21 clocks |
+| Read | 30 clocks |
+| Split read | 79 clocks |
+| Logic elements | 688 / 114,480 |
+| Memory | 81,920 bits, all M9K |
+| **Fmax** | **141.8 MHz** against a 50 MHz requirement |
+| Testbenches | 11, all self-checking, all passing |
+
+```bash
+cd Serial_System_Bus
+./sim/run_icarus.sh              # all 11 testbenches; exit 0 only if all pass
+```
+
+Full documentation lives with the design:
+
+- [`Serial_System_Bus/README.md`](Serial_System_Bus/README.md) — board controls, LED map, demo walkthrough
+- [`docs/protocol.md`](Serial_System_Bus/docs/protocol.md) — the wire table, frame format, split flow
+- [`docs/address_map.md`](Serial_System_Bus/docs/address_map.md) — the map and per-slave address widths
+- [`docs/design_notes.md`](Serial_System_Bus/docs/design_notes.md) — every decision, and why
+
+---
+
+# System_Bus_Final — the earlier parallel design
+
+Hardware-verified on the board over JTAG, with a UART link for remote access
+between two boards. 14-bit address, 8-bit data, two masters, four slaves.
+The whole design is driven and observed over JTAG — no pins, no board wiring
+— using Altera In-System Sources & Probes.
+
+**Verified on hardware.** All four integration cases pass on the board,
+including split-transaction interleaving.
 
 ## Architecture
 
@@ -316,3 +383,11 @@ Run these on a copy: compiling in place rewrites ~100 tracked Quartus build file
 ## Repository notes
 
 `.gitignore` ignores `System_Bus_Final/` wholesale. Existing files there are tracked only because they predate that rule — **new files added to that directory are silently ignored by git**. Use `git add -f`, or narrow the rule to `System_Bus_Final/db/`, `incremental_db/`, `output_files/` and `simulation/`.
+
+`Serial_System_Bus/` is **not** subject to that rule — files added there commit
+normally. Its build output is ignored by pattern instead (`**/db/`,
+`**/output_files/`, and the Quartus-generated Questa netlists under
+`**/simulation/questa/`), so `git status` stays readable.
+
+Run Quartus on a **copy** in a scratch directory either way. Compiling in
+place rewrites the tracked `db/` and `output_files/` blobs.

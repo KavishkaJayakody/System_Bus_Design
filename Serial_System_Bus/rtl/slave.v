@@ -1,5 +1,5 @@
 //==========================================================================
-// slave_mem.v
+// slave.v
 //
 // Word-addressed memory slave on the SERIAL bus.  One module covers all
 // three slaves; WORDS/LADDR_W set the size and SPLIT_CAPABLE adds the split
@@ -82,7 +82,7 @@
 //==========================================================================
 `include "bus_defs.vh"
 
-module slave_mem #(
+module slave #(
     parameter DATA_W        = `BUS_DATA_W,
     parameter LADDR_W       = 12,
     parameter WORDS         = 4096,

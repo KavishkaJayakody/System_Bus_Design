@@ -2,18 +2,154 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Repository layout — two separate designs
+## Repository layout — three separate designs
 
-This repo holds **two independent implementations** of the same system bus. They do not share files.
+This repo holds **three independent implementations**. They do not share files.
 
 | Location | Language | Status |
 |---|---|---|
-| `System_Bus_Final/` | Verilog-2001 (`.v`) | **Active.** The real project. All work goes here. |
+| `Serial_System_Bus/` | Verilog-2001 (`.v`) | **Active.** The serial bus. All new work goes here. |
+| `System_Bus_Final/` | Verilog-2001 (`.v`) | Complete and hardware-verified. The earlier parallel bus with JTAG/ISSP and UART. Do not extend; do not break. |
 | Repo root (`*.sv`), `src/`, `tb/` | SystemVerilog (`.sv`) + earlier `.v` copies | Legacy. Superseded; do not extend. |
+
+`Serial_System_Bus/` and `System_Bus_Final/` are different buses, not versions
+of one. The former sends address and data one bit at a time on two shared
+wires; the latter is a parallel muxed bus. Don't copy fixes between them
+without checking the protocol matches.
 
 `src/` and `tb/` contain earlier `.v` copies of the `System_Bus_Final/` modules. They have **diverged** — `src/slave_fast_ram.v` and `src/slave_0_split_4k.v` still use full-depth memories with a reset loop over all 4096 words (which forces LUT/FF memory instead of M9K). Treat `System_Bus_Final/` as the only source of truth.
 
 The root `System_Bus_Design.qsf` targets `EP4CE115F29C7`; `System_Bus_Final/System_Bus_Final.qsf` targets **`EP4CE115F29C7`** (a DE2-115) with top **`top_debug`**. Only the latter matters.
+
+## `Serial_System_Bus/` — the active design
+
+Serial shared bus: 2 masters, 3 memory slaves + a default slave, 16-bit word
+address, 8-bit data, fixed-priority arbitration with bus lock, AHB-style
+split transactions. Target `EP4CE115F29C7` (DE2-115), top `de2_top`.
+
+**The address and the data each travel on one wire.** The whole shared bus is
+8 wires: `bus_astream`, `bus_dstream`, `bus_valid`, `bus_we`, `bus_ready`,
+`bus_resp[1:0]`, `master_id`. Everything else is point-to-point.
+
+**Three kinds of module.** `system_bus` is the bus and contains no master and
+no memory. `master` and `slave` are peripherals and contain no bus logic.
+`bus_top` is integration only — no logic beyond wiring and one OR gate. Keep
+that split: a change that wants to put memory in `system_bus`, or arbitration
+in `slave`, is in the wrong module. `tb_system_bus` depends on it — it drives
+both serial interfaces with nothing attached at either end.
+
+```
+de2_top                          synthesis top (DE2-115)
+ +- reset_ctrl / debouncer       KEY[0] reset, KEY[1] single-step
+ +- master_prog x2               on-board scenario sequencers (SW[1:0])
+ +- bus_top                      integration: masters + bus + slaves, nothing else
+ |
+ |   +- master x2                1. parallel command in, SERIAL onto the bus
+ |   |                              cmd_addr[15:0] -> m_astream (1 wire)
+ |   |                              cmd_wdata[7:0] -> m_dstream (1 wire)
+ |   |
+ |   +- system_bus               2. THE BUS - no master, no memory in here
+ |   |   +- arbiter                 priority + bus lock + split mask, param on N
+ |   |   +- addr_decoder            combinational, one-hot + default select
+ |   |   +- bus_mux                 who drives the two shared wires
+ |   |   +- shift_deser             central 16-bit address receiver -> decoder
+ |   |   +- default_slave           unmapped -> ERROR, so the bus never hangs
+ |   |
+ |   +- slave x3                 3. 4 KB @0x0000 (split capable)
+ |                                  4 KB @0x1000,  2 KB @0x2000
+ +- seg7_hex x8                  displays
+```
+
+`0x2800-0x2FFF` and all of `addr[15]==1` are unmapped and answer ERROR.
+`addr[15]==1` is reserved for the phase-2 remote window — never map it.
+
+**Frame format.** `bus_valid` is high for `ADDR_W` = 16 clocks. The address
+goes out MSB-first on `bus_astream`; write data goes out **right-aligned** on
+`bus_dstream` (8 zeros, then the byte). That right-alignment is load-bearing:
+every receiver is a plain `shift_deser` of its own width holding *the last W
+bits it saw*, which is exactly the field it wants — 16 for the decoder, 12 or
+11 for a slave's offset, 8 for the data. **No receiver has a bit counter; one
+frame timer in the master serves the whole bus.** Don't "tidy" this by
+left-aligning the data or adding counters.
+
+**Read data is the last `DATA_W` bits on `bus_dstream` before `bus_ready`.**
+The master's deserialiser free-runs through its wait state.
+
+Latency: write 21 clocks, read 30, split read 79. Fmax 141.8 MHz.
+
+### Commands
+
+There IS a run script here — use it.
+
+```bash
+cd Serial_System_Bus
+./sim/run_icarus.sh              # all 11 testbenches; exit 0 only if all pass
+./sim/run_icarus.sh arbiter      # just one
+```
+
+The script greps the output and sets the exit status itself, because the
+testbenches always `exit 0`. Under ModelSim/Questa: `vsim -c -do sim/run_questa.do`.
+
+`rtl/` must be on the include path (`iverilog -I rtl`, or `SEARCH_PATH` in the
+`.qsf`) so `` `include "bus_defs.vh" `` resolves.
+
+Synthesis — run on a **copy** in a scratch directory:
+
+```bash
+quartus_map Serial_System_Bus --part=EP4CE115F29C7
+quartus_fit Serial_System_Bus
+quartus_sta Serial_System_Bus
+quartus_asm Serial_System_Bus
+```
+
+Unlike `System_Bus_Final/`, `de2_top` instantiates no megafunctions, so
+`iverilog` elaborates the real board top level directly — `tb_de2_top` drives
+it through its actual pins.
+
+### Things that are deliberate — do not "fix" them
+
+- **The memory arrays have no reset.** `slave_mem.v` puts `mem[]` and `mem_q`
+  in a clock-only block. An async reset on a 4096-word array stops M9K
+  inference and builds it from flip-flops instead — the exact bug still
+  present in `src/`. The arrays hold no defined value at power-up; every test
+  writes before it reads.
+- **`reset_ctrl` has no reset.** It *is* the reset generator; it relies on
+  Cyclone IV registers powering up cleared.
+- **No divided clock.** A derived clock would break the one-domain rule. The
+  bus runs at 50 MHz and the scenario sequencer is throttled by a slow tick
+  enable.
+- **The read data phase starts at S+2, not S+1.** `mem_q` must stay a plain
+  register so Quartus absorbs it as the M9K output register. Merging it with
+  the output shift register forces an async array read and drops all three
+  memories into LUTs.
+- **The read/write enables are mutually exclusive** (`mem_read` vs
+  `mem_write`). A read-during-write makes Quartus infer a RAM whose result it
+  documents as undefined.
+- **The return select in `bus_mux` is a LATCH, not a one-cycle delay.** A
+  write answers in 1 cycle, a split in 1, a read in 10 — the reply is not at
+  a fixed offset. A delayed select goes stale before a read reply arrives.
+- **`arbiter.v` and `addr_decoder.v` are shared, unchanged, with the parallel
+  design's structure.** The arbiter only looks at req/ready/resp; the decoder
+  is combinational and merely enabled once per frame by `addr_done`, the
+  falling edge of `bus_valid`.
+
+### Traps that have already cost time here
+
+- **`// synthesis` at the start of a comment's text is parsed as a pragma.**
+  A comment reading `// synthesis in each instance.` produced three
+  "unrecognized synthesis attribute" warnings.
+- **Verilog tasks are STATIC by default.** `tb_bus_top` calls `m_run` from two
+  branches of a `fork`; without `task automatic` the two calls share storage
+  and corrupt each other. Three tests failed for a reason unrelated to the RTL.
+- **A counter narrower than its own parameter truncates silently.**
+  `SPLIT_LATENCY = 10_000_000` into a 16-bit counter became 38,528. The
+  counter is now 32 bits.
+- **The fitter deletes what cannot reach an output, or cannot change.** Two
+  separate instances: read data that only partly reached a pin, and a write
+  pattern with two identical byte lanes. Both silently produced narrower
+  memories than the design specifies. All 8 data bits now reach `HEX1..HEX0`
+  and the demo pattern varies every one of them. Check `Total memory bits` in
+  the fit report — it must be 81,920.
 
 ## Critical: `System_Bus_Final/` is gitignored
 
@@ -32,9 +168,15 @@ System_Bus_Final/simulation/
 
 The tracked tree already includes ~100 Quartus `db/`, `incremental_db/` and `output_files/` blobs that churn on every compile — that is why most of `git status` is noise.
 
-## Commands
+**`Serial_System_Bus/` is NOT subject to that rule** — files added there commit
+normally. Its build output is excluded by pattern (`**/db/`,
+`**/output_files/`, `**/simulation/questa/*.vo` and friends).
 
-No build script or Makefile — invoke tools directly. **`bus_interconnect.v` must be in every RTL compile** since the refactor.
+## Commands — `System_Bus_Final/` only
+
+For `Serial_System_Bus/`, see its section above; it has a run script.
+
+No build script or Makefile here — invoke tools directly. **`bus_interconnect.v` must be in every RTL compile** since the refactor.
 
 Full integration testbench:
 
@@ -113,7 +255,7 @@ Two ordering constraints inside the script, both easy to reintroduce:
 - `get_insystem_source_probe_instance_info` opens a **transient session of its own**, so it must be called *before* `start_insystem_source_probe`, never after.
 - Bit 0 of each 24-bit source slice is the `go` level and is deliberately excluded from the command payload concat (`src[23:1]`, not `src[23:0]`). Widening it back over bit 0 aliases `we` onto `go` and makes reads impossible.
 
-## Architecture
+## Architecture — `System_Bus_Final/`
 
 Single-master-at-a-time shared bus: 14-bit address, 8-bit data, 2 masters, 4 slaves, with a **split-transaction** protocol.
 
@@ -186,9 +328,11 @@ the other, plus common ground.
 checks remote write, remote read, both directions, a remote read of the split
 slave, and that cutting the link produces `cmd_error` rather than a hang.
 
-## Known quirks
+## Known quirks — `System_Bus_Final/`
 
-Deliberate or known-broken.
+Deliberate or known-broken. **These are the OLD design's bugs.** The
+equivalents are fixed in `Serial_System_Bus/` — the decode gap answers ERROR
+there, and either master can split — so do not carry these notes across.
 
 - **Memories are full-depth `altsyncram` blocks** (4K / 4K / 2K) inferred into M9K. An earlier revision used 64-word arrays indexed on the upper address bits, so offsets aliased in blocks of 0x40 — that is gone; every offset is now its own word.
 - **A decode-gap access deadlocks the bus.** `decode_err` is driven by `address_decoder` but left unconnected in `bus_interconnect`. An access to `0x2800-0x2FFF` asserts no slave select, so `bus_ready` never rises and the master waits forever holding `bus_req`. There is no timeout, and nothing but `rst_n` recovers it — `soft_rst` (`src[48]`) only clears the ISSP driver's status flags, not the fabric.

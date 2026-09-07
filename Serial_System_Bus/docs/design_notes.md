@@ -161,7 +161,7 @@ and sets the exit status. Do not trust `vvp`'s exit code.
 | `tb_shift_ser` | reset; MSB-first order; **zero padding past the end of the word**, which is what right-aligns short fields in a long frame; load beating a simultaneous shift; reload for a replay |
 | `tb_shift_deser` | reset; MSB-first order; the **"last W bits"** property, checked by feeding one 16-bit frame into 8-, 12- and 16-bit receivers at once and confirming each keeps the field it needs |
 | `tb_bus_mux` | reset; the forward mux follows the grant and ignores the other master entirely; the data wire's direction is exactly `bus_we` and a slave cannot disturb a write; the return select is **latched and held for 12 cycles**, so a read reply arriving 10 cycles late still finds the right slave |
-| `tb_slave_mem` | both `SPLIT_CAPABLE` builds: reset; write/read-back through the serial path; **response timing** — a write at S+1, a read at S+10; only the **low** address bits reach a slave (`0x2123` and `0xF923` must share offset `0x123` on the 2K slave); **a frame with no select must do nothing** — no ready, no memory change; split read with SPLIT arriving at S+1 while the read it defers costs 10; split of a write not taking effect until the replay; one split outstanding; the data wire left idle |
+| `tb_slave` | both `SPLIT_CAPABLE` builds: reset; write/read-back through the serial path; **response timing** — a write at S+1, a read at S+10; only the **low** address bits reach a slave (`0x2123` and `0xF923` must share offset `0x123` on the 2K slave); **a frame with no select must do nothing** — no ready, no memory change; split read with SPLIT arriving at S+1 while the read it defers costs 10; split of a write not taking effect until the replay; one split outstanding; the data wire left idle |
 | `tb_default_slave` | reset, `ERROR` one cycle after `sel`, `rdata = 0`, quiet while idle, back-to-back bad addresses |
 | `tb_master` | reset; the testbench **deserialises what the master puts on the wires**, so the checks are on the traffic itself: the frame is exactly `ADDR_W` clocks, the address arrives MSB-first, the write data arrives right-aligned; `0x80` and `0x01` both round-trip (catches a bit-order slip); the master does **not** drive the data wire during a read; `ERROR` reported and not retried; `SPLIT` → `bus_req` held, **no frame at all** while masked, then a complete second frame with the identical address *and data*, and exactly **one** `done` |
 | `tb_bus_top` | all five things the brief lists, end to end — see below |
@@ -322,7 +322,7 @@ their structure — only the data values changed width.
 **Selection happens after the frame.** The decoder cannot decide anything
 until the last address bit lands, so every slave shifts every frame in
 whether or not it is addressed. Acting on a frame without `sel` would corrupt
-another slave's transfer; `tb_slave_mem` test 4 drives a full frame with no
+another slave's transfer; `tb_slave` test 4 drives a full frame with no
 select and checks that nothing answers and no memory changes.
 
 **The return select had to become a latch.** On the parallel bus the reply
@@ -354,9 +354,7 @@ out in the comment so the next reader can check it.
 
 ## 9. Verification and synthesis after the conversion
 
-Ten self-checking testbenches, all passing (`./sim/run_icarus.sh`). Two are
-new — `tb_shift_ser` and `tb_shift_deser` for the serial primitives — and the
-rest were reworked for the new protocol.
+Eleven self-checking testbenches, all passing (`./sim/run_icarus.sh`).
 
 The tests that matter most for a serial bus, and where they live:
 
@@ -366,10 +364,10 @@ The tests that matter most for a serial bus, and where they live:
 | The address reassembled off the wire matches what was sent | `tb_bus_top` test 7, `tb_master` tests 2/4 |
 | Write data arrives right-aligned | `tb_master` test 2 |
 | Bit order is MSB-first (0x80 and 0x01 both round-trip) | `tb_master` test 3, `tb_shift_ser` test 2 |
-| A slave ignores a frame it was not selected for | `tb_slave_mem` test 4 |
-| Only the low address bits reach a slave | `tb_slave_mem` test 3 |
+| A slave ignores a frame it was not selected for | `tb_slave` test 4 |
+| Only the low address bits reach a slave | `tb_slave` test 3 |
 | The master does not drive the data wire during a read | `tb_master` test 3 |
-| The data wire is idle when nobody is sending | `tb_slave_mem` test 8, `tb_bus_mux` test 3 |
+| The data wire is idle when nobody is sending | `tb_slave` test 8, `tb_bus_mux` test 3 |
 | A split replays a COMPLETE frame, not a resumption | `tb_master` test 6, `tb_bus_top` test 7 |
 | A read reply arriving 10 cycles late still finds the right slave | `tb_bus_mux` test 4 |
 
@@ -391,3 +389,71 @@ Fmax rose because the widest combinational path — the 32-bit return mux — is
 now one bit wide.
 
 The remaining warnings are the same set as before and are explained in §6.
+
+---
+
+## 10. The design was split into three modules
+
+`bus_top` used to contain the masters, the slaves and all the interconnect in
+one file. It is now integration only, and the design is three kinds of module:
+
+| Module | Contains | Does NOT contain |
+|---|---|---|
+| `system_bus` | arbiter, address decoder, `bus_mux`, the central address deserialiser, the default responder | any master, any memory |
+| `master` | command FSM, serialisers, deserialiser, replay | arbitration, decoding |
+| `slave` | memory, deserialisers, output shift register, split state | arbitration, decoding |
+
+`bus_top` holds no logic beyond wiring and one OR gate (the split wake-ups
+from every split-capable slave, OR-ed per master).
+
+### Why the default responder lives inside the bus
+
+It is the only judgement call in the split. It looks like a slave and is
+named like one, but it holds none of the state a peripheral has — no memory,
+no address of its own — and its entire job is to stop an unmapped address
+leaving the bus without a responder. That is a property of the bus, not of
+anything hanging off it. Putting it inside `system_bus` also means the
+slave-side interface carries only real slaves, so `N_SLAVES` means what it
+says.
+
+### The interfaces are serial on both sides
+
+| Interface | Address | Data |
+|---|---|---|
+| master → bus | `m_astream`, 1 wire per master | `m_dstream`, 1 wire per master |
+| bus → slave | `bus_astream`, 1 shared wire | `bus_dstream`, 1 shared wire |
+| slave → bus | — | `s_dstream`, 1 wire per slave |
+| bus → master | — | `bus_dstream`, the same shared wire |
+
+The per-endpoint `m_astream`, `m_dstream` and `s_dstream` inputs are
+*candidates* — one wire from each endpoint into the mux, of which exactly one
+reaches the shared wire. `bus_astream` and `bus_dstream` are single nets that
+every endpoint taps; `bus_dstream` is one net exposed once and wired to both
+masters and slaves, so the "one data wire" is literally one signal in the
+netlist rather than a pair that happens to be connected.
+
+There are no `inout` ports and no tristates. An FPGA has no internal tristate
+buffers, so a shared wire is a mux — which is why each endpoint has an output
+and an input onto the same net rather than one bidirectional port.
+
+### What the split bought
+
+**A testbench for the bus alone.** `tb_system_bus` instantiates no master and
+no memory. It plays both roles by driving the two serial interfaces directly:
+it shifts an address frame in on a master's wire and answers as a slave on a
+slave's wire. That makes it possible to test things that were previously only
+observable through a full system:
+
+* the address shifted in on one wire comes back out reassembled and lands on
+  the right select
+* the data wire carries the granted master's bit on a write and the selected
+  slave's bit on a read, and neither side can disturb the other
+* the latched return select still routes a reply that arrives ten cycles after
+  the frame
+* **an unmapped frame is answered `ERROR` by the bus itself, with nothing
+  attached to the slave ports at all** — the clearest possible statement that
+  hang-freedom is the bus's property and not a slave's
+
+**It cost nothing in hardware.** The build before and after the split is
+identical: 688 logic elements, 513 registers, 81,920 memory bits, Fmax
+141.8 MHz. It is a pure refactor, and the fitter agrees.

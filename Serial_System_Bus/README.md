@@ -24,28 +24,45 @@ master_id    1   tag of the granted master
 
 ```
 de2_top                          synthesis top (DE2-115 wrapper)
- +- reset_ctrl                   debounced KEY[0] -> async-assert/sync-release rst_n
- +- debouncer                    KEY[1] single-step
+ +- reset_ctrl / debouncer       KEY[0] reset, KEY[1] single-step
  +- master_prog x2               on-board scenario sequencers (SW[1:0])
- +- bus_top                      the bus itself, board-independent
- |   +- master x2                serialises addr+data, replays after SPLIT
- |   +- arbiter                  priority + lock + split mask, parameterised for N
- |   +- addr_decoder             combinational, one-hot + default select
- |   +- bus_mux                  the two shared wires and who drives them
- |   +- shift_deser              central 16-bit address receiver -> decoder
- |   +- slave_mem #0             0x0000-0x0FFF  4 KB, split capable
- |   +- slave_mem #1             0x1000-0x1FFF  4 KB
- |   +- slave_mem #2             0x2000-0x27FF  2 KB
- |   +- default_slave            everything else -> ERROR, so the bus never hangs
+ +- bus_top                      integration: masters + bus + slaves, nothing else
+ |
+ |   +- master x2                1. parallel command in, SERIAL onto the bus
+ |   |                              cmd_addr[15:0] -> m_astream (1 wire)
+ |   |                              cmd_wdata[7:0] -> m_dstream (1 wire)
+ |   |
+ |   +- system_bus               2. THE BUS - no master, no memory in here
+ |   |   +- arbiter                 priority + bus lock + split mask, param on N
+ |   |   +- addr_decoder            combinational, one-hot + default select
+ |   |   +- bus_mux                 who drives the two shared wires
+ |   |   +- shift_deser             central 16-bit address receiver -> decoder
+ |   |   +- default_slave           unmapped -> ERROR, so the bus never hangs
+ |   |
+ |   +- slave x3                 3. 4 KB @0x0000 (split capable)
+ |                                  4 KB @0x1000,  2 KB @0x2000
  +- seg7_hex x8                  displays
 ```
+
+**Three kinds of module, and only serial wires between them.** `system_bus`
+is the bus and contains no master and no memory; `master` and `slave` are
+peripherals and contain no bus logic. `bus_top` is integration only. That
+split is what lets `tb_system_bus` test the bus on its own, driving both
+serial interfaces with nothing attached at either end.
+
+| Interface | Address | Data |
+|---|---|---|
+| master -> bus | `m_astream`, 1 wire per master | `m_dstream`, 1 wire per master |
+| bus -> slave | `bus_astream`, 1 shared wire | `bus_dstream`, 1 shared wire |
+| slave -> bus | — | `s_dstream`, 1 wire per slave |
+| bus -> master | — | `bus_dstream`, the same shared wire |
 
 ## Layout
 
 | Path | Contents |
 |---|---|
 | `rtl/` | synthesisable modules, one per file, plus `bus_defs.vh`; `shift_ser.v` / `shift_deser.v` are the two serial primitives everything else is built from |
-| `tb/` | one self-checking testbench per module, plus `tb_bus_top` and `tb_de2_top` |
+| `tb/` | one self-checking testbench per module — including `tb_system_bus`, which exercises the bus with no master and no memory attached — plus `tb_bus_top` and `tb_de2_top` |
 | `sim/` | `run_icarus.sh`, `run_questa.do` |
 | `docs/` | [design_notes.md](docs/design_notes.md), [address_map.md](docs/address_map.md), [protocol.md](docs/protocol.md) |
 | `Serial_System_Bus.qsf/.qpf/.sdc` | Quartus project, pin assignments and timing constraints |
@@ -54,7 +71,7 @@ de2_top                          synthesis top (DE2-115 wrapper)
 
 ```bash
 cd Serial_System_Bus
-./sim/run_icarus.sh              # all 10 testbenches; exit 0 only if all pass
+./sim/run_icarus.sh              # all 11 testbenches; exit 0 only if all pass
 ./sim/run_icarus.sh arbiter      # just one
 ```
 

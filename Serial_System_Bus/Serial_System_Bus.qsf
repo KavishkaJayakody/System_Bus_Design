@@ -72,9 +72,10 @@ set_global_assignment -name VERILOG_FILE rtl/shift_deser.v
 set_global_assignment -name VERILOG_FILE rtl/addr_decoder.v
 set_global_assignment -name VERILOG_FILE rtl/arbiter.v
 set_global_assignment -name VERILOG_FILE rtl/bus_mux.v
-set_global_assignment -name VERILOG_FILE rtl/slave_mem.v
+set_global_assignment -name VERILOG_FILE rtl/slave.v
 set_global_assignment -name VERILOG_FILE rtl/default_slave.v
 set_global_assignment -name VERILOG_FILE rtl/master.v
+set_global_assignment -name VERILOG_FILE rtl/system_bus.v
 set_global_assignment -name VERILOG_FILE rtl/bus_top.v
 set_global_assignment -name VERILOG_FILE rtl/master_prog.v
 set_global_assignment -name VERILOG_FILE rtl/reset_ctrl.v
@@ -88,9 +89,10 @@ set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_shift_deser.v -section_id 
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_addr_decoder.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_arbiter.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_bus_mux.v -section_id eda_simulation
-set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_slave_mem.v -section_id eda_simulation
+set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_slave.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_default_slave.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_master.v -section_id eda_simulation
+set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_system_bus.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_bus_top.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_de2_top.v -section_id eda_simulation
 

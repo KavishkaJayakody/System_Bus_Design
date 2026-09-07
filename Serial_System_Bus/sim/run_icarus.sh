@@ -18,9 +18,18 @@ TB=tb
 OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 
+# Source groups, mirroring the module split: the serial primitives, the bus,
+# the peripherals, the board layer.
 SER="$RTL/shift_ser.v $RTL/shift_deser.v"
-COMMON="$RTL/addr_decoder.v $RTL/arbiter.v $RTL/bus_mux.v $RTL/slave_mem.v \
-        $RTL/default_slave.v $RTL/master.v $RTL/bus_top.v $SER"
+
+# Everything inside system_bus - this is what tb_system_bus compiles, with
+# no master and no memory anywhere in the list.
+BUS="$RTL/system_bus.v $RTL/arbiter.v $RTL/addr_decoder.v $RTL/bus_mux.v \
+     $RTL/default_slave.v $RTL/shift_deser.v"
+
+# The whole system: masters + bus + slaves.
+COMMON="$RTL/bus_top.v $RTL/master.v $RTL/slave.v $BUS $RTL/shift_ser.v"
+
 BOARD="$RTL/de2_top.v $RTL/master_prog.v $RTL/reset_ctrl.v $RTL/debouncer.v \
        $RTL/seg7_hex.v"
 
@@ -52,14 +61,24 @@ try () {
     fi
 }
 
+# --- serial primitives ---------------------------------------------------
 try shift_ser     "$RTL/shift_ser.v"
 try shift_deser   "$RTL/shift_deser.v"
+
+# --- inside the bus ------------------------------------------------------
 try addr_decoder  "$RTL/addr_decoder.v"
 try arbiter       "$RTL/arbiter.v"
 try bus_mux       "$RTL/bus_mux.v"
-try slave_mem     "$RTL/slave_mem.v" "$RTL/shift_deser.v"
 try default_slave "$RTL/default_slave.v"
+
+# --- the bus itself, with no master and no memory attached ---------------
+try system_bus    $BUS
+
+# --- the peripherals -----------------------------------------------------
 try master        "$RTL/master.v" $SER
+try slave         "$RTL/slave.v" "$RTL/shift_deser.v"
+
+# --- integration ---------------------------------------------------------
 try bus_top       $COMMON
 try de2_top       $COMMON $BOARD
 

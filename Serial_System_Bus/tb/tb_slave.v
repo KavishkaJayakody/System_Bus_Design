@@ -1,5 +1,5 @@
 //==========================================================================
-// tb_slave_mem.v -- self-checking testbench for slave_mem
+// tb_slave.v -- self-checking testbench for slave_mem
 //
 // Two DUTs from the same module: a plain 2K slave and a 4K split-capable
 // slave, so both SPLIT_CAPABLE builds are covered.
@@ -30,7 +30,7 @@
 `timescale 1ns/1ps
 `include "bus_defs.vh"
 
-module tb_slave_mem;
+module tb_slave;
 
     localparam ADDR_W  = `BUS_ADDR_W;
     localparam DATA_W  = `BUS_DATA_W;
@@ -69,7 +69,7 @@ module tb_slave_mem;
     wire [RESP_W-1:0] a_resp;
     wire [N-1:0]      a_sc;
 
-    slave_mem #(
+    slave #(
         .DATA_W(DATA_W), .LADDR_W(11), .WORDS(2048), .RESP_W(RESP_W),
         .N_MASTERS(N), .ID_W(ID_W), .SPLIT_CAPABLE(0)
     ) dut_plain (
@@ -86,7 +86,7 @@ module tb_slave_mem;
     wire [RESP_W-1:0] b_resp;
     wire [N-1:0]      b_sc;
 
-    slave_mem #(
+    slave #(
         .DATA_W(DATA_W), .LADDR_W(12), .WORDS(4096), .RESP_W(RESP_W),
         .N_MASTERS(N), .ID_W(ID_W), .SPLIT_CAPABLE(1), .SPLIT_LATENCY(SPL_LAT)
     ) dut_split (
@@ -175,7 +175,7 @@ module tb_slave_mem;
 
     initial begin
         $display("======================================================");
-        $display(" tb_slave_mem");
+        $display(" tb_slave");
         $display("======================================================");
 
         rst_n = 1'b0;
@@ -319,15 +319,15 @@ module tb_slave_mem;
         $display("  ok    both slaves quiet for 8 idle cycles");
 
         $display("======================================================");
-        if (errors == 0) $display(" tb_slave_mem: PASSED (0 errors)");
-        else             $display(" tb_slave_mem: FAILED (%0d errors)", errors);
+        if (errors == 0) $display(" tb_slave: PASSED (0 errors)");
+        else             $display(" tb_slave: FAILED (%0d errors)", errors);
         $display("======================================================");
         $finish;
     end
 
     initial begin
         #500000;
-        $display(" tb_slave_mem: FAILED (timeout)");
+        $display(" tb_slave: FAILED (timeout)");
         $finish;
     end
 
