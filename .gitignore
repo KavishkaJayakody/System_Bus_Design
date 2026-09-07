@@ -44,6 +44,13 @@
 **/*.qdb
 **/*.qtl
 
+# Quartus-generated gate-level netlists for Questa.  These are build output -
+# the .vo alone is ~1 MB and is rewritten on every compile.
+**/simulation/questa/*.vo
+**/simulation/questa/*.xrf
+**/simulation/questa/*.do
+**/simulation/questa/modelsim.ini
+
 # Additional generated Questa/ModelSim files
 **/*.sft
 **/*.svo
