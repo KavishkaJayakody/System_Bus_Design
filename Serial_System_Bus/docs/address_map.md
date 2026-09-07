@@ -1,13 +1,16 @@
 # Address map
 
-16-bit **word** address, 32-bit data. 64K word space, of which 10K words are
-mapped.
+16-bit **word** address, 8-bit data, both carried **one bit at a time** on a
+single wire each. 64K word space, of which 10K words are mapped.
+
+The address is 16 bits because the map needs it, and that means every
+transfer spends 16 clocks shifting it. See [protocol.md](protocol.md).
 
 | Slave | Range | Size | Decode | Notes |
 |---|---|---|---|---|
-| Slave 0 | `0x0000`–`0x0FFF` | 4K words | `addr[15:12] == 4'h0` | split capable |
-| Slave 1 | `0x1000`–`0x1FFF` | 4K words | `addr[15:12] == 4'h1` | plain memory |
-| Slave 2 | `0x2000`–`0x27FF` | 2K words | `addr[15:11] == 5'b00100` | plain memory |
+| Slave 0 | `0x0000`–`0x0FFF` | 4096 x 8 = **4 KB** | `addr[15:12] == 4'h0` | split capable |
+| Slave 1 | `0x1000`–`0x1FFF` | 4096 x 8 = **4 KB** | `addr[15:12] == 4'h1` | plain memory |
+| Slave 2 | `0x2000`–`0x27FF` | 2048 x 8 = **2 KB** | `addr[15:11] == 5'b00100` | plain memory |
 | Default slave | everything else | — | no other match | answers `ERROR` |
 
 ## Unmapped regions
@@ -25,6 +28,23 @@ bad address — see [protocol.md](protocol.md).
 `tb_addr_decoder` proves this exhaustively: it sweeps all 65,536 addresses and
 checks that `{def_sel, slv_sel}` is one-hot for every single one, and that
 nothing inside `addr[15] == 1` ever selects a real slave.
+
+## How much of the address each slave actually sees
+
+A slave never receives the whole address. Its deserialiser is only as wide as
+its own offset, so after the 16-clock frame it holds exactly the low bits it
+needs and the upper bits have shifted straight through and been discarded.
+
+| Slave | Deserialiser width | Holds |
+|---|---|---|
+| Slave 0 | 12 | `addr[11:0]` |
+| Slave 1 | 12 | `addr[11:0]` |
+| Slave 2 | 11 | `addr[10:0]` |
+| Central, for the decoder | 16 | the whole address |
+
+Deciding *which* slave is the decoder's job, and it is the only receiver that
+needs all 16 bits. `tb_slave_mem` test 3 checks this directly: `0x2123` and
+`0xF923` share `addr[10:0]`, so on the 2K slave they must hit the same word.
 
 ## Constants
 
