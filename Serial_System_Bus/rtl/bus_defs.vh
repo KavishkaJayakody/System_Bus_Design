@@ -14,9 +14,19 @@
 
 //--------------------------------------------------------------------------
 // Bus geometry
+//
+// The address and the data each travel on ONE wire, MSB first, one bit per
+// clock.  BUS_ADDR_W and BUS_DATA_W are therefore frame lengths as much as
+// widths: an address phase costs BUS_ADDR_W clocks.
+//
+// BUS_DATA_W must be <= BUS_ADDR_W.  Write data is right-aligned inside the
+// address frame (BUS_ADDR_W-BUS_DATA_W leading zeros, then the data), which
+// is what lets every receiver simply keep "the last W bits I saw" with no
+// bit counter of its own.
 //--------------------------------------------------------------------------
 `define BUS_ADDR_W    16      // byte-less word address, 64K word space
-`define BUS_DATA_W    32      // one bus word
+`define BUS_DATA_W     8      // one bus word.  Serial, so this is also the
+                              // number of clocks a data phase costs.
 `define BUS_RESP_W     2      // slave response code, see below
 `define BUS_N_MASTERS  2      // arbiter is parameterised; 3 is the phase-2 size
 `define BUS_N_SLAVES   3      // mapped slaves, excluding the default slave

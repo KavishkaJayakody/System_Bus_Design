@@ -1,36 +1,43 @@
 //==========================================================================
 // tb_slave_mem.v -- self-checking testbench for slave_mem
 //
-// Two DUTs are instantiated from the same module: a plain 2K slave and a 4K
-// split-capable slave, so the SPLIT_CAPABLE=0 and =1 builds are both covered.
+// Two DUTs from the same module: a plain 2K slave and a 4K split-capable
+// slave, so both SPLIT_CAPABLE builds are covered.
+//
+// The testbench drives the wires the way the bus does: `frame' high for
+// ADDR_W clocks with the address MSB-first on astream and the write data
+// right-aligned on dstream_in, then a one-cycle `sel'.
 //
 // Covers:
-//   1. reset behaviour          - ready low, no spurious response
-//   2. write then read back     - data integrity, ready exactly one cycle
-//                                 after sel, resp = OKAY
-//   3. address independence     - first word, last word and a few interior
-//                                 words all hold distinct values (catches the
-//                                 classic "upper address bits ignored, so
-//                                 offsets alias" bug)
-//   4. no response when idle    - ready never rises without sel
-//   5. split: SPLIT response, the deferred transfer is NOT performed,
-//      split_complete pulses on the right master's bit exactly once, the
-//      replay is served with OKAY, and the data is correct
-//   6. split of a WRITE          - the write must not take effect until the
-//                                 replay
-//   7. only one split outstanding - an access from the other master while the
-//                                 slave is busy is served normally
+//   1. reset behaviour       - ready low, not busy, wire not driven
+//   2. write / read back     - data integrity through the serial path
+//   3. response timing       - a write answers at S+1, a read at S+10, and
+//                              ready is one cycle wide in both cases
+//   4. address extraction    - a LADDR_W-wide deserialiser fed the whole
+//                              16-bit frame must end up holding exactly the
+//                              low bits: 0x1ABC and 0xFABC must hit the SAME
+//                              offset 0xABC, and 0x040 must not alias
+//   5. NOT SELECTED          - a slave shifts every frame in whether or not
+//                              it is addressed, so it must do nothing at all
+//                              without `sel': no ready, no memory change
+//   6. split read            - SPLIT at S+1 (fast) while a real read costs
+//                              ten cycles, split_complete on the right bit,
+//                              replay served with the correct data
+//   7. split write           - the deferred write does NOT land until the
+//                              replay
+//   8. one split outstanding - another master is served normally meanwhile
 //==========================================================================
 `timescale 1ns/1ps
 `include "bus_defs.vh"
 
 module tb_slave_mem;
 
-    localparam DATA_W    = `BUS_DATA_W;
-    localparam RESP_W    = `BUS_RESP_W;
-    localparam N         = `BUS_N_MASTERS;
-    localparam ID_W      = 1;
-    localparam SPL_LAT   = 4;
+    localparam ADDR_W  = `BUS_ADDR_W;
+    localparam DATA_W  = `BUS_DATA_W;
+    localparam RESP_W  = `BUS_RESP_W;
+    localparam N       = `BUS_N_MASTERS;
+    localparam ID_W    = 1;
+    localparam SPL_LAT = 4;
 
     reg clk = 1'b0;
     reg rst_n;
@@ -51,57 +58,52 @@ module tb_slave_mem;
     endtask
 
     //======================================================================
-    // DUT A: plain slave, 2K words (slave 2 geometry)
+    // Shared serial wires
     //======================================================================
-    reg                a_sel, a_we;
-    reg  [10:0]        a_addr;
-    reg  [DATA_W-1:0]  a_wdata;
-    wire [DATA_W-1:0]  a_rdata;
-    wire               a_ready;
-    wire [RESP_W-1:0]  a_resp;
-    wire [N-1:0]       a_sc;
-    wire               a_busy;
+    reg              frame, astream, dstream_in, we;
+    reg  [ID_W-1:0]  mid;
+
+    // DUT A: plain slave, 2K words (slave 2 geometry)
+    reg               a_sel;
+    wire              a_dout, a_ready, a_busy;
+    wire [RESP_W-1:0] a_resp;
+    wire [N-1:0]      a_sc;
 
     slave_mem #(
         .DATA_W(DATA_W), .LADDR_W(11), .WORDS(2048), .RESP_W(RESP_W),
         .N_MASTERS(N), .ID_W(ID_W), .SPLIT_CAPABLE(0)
     ) dut_plain (
-        .clk(clk), .rst_n(rst_n), .sel(a_sel), .we(a_we), .addr(a_addr),
-        .wdata(a_wdata), .master_id(1'b0), .split_en(1'b0),
-        .rdata(a_rdata), .ready(a_ready), .resp(a_resp),
+        .clk(clk), .rst_n(rst_n),
+        .frame(frame), .astream(astream), .dstream_in(dstream_in),
+        .sel(a_sel), .we(we), .master_id(mid), .split_en(1'b0),
+        .dstream_out(a_dout), .ready(a_ready), .resp(a_resp),
         .split_complete(a_sc), .busy(a_busy)
     );
 
-    //======================================================================
     // DUT B: split-capable slave, 4K words (slave 0 geometry)
-    //======================================================================
-    reg                b_sel, b_we, b_split_en;
-    reg  [11:0]        b_addr;
-    reg  [DATA_W-1:0]  b_wdata;
-    reg  [ID_W-1:0]    b_mid;
-    wire [DATA_W-1:0]  b_rdata;
-    wire               b_ready;
-    wire [RESP_W-1:0]  b_resp;
-    wire [N-1:0]       b_sc;
-    wire               b_busy;
+    reg               b_sel, b_split_en;
+    wire              b_dout, b_ready, b_busy;
+    wire [RESP_W-1:0] b_resp;
+    wire [N-1:0]      b_sc;
 
     slave_mem #(
         .DATA_W(DATA_W), .LADDR_W(12), .WORDS(4096), .RESP_W(RESP_W),
         .N_MASTERS(N), .ID_W(ID_W), .SPLIT_CAPABLE(1), .SPLIT_LATENCY(SPL_LAT)
     ) dut_split (
-        .clk(clk), .rst_n(rst_n), .sel(b_sel), .we(b_we), .addr(b_addr),
-        .wdata(b_wdata), .master_id(b_mid), .split_en(b_split_en),
-        .rdata(b_rdata), .ready(b_ready), .resp(b_resp),
+        .clk(clk), .rst_n(rst_n),
+        .frame(frame), .astream(astream), .dstream_in(dstream_in),
+        .sel(b_sel), .we(we), .master_id(mid), .split_en(b_split_en),
+        .dstream_out(b_dout), .ready(b_ready), .resp(b_resp),
         .split_complete(b_sc), .busy(b_busy)
     );
 
-    // Captured results of the last access on each DUT.
-    reg                cap_ready;
-    reg  [RESP_W-1:0]  cap_resp;
-    reg  [DATA_W-1:0]  cap_rdata;
+    // Captured results of the last access.
+    reg  [RESP_W-1:0] cap_resp;
+    reg  [DATA_W-1:0] cap_rdata;
+    integer           cap_lat;        // clocks from sel to ready
 
-    // Count split_complete pulses on the split slave.
-    integer sc_pulses = 0;
+    // Count split_complete pulses.
+    integer sc_pulses  = 0;
     integer sc_last_id = -1;
     always @(posedge clk) begin
         if (rst_n && |b_sc) begin
@@ -111,38 +113,65 @@ module tb_slave_mem;
     end
 
     //----------------------------------------------------------------------
-    // One access to the plain slave.  Drives sel for exactly one cycle and
-    // captures the response that arrives on the following cycle.
+    // Drive one frame on the shared wires.  `do_sel' picks which DUT (if
+    // any) gets the select pulse: 0 = none, 1 = plain, 2 = split.
     //----------------------------------------------------------------------
-    task acc_a;
-        input             we_i;
-        input [10:0]      addr_i;
-        input [DATA_W-1:0] wd;
+    task automatic ser_access;
+        input integer           do_sel;
+        input                   we_i;
+        input [ADDR_W-1:0]      a;
+        input [DATA_W-1:0]      d;
+        input [ID_W-1:0]        id;
+        integer                 k;
+        reg   [DATA_W-1:0]      rx;
+        reg                     got;
         begin
+            // --- address frame, MSB first, data right-aligned ------------
+            for (k = ADDR_W-1; k >= 0; k = k - 1) begin
+                @(posedge clk);
+                frame      <= 1'b1;
+                astream    <= a[k];
+                dstream_in <= (k < DATA_W) ? d[k] : 1'b0;
+                we         <= we_i;
+                mid        <= id;
+            end
+
+            // --- one-cycle select ----------------------------------------
             @(posedge clk);
-            a_sel <= 1'b1; a_we <= we_i; a_addr <= addr_i; a_wdata <= wd;
+            frame      <= 1'b0;
+            astream    <= 1'b0;
+            dstream_in <= 1'b0;
+            a_sel      <= (do_sel == 1);
+            b_sel      <= (do_sel == 2);
+
             @(posedge clk);
-            a_sel <= 1'b0; a_we <= 1'b0;
-            #1;
-            cap_ready = a_ready; cap_resp = a_resp; cap_rdata = a_rdata;
+            a_sel <= 1'b0;
+            b_sel <= 1'b0;
+
+            // --- collect the reply ---------------------------------------
+            // Read data is "the last DATA_W bits on the wire before ready",
+            // exactly as master.v takes it.
+            rx = {DATA_W{1'b0}};
+            got = 1'b0;
+            cap_lat = 1;
+            for (k = 0; k < 60 && !got; k = k + 1) begin
+                #1;
+                if ((do_sel == 1 && a_ready) || (do_sel == 2 && b_ready)
+                    || (do_sel == 0 && (a_ready || b_ready))) begin
+                    got      = 1'b1;
+                    cap_resp = (do_sel == 1) ? a_resp : b_resp;
+                end else begin
+                    rx = {rx[DATA_W-2:0], (do_sel == 1) ? a_dout : b_dout};
+                    @(posedge clk);
+                    cap_lat = cap_lat + 1;
+                end
+            end
+            cap_rdata = rx;
+            if (!got) cap_lat = -1;
         end
     endtask
 
-    task acc_b;
-        input             we_i;
-        input [11:0]      addr_i;
-        input [DATA_W-1:0] wd;
-        input [ID_W-1:0]  id;
-        begin
-            @(posedge clk);
-            b_sel <= 1'b1; b_we <= we_i; b_addr <= addr_i; b_wdata <= wd;
-            b_mid <= id;
-            @(posedge clk);
-            b_sel <= 1'b0; b_we <= 1'b0;
-            #1;
-            cap_ready = b_ready; cap_resp = b_resp; cap_rdata = b_rdata;
-        end
-    endtask
+    integer i;
 
     initial begin
         $display("======================================================");
@@ -150,128 +179,144 @@ module tb_slave_mem;
         $display("======================================================");
 
         rst_n = 1'b0;
-        a_sel = 0; a_we = 0; a_addr = 0; a_wdata = 0;
-        b_sel = 0; b_we = 0; b_addr = 0; b_wdata = 0; b_mid = 0;
-        b_split_en = 1'b0;
+        frame = 0; astream = 0; dstream_in = 0; we = 0; mid = 0;
+        a_sel = 0; b_sel = 0; b_split_en = 0;
 
         //------------------------------------------------------------------
-        $display("-- 1. reset behaviour --------------------------------");
+        $display("-- 1. reset ------------------------------------------");
         repeat (3) @(posedge clk); #1;
         chk(a_ready === 1'b0, "plain slave: ready low in reset");
         chk(b_ready === 1'b0, "split slave: ready low in reset");
         chk(b_busy  === 1'b0, "split slave: not busy in reset");
-        chk(b_sc    === {N{1'b0}}, "split slave: split_complete clear in reset");
+        chk(a_dout  === 1'b0, "plain slave: not driving the data wire");
+        chk(b_dout  === 1'b0, "split slave: not driving the data wire");
+        chk(b_sc    === {N{1'b0}}, "split_complete clear in reset");
         @(posedge clk); rst_n = 1'b1;
         repeat (3) @(posedge clk); #1;
-        chk(a_ready === 1'b0, "plain slave: no ready without sel");
-        chk(b_ready === 1'b0, "split slave: no ready without sel");
+        chk(a_ready === 1'b0, "no ready without an access");
 
         //------------------------------------------------------------------
-        $display("-- 2. plain slave write / read back ------------------");
-        acc_a(1'b1, 11'h123, 32'hDEAD_BEEF);
-        chk(cap_ready === 1'b1,        "write completes one cycle after sel");
-        chk(cap_resp  === `RESP_OKAY,  "write resp = OKAY");
-        chk(a_ready   === 1'b1,        "ready is high now");
+        $display("-- 2. write and read back ----------------------------");
+        ser_access(1, 1'b1, 16'h2123, 8'hD7, 1'b0);
+        chk(cap_resp === `RESP_OKAY, "write answered OKAY");
+        chk(cap_lat  == 1,           "a write answers at S+1");
+
+        ser_access(1, 1'b0, 16'h2123, 8'h00, 1'b0);
+        chk(cap_resp  === `RESP_OKAY, "read answered OKAY");
+        chk(cap_rdata === 8'hD7,      "read data came back through the wire");
+        chk(cap_lat   == 10,          "a read answers at S+10 (memory + 8 bits)");
+
         @(posedge clk); #1;
-        chk(a_ready === 1'b0,          "ready is only one cycle wide");
-
-        acc_a(1'b0, 11'h123, 32'h0);
-        chk(cap_ready === 1'b1,               "read completes one cycle after sel");
-        chk(cap_resp  === `RESP_OKAY,         "read resp = OKAY");
-        chk(cap_rdata === 32'hDEAD_BEEF,      "read data matches what was written");
+        chk(a_ready === 1'b0, "ready is only one cycle wide");
 
         //------------------------------------------------------------------
-        $display("-- 3. every word is its own location -----------------");
-        acc_a(1'b1, 11'h000, 32'h1111_0000);
-        acc_a(1'b1, 11'h001, 32'h1111_0001);
-        acc_a(1'b1, 11'h040, 32'h1111_0040);   // +0x40: the classic alias
-        acc_a(1'b1, 11'h7FF, 32'h1111_07FF);   // last word of the 2K slave
-        acc_a(1'b0, 11'h000, 32'h0);
-        chk(cap_rdata === 32'h1111_0000, "word 0x000 intact");
-        acc_a(1'b0, 11'h001, 32'h0);
-        chk(cap_rdata === 32'h1111_0001, "word 0x001 intact");
-        acc_a(1'b0, 11'h040, 32'h0);
-        chk(cap_rdata === 32'h1111_0040, "word 0x040 intact (no 0x40 aliasing)");
-        acc_a(1'b0, 11'h7FF, 32'h0);
-        chk(cap_rdata === 32'h1111_07FF, "last word 0x7FF intact");
-        acc_a(1'b0, 11'h123, 32'h0);
-        chk(cap_rdata === 32'hDEAD_BEEF, "earlier word 0x123 undisturbed");
+        $display("-- 3. only the LOW address bits matter ---------------");
+        // The slave's deserialiser is LADDR_W wide but is fed all 16 bits.
+        ser_access(1, 1'b1, 16'h2000, 8'h10, 1'b0);   // offset 0x000
+        ser_access(1, 1'b1, 16'h2001, 8'h11, 1'b0);   // offset 0x001
+        ser_access(1, 1'b1, 16'h2040, 8'h12, 1'b0);   // offset 0x040
+        ser_access(1, 1'b1, 16'h27FF, 8'h13, 1'b0);   // last word
+        ser_access(1, 1'b0, 16'h2000, 8'h00, 1'b0);
+        chk(cap_rdata === 8'h10, "offset 0x000 intact");
+        ser_access(1, 1'b0, 16'h2001, 8'h00, 1'b0);
+        chk(cap_rdata === 8'h11, "offset 0x001 intact");
+        ser_access(1, 1'b0, 16'h2040, 8'h00, 1'b0);
+        chk(cap_rdata === 8'h12, "offset 0x040 intact (no 0x40 aliasing)");
+        ser_access(1, 1'b0, 16'h27FF, 8'h00, 1'b0);
+        chk(cap_rdata === 8'h13, "last word 0x7FF intact");
+
+        // Two totally different full addresses with the same low bits must
+        // land on the same word - the upper bits are the decoder's business,
+        // not the slave's.  This DUT is 11 bits wide (2K), so the addresses
+        // have to agree in addr[10:0]:
+        //   0x2123 = 0010_0001_0010_0011  ->  010_0001_0010_0011 & 0x7FF = 0x123
+        //   0xF923 = 1111_1001_0010_0011  ->                              0x123
+        ser_access(1, 1'b1, 16'h2123, 8'h5C, 1'b0);
+        ser_access(1, 1'b0, 16'hF923, 8'h00, 1'b0);
+        chk(cap_rdata === 8'h5C,
+            "0xF923 and 0x2123 share offset 0x123 - upper bits discarded");
 
         //------------------------------------------------------------------
-        $display("-- 4. no response while idle -------------------------");
-        repeat (5) begin
-            @(posedge clk); #1;
-            if (a_ready !== 1'b0) begin
-                $display("  ERROR plain slave asserted ready with no sel");
-                errors = errors + 1;
-            end
-        end
-        $display("  ok    plain slave stays quiet for 5 idle cycles");
+        $display("-- 4. a frame with NO select must do nothing ---------");
+        // Every slave shifts every frame in, addressed or not.  Acting on
+        // one without `sel' would corrupt another slave's transfer.
+        ser_access(0, 1'b1, 16'h2123, 8'hFF, 1'b0);   // no select at all
+        chk(cap_lat == -1, "no slave answered an unselected frame");
+        ser_access(1, 1'b0, 16'h2123, 8'h00, 1'b0);
+        chk(cap_rdata === 8'h5C,
+            "and the unselected write did NOT reach memory");
 
         //------------------------------------------------------------------
         $display("-- 5. split read -------------------------------------");
-        // Seed the location with split disabled.
         b_split_en = 1'b0;
-        acc_b(1'b1, 12'h010, 32'hCAFE_0010, 1'b0);
+        ser_access(2, 1'b1, 16'h0010, 8'h3E, 1'b0);
         chk(cap_resp === `RESP_OKAY, "seed write served normally (split_en=0)");
 
-        sc_pulses = 0;
+        sc_pulses  = 0;
         b_split_en = 1'b1;
-        acc_b(1'b0, 12'h010, 32'h0, 1'b0);      // master 0 reads -> split
-        chk(cap_ready === 1'b1,       "split still completes the bus cycle");
-        chk(cap_resp  === `RESP_SPLIT,"fresh access answered with SPLIT");
-        chk(b_busy    === 1'b1,       "slave is busy with the deferred transfer");
+        ser_access(2, 1'b0, 16'h0010, 8'h00, 1'b0);
+        chk(cap_resp === `RESP_SPLIT, "fresh access answered with SPLIT");
+        chk(cap_lat  == 1,
+            "the SPLIT arrives at S+1 - far faster than the 10-cycle read it defers");
+        chk(b_busy   === 1'b1, "slave busy with the deferred transfer");
 
-        // Wait for the wake-up pulse.
-        wait (sc_pulses == 1);
-        #1;
-        chk(sc_last_id == 0,      "split_complete pulsed on master 0's bit");
+        wait (sc_pulses == 1); #1;
+        chk(sc_last_id == 0, "split_complete pulsed on master 0's bit");
         repeat (4) @(posedge clk); #1;
-        chk(sc_pulses == 1,       "split_complete is exactly one cycle wide");
-        chk(b_busy === 1'b0,      "slave no longer busy");
+        chk(sc_pulses == 1,  "split_complete is exactly one cycle wide");
+        chk(b_busy === 1'b0, "slave no longer busy");
 
-        // The replay.
-        acc_b(1'b0, 12'h010, 32'h0, 1'b0);
-        chk(cap_resp  === `RESP_OKAY,      "replay served with OKAY, not split again");
-        chk(cap_rdata === 32'hCAFE_0010,   "replay returns the correct data");
+        ser_access(2, 1'b0, 16'h0010, 8'h00, 1'b0);
+        chk(cap_resp  === `RESP_OKAY, "replay served with OKAY, not split again");
+        chk(cap_rdata === 8'h3E,      "replay returned the correct data");
+        chk(cap_lat   == 10,          "and took the full read time");
 
         //------------------------------------------------------------------
-        $display("-- 6. split of a write -------------------------------");
+        $display("-- 6. split write ------------------------------------");
         sc_pulses = 0;
-        acc_b(1'b1, 12'h010, 32'h9999_9999, 1'b0);   // fresh -> SPLIT
+        ser_access(2, 1'b1, 16'h0010, 8'h99, 1'b0);
         chk(cap_resp === `RESP_SPLIT, "fresh write answered with SPLIT");
         wait (sc_pulses == 1); #1;
         b_split_en = 1'b0;
-        acc_b(1'b0, 12'h010, 32'h0, 1'b0);           // read it back
-        chk(cap_rdata === 32'hCAFE_0010,
-            "deferred write did NOT take effect during the split");
+        ser_access(2, 1'b0, 16'h0010, 8'h00, 1'b0);
+        chk(cap_rdata === 8'h3E,
+            "the deferred write did NOT take effect during the split");
         b_split_en = 1'b1;
-        // now genuinely replay the write (resume was consumed by the read
-        // above, so this one splits again - drive it through)
         sc_pulses = 0;
-        acc_b(1'b1, 12'h010, 32'h9999_9999, 1'b0);
-        chk(cap_resp === `RESP_SPLIT, "write splits again after a fresh start");
+        ser_access(2, 1'b1, 16'h0010, 8'h99, 1'b0);
+        chk(cap_resp === `RESP_SPLIT, "write splits again from a fresh start");
         wait (sc_pulses == 1); #1;
-        acc_b(1'b1, 12'h010, 32'h9999_9999, 1'b0);   // replay
-        chk(cap_resp === `RESP_OKAY,  "write replay served with OKAY");
+        ser_access(2, 1'b1, 16'h0010, 8'h99, 1'b0);
+        chk(cap_resp === `RESP_OKAY, "write replay served with OKAY");
         b_split_en = 1'b0;
-        acc_b(1'b0, 12'h010, 32'h0, 1'b0);
-        chk(cap_rdata === 32'h9999_9999, "replayed write took effect");
+        ser_access(2, 1'b0, 16'h0010, 8'h00, 1'b0);
+        chk(cap_rdata === 8'h99, "the replayed write took effect");
 
         //------------------------------------------------------------------
         $display("-- 7. only one split outstanding ---------------------");
         b_split_en = 1'b1;
         sc_pulses  = 0;
-        acc_b(1'b0, 12'h020, 32'h0, 1'b0);           // master 0 -> SPLIT
-        chk(cap_resp === `RESP_SPLIT, "master 0 access splits");
+        ser_access(2, 1'b0, 16'h0020, 8'h00, 1'b0);   // master 0 -> SPLIT
+        chk(cap_resp === `RESP_SPLIT, "master 0's access splits");
         chk(b_busy === 1'b1,          "slave busy");
-        acc_b(1'b0, 12'h010, 32'h0, 1'b1);           // master 1 while busy
+        ser_access(2, 1'b0, 16'h0010, 8'h00, 1'b1);   // master 1 while busy
         chk(cap_resp  === `RESP_OKAY,
             "master 1 served normally while a split is in flight");
-        chk(cap_rdata === 32'h9999_9999, "master 1 got real data");
+        chk(cap_rdata === 8'h99, "master 1 got real data");
         wait (sc_pulses == 1); #1;
         chk(sc_last_id == 0, "the wake-up still belongs to master 0");
         b_split_en = 1'b0;
+
+        //------------------------------------------------------------------
+        $display("-- 8. the data wire is left alone when idle ----------");
+        for (i = 0; i < 8; i = i + 1) begin
+            @(posedge clk); #1;
+            if (a_dout !== 1'b0 || b_dout !== 1'b0) begin
+                $display("  ERROR a slave drove the data wire while idle");
+                errors = errors + 1;
+            end
+        end
+        $display("  ok    both slaves quiet for 8 idle cycles");
 
         $display("======================================================");
         if (errors == 0) $display(" tb_slave_mem: PASSED (0 errors)");
@@ -281,7 +326,7 @@ module tb_slave_mem;
     end
 
     initial begin
-        #200000;
+        #500000;
         $display(" tb_slave_mem: FAILED (timeout)");
         $finish;
     end

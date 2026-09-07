@@ -18,8 +18,9 @@
 //   5. unmapped access  - the decode hole and the reserved remote window both
 //                         answer ERROR and the bus RECOVERS: the very next
 //                         transfer succeeds normally
-//   6. split by master 1- the low-priority master can split too (the legacy
-//                         design could not - it hung)
+//   6. split by master 1- the low-priority master can split too
+//   7. serial framing   - the address frame is exactly ADDR_W clocks long,
+//                         every time, including on a re-issued transfer
 //
 // Every wait has a cycle budget.  A hang is reported as a FAILURE instead of
 // running until the simulator gives up, which is the whole point of test 5.
@@ -36,7 +37,10 @@ module tb_bus_top;
     localparam RESP_W = `BUS_RESP_W;
     localparam ID_W   = 1;
     localparam SPLAT  = 6;           // slave 0 split latency, in cycles
-    localparam TMO    = 200;         // per-transaction cycle budget
+    // A serial transaction is ~21 clocks for a write and ~29 for a read,
+    // so the per-transaction budget has to be far larger than it was on
+    // the parallel bus.  It is still a budget: a hang is a FAILURE.
+    localparam TMO    = 400;
 
     reg clk = 1'b0;
     reg rst_n;
@@ -57,9 +61,9 @@ module tb_bus_top;
     wire [NM-1:0]           split_mask;
     wire [NS:0]             sel_q;
     wire                    bus_valid, bus_ready, s0_busy;
+    wire                    bus_astream, bus_dstream, addr_done;
     wire [ADDR_W-1:0]       bus_addr;
     wire [RESP_W-1:0]       bus_resp;
-    wire [DATA_W-1:0]       bus_rdata;
 
     integer errors = 0;
 
@@ -77,10 +81,40 @@ module tb_bus_top;
         .s0_split_en(s0_split_en),
         .gnt(gnt), .gnt_valid(gnt_valid), .master_id(master_id),
         .split_mask(split_mask), .sel_q(sel_q),
-        .bus_valid(bus_valid), .bus_addr(bus_addr),
-        .bus_ready(bus_ready), .bus_resp(bus_resp), .bus_rdata(bus_rdata),
+        .bus_valid(bus_valid), .bus_astream(bus_astream),
+        .bus_dstream(bus_dstream), .bus_addr(bus_addr), .addr_done(addr_done),
+        .bus_ready(bus_ready), .bus_resp(bus_resp),
         .s0_busy(s0_busy)
     );
+
+
+    //----------------------------------------------------------------------
+    // Serial framing monitor.  Watches the shared wires the way a scope
+    // would: every burst of bus_valid must be exactly ADDR_W clocks, and the
+    // address the central deserialiser reassembles must match what was asked
+    // for.  A frame that is short or long would still "work" for a while -
+    // the receivers keep the last W bits either way - and then fail on some
+    // unrelated address, so it is worth checking directly.
+    //----------------------------------------------------------------------
+    integer frame_len   = 0;
+    integer frames_seen = 0;
+    integer bad_frames  = 0;
+    reg [ADDR_W-1:0] frame_addr = 0;
+
+    always @(posedge clk) if (rst_n) begin
+        if (bus_valid) begin
+            frame_len = frame_len + 1;
+        end else if (frame_len != 0) begin
+            frames_seen = frames_seen + 1;
+            if (frame_len != ADDR_W) begin
+                $display("  ERROR frame was %0d clocks, expected %0d (t=%0t)",
+                         frame_len, ADDR_W, $time);
+                bad_frames = bad_frames + 1;
+            end
+            frame_len = 0;
+        end
+        if (addr_done) frame_addr = bus_addr;
+    end
 
     //----------------------------------------------------------------------
     // Helpers
@@ -204,66 +238,69 @@ module tb_bus_top;
 
         //==================================================================
         $display("-- 2. one master, all three slaves -------------------");
-        m_check_wr(0, 16'h0000, 32'h5000_0000, "slave 0 first word");
-        m_check_wr(0, 16'h0FFF, 32'h5000_0FFF, "slave 0 last word ");
-        m_check_wr(0, 16'h0040, 32'h5000_0040, "slave 0 word 0x40 ");
-        m_check_wr(0, 16'h1000, 32'h5100_0000, "slave 1 first word");
-        m_check_wr(0, 16'h1FFF, 32'h5100_0FFF, "slave 1 last word ");
-        m_check_wr(0, 16'h2000, 32'h5200_0000, "slave 2 first word");
-        m_check_wr(0, 16'h27FF, 32'h5200_07FF, "slave 2 last word ");
-        $display("  ..    a read of a mapped slave takes %0d clocks", lat[0]);
+        m_check_wr(0, 16'h0000, 8'hA0, "slave 0 first word");
+        m_check_wr(0, 16'h0FFF, 8'hAF, "slave 0 last word ");
+        m_check_wr(0, 16'h0040, 8'hA4, "slave 0 word 0x40 ");
+        m_check_wr(0, 16'h1000, 8'hB0, "slave 1 first word");
+        m_check_wr(0, 16'h1FFF, 8'hBF, "slave 1 last word ");
+        m_check_wr(0, 16'h2000, 8'hC0, "slave 2 first word");
+        m_check_wr(0, 16'h27FF, 8'hC7, "slave 2 last word ");
+        m_run(0, 1'b1, 16'h1500, 8'h01);
+        $display("  ..    WRITE latency %0d clocks", lat[0]);
+        m_run(0, 1'b0, 16'h1500, {DATA_W{1'b0}});
+        $display("  ..    READ  latency %0d clocks", lat[0]);
 
         // The three slaves must be genuinely independent memories.
-        m_run(0, 1'b0, 16'h0000, 32'h0);
-        chk(mrd(0) === 32'h5000_0000, "slave 0 word 0 survived the other writes");
-        m_run(0, 1'b0, 16'h1000, 32'h0);
-        chk(mrd(0) === 32'h5100_0000, "slave 1 word 0 is a different location");
-        m_run(0, 1'b0, 16'h2000, 32'h0);
-        chk(mrd(0) === 32'h5200_0000, "slave 2 word 0 is a different location");
+        m_run(0, 1'b0, 16'h0000, {DATA_W{1'b0}});
+        chk(mrd(0) === 8'hA0, "slave 0 word 0 survived the other writes");
+        m_run(0, 1'b0, 16'h1000, {DATA_W{1'b0}});
+        chk(mrd(0) === 8'hB0, "slave 1 word 0 is a different location");
+        m_run(0, 1'b0, 16'h2000, {DATA_W{1'b0}});
+        chk(mrd(0) === 8'hC0, "slave 2 word 0 is a different location");
         chk(split_mask === 2'b00, "no split happened with split_en=0");
 
         //==================================================================
         $display("-- 3. two masters requesting on the same clock -------");
         // Seed distinct values, then have both masters read at the same time.
-        m_run(0, 1'b1, 16'h1100, 32'hAAAA_0001);
-        m_run(1, 1'b1, 16'h2100, 32'hBBBB_0002);
+        m_run(0, 1'b1, 16'h1100, 8'h11);
+        m_run(1, 1'b1, 16'h2100, 8'h22);
 
         fork
-            m_run(0, 1'b0, 16'h1100, 32'h0);
-            m_run(1, 1'b0, 16'h2100, 32'h0);
+            m_run(0, 1'b0, 16'h1100, {DATA_W{1'b0}});
+            m_run(1, 1'b0, 16'h2100, {DATA_W{1'b0}});
         join
-        chk(mrd(0) === 32'hAAAA_0001, "master 0 got ITS data");
-        chk(mrd(1) === 32'hBBBB_0002, "master 1 got ITS data");
+        chk(mrd(0) === 8'h11, "master 0 got ITS data");
+        chk(mrd(1) === 8'h22, "master 1 got ITS data");
         chk(!timed_out[0] && !timed_out[1], "both masters completed");
         $display("  ..    contended latencies: m0 %0d clocks, m1 %0d clocks",
                  lat[0], lat[1]);
 
         // Concurrent writes to the two different slaves must not cross over.
         fork
-            m_run(0, 1'b1, 16'h1200, 32'h1111_1111);
-            m_run(1, 1'b1, 16'h2200, 32'h2222_2222);
+            m_run(0, 1'b1, 16'h1200, 8'h33);
+            m_run(1, 1'b1, 16'h2200, 8'h44);
         join
-        m_run(0, 1'b0, 16'h1200, 32'h0);
-        chk(mrd(0) === 32'h1111_1111, "master 0's concurrent write landed");
-        m_run(1, 1'b0, 16'h2200, 32'h0);
-        chk(mrd(1) === 32'h2222_2222, "master 1's concurrent write landed");
+        m_run(0, 1'b0, 16'h1200, {DATA_W{1'b0}});
+        chk(mrd(0) === 8'h33, "master 0's concurrent write landed");
+        m_run(1, 1'b0, 16'h2200, {DATA_W{1'b0}});
+        chk(mrd(1) === 8'h44, "master 1's concurrent write landed");
 
         //==================================================================
         $display("-- 4. full split transaction, end to end -------------");
         // Seed the split slave while it is not splitting.
         s0_split_en = 1'b0;
-        m_run(0, 1'b1, 16'h0010, 32'hC0FF_EE00);
-        m_run(1, 1'b1, 16'h2300, 32'h1234_ABCD);
+        m_run(0, 1'b1, 16'h0010, 8'hCE);
+        m_run(1, 1'b1, 16'h2300, 8'h5A);
 
         s0_split_en = 1'b1;
         fork
             // master 0 reads the split-capable slave: this WILL be deferred
-            m_run(0, 1'b0, 16'h0010, 32'h0);
+            m_run(0, 1'b0, 16'h0010, {DATA_W{1'b0}});
             // master 1 does real work in the gap the split opens up
             begin
-                m_run(1, 1'b0, 16'h2300, 32'h0);
-                m_run(1, 1'b1, 16'h2301, 32'hFEED_0001);
-                m_run(1, 1'b0, 16'h2301, 32'h0);
+                m_run(1, 1'b0, 16'h2300, {DATA_W{1'b0}});
+                m_run(1, 1'b1, 16'h2301, 8'hFE);
+                m_run(1, 1'b0, 16'h2301, {DATA_W{1'b0}});
             end
             // watch the mask go up and come back down
             begin : watch
@@ -285,62 +322,92 @@ module tb_bus_top;
 
         chk(!timed_out[0],              "master 0's split transaction completed");
         chk(msplits(0) >= 8'd1,         "master 0 recorded at least one SPLIT");
-        chk(mrd(0) === 32'hC0FF_EE00,   "the RE-ISSUED transfer returned the right data");
+        chk(mrd(0) === 8'hCE,   "the RE-ISSUED transfer returned the right data");
         chk(mresp(0) === `RESP_OKAY,    "master 0's final response is OKAY, never SPLIT");
-        chk(mrd(1) === 32'hFEED_0001,   "master 1's work in the gap was correct");
+        chk(mrd(1) === 8'hFE,   "master 1's work in the gap was correct");
         chk(split_mask === 2'b00,       "mask cleared again afterwards");
         $display("  ..    split read cost master 0 %0d clocks", lat[0]);
 
         // A write can be split too, and must still take effect exactly once.
-        m_run(0, 1'b1, 16'h0011, 32'h7777_7777);
+        m_run(0, 1'b1, 16'h0011, 8'h77);
         chk(msplits(0) >= 8'd2, "the write was split as well");
         s0_split_en = 1'b0;
-        m_run(0, 1'b0, 16'h0011, 32'h0);
-        chk(mrd(0) === 32'h7777_7777, "the split write landed exactly once");
+        m_run(0, 1'b0, 16'h0011, {DATA_W{1'b0}});
+        chk(mrd(0) === 8'h77, "the split write landed exactly once");
 
         //==================================================================
         $display("-- 5. unmapped access: ERROR, and the bus RECOVERS ---");
         // The decode hole above slave 2.
-        m_run(0, 1'b0, 16'h2800, 32'h0);
+        m_run(0, 1'b0, 16'h2800, {DATA_W{1'b0}});
         chk(!timed_out[0],           "0x2800 completed instead of hanging the bus");
         chk(mresp(0) === `RESP_ERROR,"0x2800 answered ERROR");
         chk(err[0]   === 1'b1,       "master 0 reports err");
         chk(gnt      === 2'b00,      "the grant was released, bus not held");
 
         // The very next transfer must work - that is what "recovers" means.
-        m_run(0, 1'b0, 16'h1100, 32'h0);
+        m_run(0, 1'b0, 16'h1100, {DATA_W{1'b0}});
         chk(!timed_out[0],            "the next transfer completed normally");
-        chk(mrd(0) === 32'hAAAA_0001, "and returned correct data");
+        chk(mrd(0) === 8'h11, "and returned correct data");
         chk(mresp(0) === `RESP_OKAY,  "and a clean OKAY");
 
-        m_run(0, 1'b1, 16'h2FFF, 32'hDEAD_DEAD);
+        m_run(0, 1'b1, 16'h2FFF, 8'hDD);
         chk(mresp(0) === `RESP_ERROR, "an unmapped WRITE also answers ERROR");
 
         // The window reserved for the phase-2 remote bridge.
-        m_run(1, 1'b0, 16'h8000, 32'h0);
+        m_run(1, 1'b0, 16'h8000, {DATA_W{1'b0}});
         chk(!timed_out[1],            "reserved addr[15]=1 window completed");
         chk(mresp(1) === `RESP_ERROR, "reserved window answers ERROR");
-        m_run(1, 1'b0, 16'hFFFF, 32'h0);
+        m_run(1, 1'b0, 16'hFFFF, {DATA_W{1'b0}});
         chk(mresp(1) === `RESP_ERROR, "top of memory answers ERROR");
-        m_run(1, 1'b0, 16'h2300, 32'h0);
-        chk(mrd(1) === 32'h1234_ABCD, "master 1 recovered too");
+        m_run(1, 1'b0, 16'h2300, {DATA_W{1'b0}});
+        chk(mrd(1) === 8'h5A, "master 1 recovered too");
 
         // A run of bad addresses back to back must not wedge anything.
-        for (i = 0; i < 4; i = i + 1) m_run(0, 1'b0, 16'h2900 + i[15:0], 32'h0);
+        for (i = 0; i < 4; i = i + 1) m_run(0, 1'b0, 16'h2900 + i[15:0], {DATA_W{1'b0}});
         chk(!timed_out[0], "four consecutive unmapped accesses all completed");
-        m_run(0, 1'b0, 16'h0000, 32'h0);
-        chk(mrd(0) === 32'h5000_0000, "bus fully healthy afterwards");
+        m_run(0, 1'b0, 16'h0000, {DATA_W{1'b0}});
+        chk(mrd(0) === 8'hA0, "bus fully healthy afterwards");
 
         //==================================================================
         $display("-- 6. the LOW-priority master can split too ----------");
         s0_split_en = 1'b0;
-        m_run(1, 1'b1, 16'h0100, 32'h5A5A_5A5A);
+        m_run(1, 1'b1, 16'h0100, 8'h9C);
         s0_split_en = 1'b1;
-        m_run(1, 1'b0, 16'h0100, 32'h0);
+        m_run(1, 1'b0, 16'h0100, {DATA_W{1'b0}});
         chk(!timed_out[1],             "master 1's split read completed (did not hang)");
         chk(msplits(1) >= 8'd1,        "master 1 recorded a SPLIT");
-        chk(mrd(1) === 32'h5A5A_5A5A,  "master 1's re-issued transfer got the data");
+        chk(mrd(1) === 8'h9C,  "master 1's re-issued transfer got the data");
         chk(mresp(1) === `RESP_OKAY,   "master 1's final response is OKAY");
+        s0_split_en = 1'b0;
+
+
+        //==================================================================
+        $display("-- 7. serial framing ---------------------------------");
+        chk(frames_seen > 0,   "address frames were seen on the wire");
+        chk(bad_frames == 0,
+            "EVERY frame was exactly ADDR_W clocks long");
+        $display("  ..    %0d frames on the wire, all %0d clocks", frames_seen, ADDR_W);
+
+        // Drive a known address and confirm the reassembled value.
+        m_run(0, 1'b0, 16'h1ABC, {DATA_W{1'b0}});
+        chk(frame_addr === 16'h1ABC,
+            "the address reassembled off the single wire matches what was sent");
+        m_run(1, 1'b0, 16'h2345, {DATA_W{1'b0}});
+        chk(frame_addr === 16'h2345,
+            "and again from the other master");
+
+        // A split forces a re-issue: the SECOND frame must be a full,
+        // correct frame too, not a resumption of the first.
+        s0_split_en = 1'b0;
+        m_run(0, 1'b1, 16'h0ABC, 8'h6D);
+        bad_frames  = 0;
+        frames_seen = 0;
+        s0_split_en = 1'b1;
+        m_run(0, 1'b0, 16'h0ABC, {DATA_W{1'b0}});
+        chk(frames_seen == 2,  "the split transaction put TWO frames on the wire");
+        chk(bad_frames == 0,   "the re-issued frame was full length as well");
+        chk(frame_addr === 16'h0ABC, "the replay re-sent the SAME address");
+        chk(mrd(0) === 8'h6D,  "and returned the right data");
         s0_split_en = 1'b0;
 
         //==================================================================
