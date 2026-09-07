@@ -60,7 +60,7 @@
 module master_prog #(
     parameter MID    = 0,
     parameter ADDR_W = 16,
-    parameter DATA_W = 32       // must be >= 32; the pattern uses bits 31:0
+    parameter DATA_W = 8        // must be <= 8; the pattern is a byte
 ) (
     input  wire               clk,
     input  wire               rst_n,
@@ -149,22 +149,20 @@ module master_prog #(
     end
 
     //----------------------------------------------------------------------
-    // Write pattern.  Low half = pass_count, high half = a per-master tag
-    // XORed with the transaction count.
+    // Write pattern: a per-master tag XORed with the transaction count.
     //
-    // The XOR is not decoration: with a plain constant in the high half the
-    // two byte lanes carried identical values, the fitter spotted it and
-    // merged them, and the memories were built 24 bits wide instead of 32.
-    // Every bit of the pattern has to vary independently for the whole
-    // datapath to actually be implemented.
+    // The XOR is not decoration.  A constant tag would leave bits of the
+    // pattern that never change, and the fitter - correctly - trims memory
+    // bits that can only ever hold one value, so part of the datapath would
+    // quietly not be built.  Every bit has to vary independently.  The
+    // counter also means the value on the display moves every transaction,
+    // so a frozen display is visibly a stuck bus.
     //----------------------------------------------------------------------
-    wire [15:0] tag = (MID != 0) ? 16'hB1B1 : 16'hA0A0;
+    wire [7:0] tag = (MID != 0) ? 8'hB1 : 8'hA0;
 
     reg [DATA_W-1:0] pattern;
     always @* begin
-        pattern         = {DATA_W{1'b0}};
-        pattern[15:0]   = pass_count;
-        pattern[31:16]  = tag ^ xact_count;
+        pattern = tag ^ xact_count[DATA_W-1:0];
     end
 
     //----------------------------------------------------------------------

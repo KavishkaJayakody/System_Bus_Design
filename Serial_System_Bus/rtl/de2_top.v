@@ -23,7 +23,6 @@
 //                 01  two masters        (m0 -> slave 1, m1 -> slave 2)
 //                 10  split transaction  (m0 -> slave 0, m1 -> slave 2)
 //                 11  unmapped recovery  (m0 hits 0x2800 and 0x8000)
-//   SW[13]      display half:   0 = read data [15:0], 1 = [31:16]
 //   SW[14]      display master: 0 = master 0, 1 = master 1
 //   SW[15]      0 = free run at 50 MHz, 1 = slow (one transaction per tick)
 //   SW[16]      slave 0 split enable - the "slave is busy" model
@@ -33,12 +32,12 @@
 // Displays
 //--------------------------------------------------------------------------
 //   HEX7..HEX4  address of the selected master's last command
-//   HEX3..HEX0  16 bits of the selected master's last READ data, the half
-//               chosen by SW[13].  Writes never update it, so the value
-//               stays readable.  Both halves are selectable so the whole
-//               32-bit datapath is observable - otherwise the fitter
-//               correctly trims the memories to the 16 bits that reach a
-//               pin, and half the design silently disappears.
+//   HEX3..HEX2  that master's SPLIT count
+//   HEX1..HEX0  that master's last READ data.  Writes never update it, so
+//               the value stays readable.  All 8 data bits reach a pin,
+//               which matters: the fitter trims memory bits that cannot
+//               reach an output, so an unobservable datapath is a
+//               partly-unbuilt one.
 //
 //   LEDR[1:0]   arbiter grant, one-hot {m1, m0}
 //   LEDR[3:2]   arbiter split mask {m1, m0}   <- lit while a master is split
@@ -134,7 +133,6 @@ module de2_top #(
     end
 
     wire [1:0] scenario    = sw_sync[1:0];
-    wire       disp_half   = sw_sync[13];
     wire       disp_sel    = sw_sync[14];
     wire       slow_mode   = sw_sync[15];
     wire       s0_split_en = sw_sync[16];
@@ -199,9 +197,9 @@ module de2_top #(
     wire [ID_W-1:0]   master_id;
     wire [NS:0]       sel_q;
     wire              bus_valid, bus_ready, s0_busy;
+    wire              bus_astream, bus_dstream, addr_done;
     wire [ADDR_W-1:0] bus_addr;
     wire [RESP_W-1:0] bus_resp;
-    wire [DATA_W-1:0] bus_rdata;
 
     bus_top #(
         .N_MASTERS(NM), .ID_W(ID_W), .N_SLAVES(NS),
@@ -217,8 +215,9 @@ module de2_top #(
         .s0_split_en(s0_split_en),
         .gnt(gnt), .gnt_valid(gnt_valid), .master_id(master_id),
         .split_mask(split_mask), .sel_q(sel_q),
-        .bus_valid(bus_valid), .bus_addr(bus_addr),
-        .bus_ready(bus_ready), .bus_resp(bus_resp), .bus_rdata(bus_rdata),
+        .bus_valid(bus_valid), .bus_astream(bus_astream),
+        .bus_dstream(bus_dstream), .bus_addr(bus_addr), .addr_done(addr_done),
+        .bus_ready(bus_ready), .bus_resp(bus_resp),
         .s0_busy(s0_busy)
     );
 
@@ -283,19 +282,20 @@ module de2_top #(
     wire [ADDR_W-1:0] disp_addr  = disp_sel ? last_addr1 : last_addr0;
     wire [DATA_W-1:0] disp_rdata = disp_sel ? rdata_flat[1*DATA_W +: DATA_W]
                                             : rdata_flat[0*DATA_W +: DATA_W];
-    wire [15:0] disp_word = disp_half ? disp_rdata[31:16] : disp_rdata[15:0];
+    wire [7:0]        disp_splits = disp_sel ? split_count_flat[1*8 +: 8]
+                                             : split_count_flat[0*8 +: 8];
 
     seg7_hex u_h7 (.val(disp_addr [15:12]), .blank(1'b0), .seg(HEX7));
     seg7_hex u_h6 (.val(disp_addr [11: 8]), .blank(1'b0), .seg(HEX6));
     seg7_hex u_h5 (.val(disp_addr [ 7: 4]), .blank(1'b0), .seg(HEX5));
     seg7_hex u_h4 (.val(disp_addr [ 3: 0]), .blank(1'b0), .seg(HEX4));
-    seg7_hex u_h3 (.val(disp_word[15:12]), .blank(1'b0), .seg(HEX3));
-    seg7_hex u_h2 (.val(disp_word[11: 8]), .blank(1'b0), .seg(HEX2));
-    seg7_hex u_h1 (.val(disp_word[ 7: 4]), .blank(1'b0), .seg(HEX1));
-    seg7_hex u_h0 (.val(disp_word[ 3: 0]), .blank(1'b0), .seg(HEX0));
+    seg7_hex u_h3 (.val(disp_splits[7:4]), .blank(1'b0), .seg(HEX3));
+    seg7_hex u_h2 (.val(disp_splits[3:0]), .blank(1'b0), .seg(HEX2));
+    seg7_hex u_h1 (.val(disp_rdata [7:4]), .blank(1'b0), .seg(HEX1));
+    seg7_hex u_h0 (.val(disp_rdata [3:0]), .blank(1'b0), .seg(HEX0));
 
     //----------------------------------------------------------------------
-    // KEY[3:2] and SW[12:2] are brought out to their board pins but are not
+    // KEY[3:2] and SW[13:2] are brought out to their board pins but are not
     // used by this design, and master_id / bus_valid / bus_rdata / the
     // sequencer counters exist for SignalTap and waveforms only.  Quartus
     // reports these as "input pins that do not drive logic" - that warning

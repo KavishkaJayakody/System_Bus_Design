@@ -18,8 +18,9 @@ TB=tb
 OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 
+SER="$RTL/shift_ser.v $RTL/shift_deser.v"
 COMMON="$RTL/addr_decoder.v $RTL/arbiter.v $RTL/bus_mux.v $RTL/slave_mem.v \
-        $RTL/default_slave.v $RTL/master.v $RTL/bus_top.v"
+        $RTL/default_slave.v $RTL/master.v $RTL/bus_top.v $SER"
 BOARD="$RTL/de2_top.v $RTL/master_prog.v $RTL/reset_ctrl.v $RTL/debouncer.v \
        $RTL/seg7_hex.v"
 
@@ -51,12 +52,14 @@ try () {
     fi
 }
 
+try shift_ser     "$RTL/shift_ser.v"
+try shift_deser   "$RTL/shift_deser.v"
 try addr_decoder  "$RTL/addr_decoder.v"
 try arbiter       "$RTL/arbiter.v"
 try bus_mux       "$RTL/bus_mux.v"
-try slave_mem     "$RTL/slave_mem.v"
+try slave_mem     "$RTL/slave_mem.v" "$RTL/shift_deser.v"
 try default_slave "$RTL/default_slave.v"
-try master        "$RTL/master.v"
+try master        "$RTL/master.v" $SER
 try bus_top       $COMMON
 try de2_top       $COMMON $BOARD
 

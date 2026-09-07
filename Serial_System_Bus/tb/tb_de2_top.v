@@ -6,6 +6,10 @@
 // split intervals are shrunk by parameter so a simulated key press does not
 // take 65536 cycles.
 //
+// Every cycle budget below is far larger than it was on the parallel bus: a
+// serial transaction costs ~21 clocks for a write and ~30 for a read, since
+// the 16-bit address goes out one bit at a time.
+//
 // Covers:
 //   1. power-on / KEY[0] reset - the design comes up held in reset and
 //                                releases cleanly, with nothing driving the
@@ -115,7 +119,7 @@ module tb_de2_top;
         $display("-- 2. scenario 00: one master ------------------------");
         SW[1:0]  = 2'b00;
         SW[17]   = 1'b1;                 // run, full speed
-        repeat (400) @(posedge CLOCK_50); #1;
+        repeat (2500) @(posedge CLOCK_50); #1;
         chk(m0_xacts > 16'd4, "master 0 completed several transactions");
         chk(m1_xacts === 16'd0, "master 1 never issued a transaction");
         chk(LEDG[8] === 1'b0,  "no error flagged");
@@ -126,7 +130,7 @@ module tb_de2_top;
         press_reset;
         SW[1:0] = 2'b01;
         SW[17]  = 1'b1;
-        repeat (600) @(posedge CLOCK_50); #1;
+        repeat (3500) @(posedge CLOCK_50); #1;
         chk(m0_xacts > 16'd4, "master 0 made progress");
         chk(m1_xacts > 16'd4, "master 1 made progress");
         chk(LEDG[8] === 1'b0, "no error flagged");
@@ -134,7 +138,7 @@ module tb_de2_top;
         begin : both_granted
             reg g0, g1;
             g0 = 0; g1 = 0;
-            for (k = 0; k < 400; k = k + 1) begin
+            for (k = 0; k < 2500; k = k + 1) begin
                 @(posedge CLOCK_50); #1;
                 if (LEDR[0]) g0 = 1;
                 if (LEDR[1]) g1 = 1;
@@ -152,7 +156,7 @@ module tb_de2_top;
         SW[17]  = 1'b1;
 
         saw_mask = 0; saw_m1_progress = 0; m1_at_mask = -1;
-        for (k = 0; k < 3000; k = k + 1) begin
+        for (k = 0; k < 20000; k = k + 1) begin
             @(posedge CLOCK_50); #1;
             if (LEDR[2]) begin           // split_mask[0]
                 if (!saw_mask) begin
@@ -177,10 +181,10 @@ module tb_de2_top;
         press_reset;
         SW[1:0] = 2'b11;
         SW[17]  = 1'b1;
-        repeat (200) @(posedge CLOCK_50); #1;
+        repeat (1500) @(posedge CLOCK_50); #1;
         chk(LEDG[8] === 1'b1,  "sticky ERROR LED lit by the unmapped access");
         x0 = m0_xacts;
-        repeat (800) @(posedge CLOCK_50); #1;
+        repeat (5000) @(posedge CLOCK_50); #1;
         chk(m0_xacts > x0,
             "the design KEPT RUNNING after the error - the bus recovered");
         chk(m1_xacts > 16'd0,  "master 1 unaffected");
@@ -191,21 +195,21 @@ module tb_de2_top;
         press_reset;
         SW[1:0] = 2'b00;
         SW[17]  = 1'b0;                  // stopped
-        repeat (200) @(posedge CLOCK_50); #1;
+        repeat (1500) @(posedge CLOCK_50); #1;
         chk(m0_xacts === 16'd0, "nothing runs while the run switch is off");
 
         x0 = m0_xacts;
         press_step;
-        repeat (100) @(posedge CLOCK_50); #1;
+        repeat (600) @(posedge CLOCK_50); #1;
         chk(m0_xacts == x0 + 1, "one KEY[1] press ran exactly one transaction");
         x0 = m0_xacts;
-        repeat (300) @(posedge CLOCK_50); #1;
+        repeat (2000) @(posedge CLOCK_50); #1;
         chk(m0_xacts == x0, "and then it stopped again");
 
         //==================================================================
         $display("-- 7. displays ---------------------------------------");
         SW[17] = 1'b1;
-        repeat (400) @(posedge CLOCK_50); #1;
+        repeat (2500) @(posedge CLOCK_50); #1;
         chk(dut.last_addr0 !== 16'h0000 || dut.u_prog0.cmd_addr !== 16'h0000,
             "the address display latched a real command address");
         chk(HEX7 !== 7'h7F && HEX0 !== 7'h7F, "the HEX digits are driven");
@@ -223,7 +227,7 @@ module tb_de2_top;
     end
 
     initial begin
-        #5000000;
+        #300000000;
         $display(" tb_de2_top: FAILED (global timeout)");
         $finish;
     end
