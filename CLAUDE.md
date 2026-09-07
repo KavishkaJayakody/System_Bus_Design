@@ -106,9 +106,21 @@ Unlike `System_Bus_Final/`, `de2_top` instantiates no megafunctions, so
 `iverilog` elaborates the real board top level directly — `tb_de2_top` drives
 it through its actual pins.
 
+The engineering report is LaTeX, not Markdown:
+
+```bash
+cd Serial_System_Bus/docs
+latexmk -pdf report.tex        # or: pdflatex report.tex, twice
+```
+
+`report.pdf` is tracked (it is the deliverable); the `.aux`/`.toc`/`.out`
+intermediates are gitignored. If you change a measured number in the RTL,
+it appears in `report.tex` §Results and in `docs/design_notes.md` — keep both
+in step.
+
 ### Things that are deliberate — do not "fix" them
 
-- **The memory arrays have no reset.** `slave_mem.v` puts `mem[]` and `mem_q`
+- **The memory arrays have no reset.** `slave.v` puts `mem[]` and `mem_q`
   in a clock-only block. An async reset on a 4096-word array stops M9K
   inference and builds it from flip-flops instead — the exact bug still
   present in `src/`. The arrays hold no defined value at power-up; every test

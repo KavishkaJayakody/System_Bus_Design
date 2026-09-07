@@ -69,7 +69,7 @@ a concrete reason.
 
 ### The memory arrays have no reset
 
-`slave_mem.v` puts `mem[]` and `rdata` in a clock-only `always` block.
+`slave.v` puts `mem[]` and `mem_q` in a clock-only `always` block.
 
 Giving a 4096-word array an asynchronous reset stops Quartus inferring M9K
 block RAM and makes it build the memory out of LUTs and flip-flops instead —
@@ -110,7 +110,7 @@ instance.` was parsed by Quartus as a synthesis pragma and produced three
 "unrecognized synthesis attribute" warnings. The word `synthesis` must not
 start the text of a comment line.
 
-**A busy counter too narrow for its own parameter.** `slave_mem`'s counter was
+**A busy counter too narrow for its own parameter.** `slave`'s counter was
 16 bits while `de2_top` passes `SPLIT_LATENCY = 10,000,000`. The constant was
 silently truncated to 38,528 — the split would have been ~260× shorter than
 intended and nobody would have noticed on the board. The counter is now 32
@@ -244,7 +244,7 @@ The brief asks that two things be ready for the remote-bridge phase.
   splits on both a high- and a low-priority master, so the third requester
   inherits tested behaviour.
 
-* **The split mechanism is written once.** All of it lives in `slave_mem`'s
+* **The split mechanism is written once.** All of it lives in `slave`'s
   `SPLIT_CAPABLE` generate block plus the arbiter mask. Any future slave —
   including the remote bridge, which will be slow for the same reason — gets
   split support by setting `SPLIT_CAPABLE = 1`.
@@ -344,7 +344,7 @@ no contention window.
 
 ### Bugs caught during the conversion
 
-**A testbench address that was wrong for the slave's width.** `tb_slave_mem`
+**A testbench address that was wrong for the slave's width.** `tb_slave`
 checked that `0x2123` and `0xFB23` hit the same word on the 2K slave. They do
 not: an 11-bit offset makes them `0x123` and `0x323`. The RTL was right and
 the test was wrong — corrected to `0xF923`, and the arithmetic is now written

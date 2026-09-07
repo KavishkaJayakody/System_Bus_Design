@@ -60,6 +60,7 @@ Full documentation lives with the design:
 - [`docs/protocol.md`](Serial_System_Bus/docs/protocol.md) — the wire table, frame format, split flow
 - [`docs/address_map.md`](Serial_System_Bus/docs/address_map.md) — the map and per-slave address widths
 - [`docs/design_notes.md`](Serial_System_Bus/docs/design_notes.md) — every decision, and why
+- [`docs/report.pdf`](Serial_System_Bus/docs/report.pdf) — **the engineering report**: plans, trade-offs, measured results ([source](Serial_System_Bus/docs/report.tex))
 
 ---
 

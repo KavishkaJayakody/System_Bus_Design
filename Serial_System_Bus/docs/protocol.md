@@ -4,6 +4,19 @@ One clock domain, one asynchronous active-low reset, one master on the bus at
 a time. **The address and the data each travel on a single wire**, MSB first,
 one bit per clock.
 
+## Where the protocol lives
+
+Three kinds of module speak this protocol, and the split is strict:
+
+| Module | Role |
+|---|---|
+| `system_bus` | the bus: arbiter, decoder, `bus_mux`, the central address deserialiser, the default responder. No master, no memory. |
+| `master` | drives a frame, absorbs a split, reassembles read data. No arbitration, no decoding. |
+| `slave` | shifts every frame in, acts only on `sel`. No arbitration, no decoding. |
+
+`bus_top` wires the three together and holds no logic beyond one OR gate.
+Everything below describes the two interfaces between them.
+
 ## The shared bus is 8 wires
 
 | Wire | Width | Direction | Meaning |
@@ -74,7 +87,7 @@ place — the master's counter.
 purely combinational. It is merely enabled one cycle per frame.
 
 Shifting speculatively costs nothing: a slave that was not selected simply
-never acts on what it collected. `tb_slave_mem` test 4 drives a full frame
+never acts on what it collected. `tb_slave` test 4 drives a full frame
 with *no* select and checks that no slave answers and no memory changes.
 
 ## Completion

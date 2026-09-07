@@ -43,7 +43,7 @@ needs and the upper bits have shifted straight through and been discarded.
 | Central, for the decoder | 16 | the whole address |
 
 Deciding *which* slave is the decoder's job, and it is the only receiver that
-needs all 16 bits. `tb_slave_mem` test 3 checks this directly: `0x2123` and
+needs all 16 bits. `tb_slave` test 3 checks this directly: `0x2123` and
 `0xF923` share `addr[10:0]`, so on the 2K slave they must hit the same word.
 
 ## Constants

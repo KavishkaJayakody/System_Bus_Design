@@ -64,7 +64,7 @@ serial interfaces with nothing attached at either end.
 | `rtl/` | synthesisable modules, one per file, plus `bus_defs.vh`; `shift_ser.v` / `shift_deser.v` are the two serial primitives everything else is built from |
 | `tb/` | one self-checking testbench per module — including `tb_system_bus`, which exercises the bus with no master and no memory attached — plus `tb_bus_top` and `tb_de2_top` |
 | `sim/` | `run_icarus.sh`, `run_questa.do` |
-| `docs/` | [design_notes.md](docs/design_notes.md), [address_map.md](docs/address_map.md), [protocol.md](docs/protocol.md) |
+| `docs/` | [report.pdf](docs/report.pdf) (the engineering report), [design_notes.md](docs/design_notes.md), [address_map.md](docs/address_map.md), [protocol.md](docs/protocol.md) |
 | `Serial_System_Bus.qsf/.qpf/.sdc` | Quartus project, pin assignments and timing constraints |
 
 ## Simulate
@@ -150,6 +150,24 @@ earns its keep here.
 
 `addr[15] == 1` (`0x8000`–`0xFFFF`) is reserved for the remote window and is
 deliberately unmapped. The arbiter is parameterised for `N_MASTERS`
-requesters, and the split mechanism is written once in `slave_mem`'s
+requesters, and the split mechanism is written once in `slave`'s
 `SPLIT_CAPABLE` block, so the bridge reuses both. See §7 of
 [design_notes.md](docs/design_notes.md).
+
+## The report
+
+[`docs/report.pdf`](docs/report.pdf) is the engineering report: requirements
+and the decisions taken before any RTL, the parallel bus that came first and
+why it was replaced, the serial architecture in detail, arbitration, split
+transactions, hang-freedom, the module partitioning, verification, measured
+results, and limitations. It concerns the **interconnect** — masters and
+slaves appear only where they define the bus contract.
+
+Rebuild it from source:
+
+```bash
+cd Serial_System_Bus/docs
+latexmk -pdf report.tex        # or: pdflatex report.tex, twice
+```
+
+Needs TeX Live with `tikz`, `booktabs`, `listings` and `newtx`.
