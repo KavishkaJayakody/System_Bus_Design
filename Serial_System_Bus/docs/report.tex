@@ -23,14 +23,18 @@
 \usepackage{titlesec}
 \usepackage[hidelinks]{hyperref}
 
+\hypersetup{
+    pdfauthor={Jayakody J.A.K., Attanayake A.Y., Rajinthan R.},
+    pdftitle={Serial System Bus Design -- EN4021 Advanced Digital Systems}
+}
+
 \usetikzlibrary{positioning,arrows.meta,calc,decorations.pathreplacing}
 
 %--------------------------------------------------------------------------
-% Palette.  Teal for structure; clay is reserved for the superseded parallel
-% design so every before/after comparison reads at a glance.
+% Palette.  Teal for structure, muted grey for secondary text; the report is
+% monochrome apart from those two.
 %--------------------------------------------------------------------------
 \definecolor{signal}{HTML}{0B6E62}
-\definecolor{legacy}{HTML}{9C5A3C}
 \definecolor{rule}  {HTML}{C9D4D1}
 \definecolor{muted} {HTML}{5C6B68}
 \definecolor{wash}  {HTML}{EDF3F1}
@@ -70,38 +74,39 @@
 
 \begin{titlepage}
 \centering
-\vspace*{3.2cm}
-{\color{signal}\rule{\textwidth}{1.2pt}}\\[4mm]
-{\Huge\bfseries Design of a Serial Shared System Bus\par}
-\vspace{3mm}
-{\large Two masters, three slaves, priority arbitration and split
-transactions on a Cyclone IV E\par}
-\vspace{2mm}
-{\color{signal}\rule{\textwidth}{1.2pt}}\\[10mm]
+\vspace*{1.2cm}
 
-{\large rajinthanr\par}
-\vspace{2mm}
-{\color{muted} Digital Design --- Final Year Project Report\par}
-\vspace{12mm}
+{\large Department of Electronic and Telecommunication Engineering\par}
+\vspace{0.35cm}
+{\large University of Moratuwa, Sri Lanka\par}
 
-\begin{minipage}{0.82\textwidth}
-\small\color{muted}
-\begin{tabularx}{\textwidth}{@{}lX@{}}
-Target device & Altera Cyclone IV E \sig{EP4CE115F29C7} (Terasic DE2-115)\\
-Synthesis     & Quartus Prime Lite 24.1std\\
-Simulation    & Icarus Verilog (regression), ModelSim/Questa (waveforms)\\
-Language      & Verilog-2001\\
-Status        & 11 self-checking testbenches passing; timing closed at
-                141.8\,MHz\\
-\end{tabularx}
-\end{minipage}
+\vspace{3.0cm}
+
+{\Huge Serial System Bus Design\par}
+\vspace{0.8cm}
+{\large Multi-Master Shared Bus with Split Transactions\\[0.2cm]
+on a Single-Wire Address and Data Path\par}
+
+\vspace{1.0cm}
+{\large EN4021 -- Advanced Digital Systems\par}
+
+\vspace{3.0cm}
+
+{\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{ll}
+\textsc{Members:} & \textsc{Index No}\\[0.15cm]
+Jayakody J.A.K.   & 220247J\\
+Attanayake A.Y.   & 220051D\\
+Rajinthan R.      & 220502M\\
+\end{tabular}}
 
 \vfill
-{\color{muted}\small This report concerns the \emph{interconnect}. Masters and
-memory slaves appear only where they define the bus contract.\par}
-\vspace{8mm}
+{Target board: Terasic DE2-115 (Intel Cyclone~IV~E, \texttt{EP4CE115F29C7})\par}
+\vspace{0.2cm}
+{September 2026\par}
 \end{titlepage}
 
+\newpage
 \tableofcontents
 \newpage
 
@@ -115,28 +120,26 @@ memory slaves are treated as endpoints: they appear where they define or
 constrain the bus contract, and not otherwise.
 
 The headline result is a shared bus in which \textbf{the address and the data
-each travel on a single wire}. The shared segment is eight wires, down from
-eighty-six in the parallel design it replaced, and the total net count across
-the interconnect falls from 337 to 60. The cost is time: a write takes 21
-clocks instead of 5, a read 30 instead of 5. The design still closes timing
-at 141.8\,MHz against a 50\,MHz requirement, and is slightly \emph{smaller}
-than the parallel bus it replaced.
+each travel on a single wire}. The shared segment is eight wires and the whole
+interconnect is sixty nets. The cost is time --- a write takes 21 clocks and a
+read 30, of which sixteen are the address going out one bit per clock --- and
+the design closes timing at 141.8\,MHz against a 50\,MHz requirement.
 
 \begin{table}[htb]
 \centering\small
-\caption{Summary of the two architectures. All figures measured, not estimated.}
-\begin{tabular}{@{}lrr@{}}
+\caption{Summary of the design. All figures measured, not estimated.}
+\begin{tabular}{@{}lr@{}}
 \toprule
-& \textcolor{legacy}{\textbf{Parallel}} & \textcolor{signal}{\textbf{Serial}}\\
+\textbf{Measure} & \textbf{Result}\\
 \midrule
-Shared bus wires        & 86         & \textbf{8}\\
-Total interconnect nets & 337        & \textbf{60}\\
-Write latency           & 5\,clk     & 21\,clk\\
-Read latency            & 5\,clk     & 30\,clk\\
-Split read latency      & 16\,clk    & 79\,clk\\
-Logic elements          & 721        & \textbf{688}\\
-Registers               & 544        & \textbf{513}\\
-$F_{\max}$              & 117.7\,MHz & \textbf{141.8\,MHz}\\
+Shared bus wires        & \textbf{8}\\
+Total interconnect nets & \textbf{60}\\
+Write latency           & 21\,clk\\
+Read latency            & 30\,clk\\
+Split read latency (contended) & 79\,clk\\
+Logic elements          & 688\\
+Registers               & 513\\
+$F_{\max}$              & \textbf{141.8\,MHz}\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -211,65 +214,7 @@ actually driven. The replay is the bus's business.\\
 \end{table}
 
 %==========================================================================
-\section{First architecture: a parallel multiplexed bus}
-\label{sec:parallel}
-
-The first implementation was a conventional parallel bus. It is worth
-recording, because it establishes the baseline the serial design is measured
-against, and because building it surfaced one fact that governs everything
-afterwards.
-
-\subsection{A ``shared bus'' on an FPGA is a multiplexer}
-
-The textbook shared bus is wired-OR or tri-stated: every master drives the
-same physical conductor and only one enables its driver at a time.
-\textbf{An FPGA has no internal tri-state buffers.} Quartus will accept an
-\sig{inout} on an internal net and then silently convert it into exactly the
-multiplexer one would have written by hand, so there is nothing to be gained
-by pretending otherwise.
-
-The design therefore has no \sig{inout} ports and no \sig{z} values anywhere.
-``Sharing'' means:
-
-\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
-\item a \emph{forward} multiplexer selected by the arbiter's one-hot grant,
-      putting the granted master's signals onto the bus;
-\item a \emph{return} multiplexer selected by a copy of the decoder's select,
-      putting the responding slave's reply back.
-\end{itemize}
-
-Each master has its own private bundle of wires running to the multiplexer;
-the shared segment exists only downstream of it.
-
-\subsection{The wire census}
-
-Counting nets made the cost of the parallel approach concrete.
-
-\begin{table}[htb]
-\centering\small
-\caption{Parallel bus net count. The shared segment is what every endpoint taps.}
-\begin{tabular}{@{}lrrr@{}}
-\toprule
-\textbf{Segment} & \textbf{Per unit} & \textbf{Units} & \textbf{Nets}\\
-\midrule
-Master $\rightarrow$ forward mux (private) & 50 & 2 & 100\\
-Shared forward (mux $\rightarrow$ slaves)  & 51 & 1 & 51\\
-Slave $\rightarrow$ return mux (private)   & 35 & 4 & 140\\
-Shared return (broadcast to masters)       & 35 & 1 & 35\\
-Arbitration and select                     & 11 & 1 & 11\\
-\midrule
-\multicolumn{3}{@{}l}{\textbf{Total}} & \textbf{337}\\
-\multicolumn{3}{@{}l}{\emph{of which shared}} & \emph{86}\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The parallel bus worked and passed a full test suite at five clocks per
-transfer. But eighty-six wires between every endpoint is precisely the cost a
-serial bus exists to avoid, and the project called for a serial one.
-
-%==========================================================================
-\section{Re-specification: serial signalling}
+\section{What serial signalling implies}
 
 The requirement is simple to state and expensive to satisfy: \textbf{the
 address travels on one wire and the data on one wire}, shared by every master
@@ -283,15 +228,16 @@ than a coding detail.
       unavoidably. Latency stops being a rounding error and becomes the
       dominant characteristic of the bus.
 
-\item \textbf{The decoder cannot decide anything until the frame ends.}
-      In the parallel design the address was present in one cycle and the
-      select followed combinationally. Here no slave knows whether it is the
-      target until the last address bit has landed.
+\item \textbf{No slave knows whether it is the target until the address has
+      arrived.} Selection cannot be combinational on a whole address, because
+      there is no whole address to look at --- only a bit per clock. The
+      decoder has to watch the address arrive, and the select can only be
+      acted on once it has.
 
-\item \textbf{The reply is no longer at a fixed offset from the address.}
+\item \textbf{The reply is not at a fixed offset from the address.}
       A write can be answered immediately; a read cannot answer until it has
-      shifted its data out. Anything that assumed a fixed reply time ---
-      and the parallel return path did --- breaks.
+      shifted its data out. Any return path that assumes a fixed reply time
+      breaks, so the routing of the reply has to be held rather than timed.
 \end{enumerate}
 
 The interesting engineering is in points 2 and 3. Point 1 is simply the price.
@@ -299,11 +245,90 @@ The interesting engineering is in points 2 and 3. Point 1 is simply the price.
 %==========================================================================
 \section{The serial bus}
 
+\subsection{Planning the nets}
+\label{sec:nets}
+
+Before any block diagram is worth drawing, it is worth being precise about
+what a ``shared wire'' actually is on this device, because that single fact
+decides the shape of the whole interconnect.
+
+\paragraph{A shared bus on an FPGA is a multiplexer.}
+The textbook shared bus is wired-OR or tri-stated: every master drives the
+same physical conductor and only one enables its driver at a time.
+\textbf{A Cyclone~IV~E has no internal tri-state buffers.} Quartus will accept
+an \sig{inout} on an internal net and then silently convert it into exactly
+the multiplexer one would have written by hand, so there is nothing to be
+gained by pretending otherwise. The design therefore has no \sig{inout} ports
+and no \sig{z} values anywhere. ``Sharing'' means two multiplexers:
+
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+\item a \textbf{forward} multiplexer selected by the arbiter's one-hot grant,
+      putting the granted master's signals onto the bus;
+\item a \textbf{return} multiplexer selected by the decoder's select, putting
+      the responding slave's reply back.
+\end{itemize}
+
+\paragraph{Every net is therefore either private or shared.}
+Each endpoint has its own private stub running to the multiplexer; the shared
+segment exists only downstream of it. Both are worth counting separately,
+because they scale differently: private stubs grow with the number of
+endpoints, while the shared segment is the number that every future endpoint
+has to tap and route to.
+
+Serialising the payload collapses both, because no stub ever has to carry a
+whole word. A master's private stub is one address bit, one data bit and two
+control lines; a slave's reply stub is one data bit plus its ready and
+response lines. Every payload net in the interconnect is one bit wide, and
+the width of the address and the data no longer appears in the net count at
+all --- it appears in the clock count instead.
+
+\begin{table}[htb]
+\centering\small
+\caption{Net plan. Widths are per endpoint; the shared segment is what every
+endpoint taps.}
+\begin{tabularx}{\textwidth}{@{}lrrX@{}}
+\toprule
+\textbf{Segment} & \textbf{Width} & \textbf{Units} & \textbf{Carries}\\
+\midrule
+Master $\rightarrow$ forward mux & 4 & 2 &
+  \sig{m\_astream}, \sig{m\_dstream}, \sig{m\_valid}, \sig{m\_we}\\
+\addlinespace
+\textbf{Shared bus} & \textbf{8} & \textbf{1} &
+  the two payload wires and six control wires --- see
+  Table~\ref{tab:wires}\\
+\addlinespace
+Slave $\rightarrow$ return mux & 4 & 4 &
+  \sig{s\_dstream}, \sig{s\_ready}, \sig{s\_resp}\,[2]\\
+\addlinespace
+Request / grant & 4 & 1 &
+  \sig{m\_req}\,[2], \sig{m\_gnt}\,[2]\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Two properties of that plan are worth stating in advance, because the rest of
+the design is built to preserve them:
+
+\begin{enumerate}[leftmargin=1.6em,itemsep=2pt]
+\item \textbf{The shared segment does not grow with the number of slaves.}
+      Adding a fourth slave adds a four-bit private stub and one select line;
+      the eight shared wires are unchanged. That is the property a serial bus
+      is bought for.
+\item \textbf{No parallel address exists anywhere in the datapath.} If any
+      module reassembled the 16-bit address to decode it, sixteen bits of
+      routing would reappear inside the bus and the saving would be
+      partially undone. The decoder is therefore serial too
+      (\S\ref{sec:decode}), and the only 16-bit reassembly in the design is
+      a debug observation point feeding the JTAG probe, removable by a
+      parameter.
+\end{enumerate}
+
 \subsection{Eight wires}
 
 \begin{table}[htb]
 \centering\small
 \caption{The complete shared bus. Everything else is point-to-point.}
+\label{tab:wires}
 \begin{tabularx}{\textwidth}{@{}llX@{}}
 \toprule
 \textbf{Wire} & \textbf{Width} & \textbf{Role}\\
@@ -363,6 +388,69 @@ The interesting engineering is in points 2 and 3. Point 1 is simply the price.
 \caption{Bus topology. The shared segment is two payload wires plus six
 control wires; every per-endpoint stub is one bit.}
 \end{figure}
+
+\subsection{Inside \sig{system\_bus}}
+
+\sig{system\_bus} is the interconnect and nothing else. It contains four
+blocks and one debug observation point, and it deliberately contains no
+master and no memory --- those are endpoints, instantiated outside it and
+reaching it only through the serial ports above. The module can therefore be
+tested on its own, with nothing attached at either end, which is what makes
+the sharpest test in the suite possible (\S\ref{sec:hang}).
+
+\begin{table}[htb]
+\centering\small
+\caption{The four blocks inside \sig{system\_bus}.}
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+\textbf{Block} & \textbf{Responsibility}\\
+\midrule
+\sig{arbiter} &
+Decides who owns the bus. Fixed priority by index, a lock that holds the
+grant until the transfer completes, and a split mask that removes a deferred
+master from arbitration entirely. It never sees the serial wires --- only
+\sig{req}, \sig{bus\_ready} and \sig{bus\_resp} --- which is why serialising
+the payload did not change it.\\
+\addlinespace
+\sig{addr\_decoder} &
+Watches the address arrive bit by bit and narrows which slave can still
+match. Emits a one-hot select, or the default select if nothing matched.
+Serial, not a comparator behind a deserialiser (\S\ref{sec:decode}).\\
+\addlinespace
+\sig{bus\_mux} &
+The datapath. The forward multiplexer puts the granted master onto
+\sig{bus\_astream}, \sig{bus\_valid} and \sig{bus\_we}; the return
+multiplexer routes the responding slave's \sig{ready}, \sig{resp} and data
+back. It also owns the direction of the one shared data wire.\\
+\addlinespace
+\sig{default\_slave} &
+Answers any address the decoder did not map, with \sig{ERROR}, on the normal
+one-cycle schedule. It is the reason the bus cannot hang, and it lives here
+rather than outside because that is a property of the interconnect
+(\S\ref{sec:hang}).\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{How a transfer flows through it.}
+A master raises \sig{m\_req}. The arbiter registers a one-hot \sig{m\_gnt}
+and locks. The granted master then drives its frame, and \sig{bus\_mux}
+forwards it onto the shared wires, where every slave and the decoder see it
+simultaneously. When the frame falls, \sig{addr\_done} strobes the decoder's
+standing answer out as a one-cycle select; \sig{bus\_mux} captures that select
+and \emph{holds} it (\S\ref{sec:latch}). Whichever responder was selected
+eventually raises \sig{ready}, the held select routes it back to
+\sig{bus\_ready} and \sig{bus\_resp}, the arbiter unlocks, and the master
+completes. Exactly one responder is ever selected, and exactly one transfer
+is ever outstanding.
+
+\paragraph{What is deliberately \emph{not} in here.}
+No memory, no master, and no parallel address. The 16-bit deserialiser that
+does exist in \sig{system\_bus} feeds the JTAG probe only; nothing in the
+datapath reads it, and setting \sig{OBSERVE\_ADDR}${=}0$ removes it along
+with the last parallel address anywhere in the design. The whole regression
+still passes with it removed, apart from the four checks that read the probe
+itself --- which is the standing test that the datapath really is serial.
 
 \subsection{The frame, and the one choice that made it cheap}
 \label{sec:frame}
@@ -443,6 +531,7 @@ assign dout = sr[W-1];
 \end{lstlisting}
 
 \subsection{Decode has to happen after the frame}
+\label{sec:decode}
 
 Since no slave knows whether it is selected until the last address bit
 arrives, \textbf{every slave shifts every frame in, addressed or not}, and
@@ -468,10 +557,15 @@ Using the falling edge of \sig{bus\_valid} rather than adding an
 usefully --- leaves the frame length defined in exactly one place. Nothing
 else on the bus knows or cares how long a frame is.
 
-A pleasant consequence: the address decoder is \textbf{unchanged} from the
-parallel design. It is still purely combinational, address in and one-hot
-select out; it is simply enabled for one cycle per frame instead of one cycle
-per access.
+The decoder itself does not wait for the frame to end, though. It is a
+\textbf{progressive prefix matcher}: a one-hot position marker walks the first
+\sig{PFX\_W} bits of the frame and one \emph{alive} bit per slave is cleared
+the moment the wire disagrees with that slave's prefix. Because every slave
+occupies a power-of-two block, its address range \emph{is} a prefix, and the
+answer is settled after five bits --- eleven clocks before the frame ends.
+\sig{addr\_done} merely strobes a result that has been standing for some time.
+The cost is eight flip-flops, and no 16-bit address is ever assembled to
+compare against.
 
 \subsection{The data wire needs no turnaround}
 
@@ -503,15 +597,12 @@ multiplexer above, but they keep an idle bus readable in a waveform, and a
 testbench asserts that the master never drives during a read.
 
 \subsection{The return select had to become a latch}
+\label{sec:latch}
 
-This is the correction serialisation forced, and it is worth spelling out
-because the parallel design's approach looks correct until it is not.
-
-In the parallel bus a reply always came back exactly one cycle after the
-address, so the return multiplexer was steered by a one-cycle-delayed copy of
-the decoder select --- a single register.
-
-On the serial bus the reply offset is variable:
+The obvious way to steer the return multiplexer is a one-cycle-delayed copy
+of the decoder select --- a single register --- and it looks correct until
+one notices that it assumes the reply arrives at a fixed offset. On this bus
+it does not:
 
 \begin{table}[htb]
 \centering\small
@@ -647,13 +738,15 @@ deferred state, allowing a second split would mask two masters with only one
 wake-up available to release them --- a deadlock.
 \end{description}
 
-\paragraph{Why splitting earns its keep here.} On the parallel bus the
-asymmetry was mild: a split freed the bus for a handful of clocks. On the
-serial bus a slave answers \sig{SPLIT} in \textbf{one} clock while a real
-read costs \textbf{ten}, and the whole transaction costs thirty. Deferring
-therefore hands the other master a genuinely useful window. Serialisation did
-not merely slow the bus down --- it turned a mechanism that was close to
-decorative into one that does real work.
+\paragraph{Why splitting earns its keep here.} The asymmetry is what makes
+the mechanism worth its cost. A slave answers \sig{SPLIT} in \textbf{one}
+clock, while a real read costs \textbf{ten} and the whole transaction costs
+thirty. Deferring therefore gets the slow slave out of the way almost
+immediately and hands the other master a genuinely useful window --- tens of
+clocks, not a handful. On a bus where every transfer is dominated by a
+16-clock address phase, that window is long enough for the other master to
+complete entire transactions inside it, which is exactly what the integration
+testbench demonstrates.
 
 %==========================================================================
 \section{The bus must not hang}
@@ -662,9 +755,10 @@ decorative into one that does real work.
 Without a responder for unmapped addresses, an access to a decode hole
 asserts no slave select, nothing ever drives \sig{bus\_ready}, and the
 granted master waits forever holding the bus. Nothing but a reset recovers
-it. This is not hypothetical: it is a live defect in the earlier parallel
-design in the same repository, where \sig{decode\_err} is generated and then
-left unconnected.
+it. This is an easy fault to create by accident: it is enough for a decoder
+to generate a ``no slave matched'' signal and for the interconnect to leave
+that signal unconnected, at which point the hole is invisible until something
+addresses it.
 
 The fix is a \textbf{default responder} that answers any unmapped address
 with \sig{ERROR} on the normal one-cycle schedule. It needs no
@@ -737,7 +831,7 @@ bus $\rightarrow$ master & ---                            & \sig{bus\_dstream}, 
 masters and slaves, so the shared data wire is literally one signal in the
 netlist rather than a pair that happens to be connected. Each endpoint has an
 output and an input onto that net rather than one bidirectional port, for the
-reason given in \S\ref{sec:parallel}: there are no internal tri-states to use.
+reason given in \S\ref{sec:nets}: there are no internal tri-states to use.
 
 The partitioning was done \emph{after} the bus was working, and it cost
 nothing --- the build before and after is identical to the logic element.
@@ -748,10 +842,10 @@ the fitter was worth the two minutes.
 \section{Verification}
 \label{sec:verif}
 
-Eleven self-checking testbenches, each printing its own \textsc{pass} /
-\textsc{fail} banner and an error count, driven by a script that greps the
-output and sets the exit status --- the testbenches themselves always exit
-zero, so the exit code cannot be trusted.
+Thirteen self-checking testbenches carrying 451 individual checks, each
+printing its own \textsc{pass} / \textsc{fail} banner and an error count,
+driven by a script that greps the output and sets the exit status --- the
+testbenches themselves always exit zero, so the exit code cannot be trusted.
 
 Two decisions were worth more than the rest.
 
@@ -839,24 +933,9 @@ corrupted each other. Three tests failed for a reason unrelated to the RTL.
 
 \subsection{Wire census}
 
-\begin{figure}[htb]
-\centering
-\begin{tikzpicture}[font=\scriptsize,x=1mm,y=1cm]
-  \foreach \lbl/\p/\s/\y/\k in {%
-    {Shared bus wires}/86/8/1.0/1.30,
-    {Total interconnect nets}/337/60/0.0/0.33}{
-    \node[anchor=east,font=\scriptsize] at (-3,\y+0.27) {\lbl};
-    \fill[legacy!85] (0,\y+0.32) rectangle (\p*\k,\y+0.54);
-    \fill[signal]    (0,\y+0.02) rectangle (\s*\k,\y+0.24);
-    \node[anchor=west,font=\scriptsize,color=legacy] at (\p*\k+2,\y+0.43) {\p};
-    \node[anchor=west,font=\scriptsize,color=signal] at (\s*\k+2,\y+0.13) {\s};}
-  \node[anchor=west,color=legacy,font=\scriptsize] at (0,-0.5)
-    {\textcolor{legacy}{\rule{6pt}{6pt}}\ parallel};
-  \node[anchor=west,color=signal,font=\scriptsize] at (26,-0.5)
-    {\textcolor{signal}{\rule{6pt}{6pt}}\ serial};
-\end{tikzpicture}
-\caption{Wire count. Bars are scaled independently per row.}
-\end{figure}
+The interconnect as built, counted from the netlist. The shared segment is
+what every endpoint has to tap; the private stubs are one bit each because
+every payload signal on this bus is one bit wide.
 
 \begin{table}[htb]
 \centering\small
@@ -876,6 +955,9 @@ Decode path inside \sig{system\_bus}       & 17 & 1 & 17\\
 \end{tabular}
 \end{table}
 
+The eight shared wires are the number that matters: adding a fourth slave
+adds four private nets and changes the shared segment not at all.
+
 \subsection{Latency}
 
 All figures measured in simulation, from command acceptance to completion.
@@ -884,14 +966,15 @@ All figures measured in simulation, from command acceptance to completion.
 \centering\small
 \caption{Transaction cost. The nine-clock gap between a write and a read is
 exactly the read data phase.}
-\begin{tabular}{@{}lrr@{}}
+\begin{tabular}{@{}lr@{}}
 \toprule
-& \textcolor{legacy}{\textbf{Parallel}} & \textcolor{signal}{\textbf{Serial}}\\
+\textbf{Case} & \textbf{Clocks}\\
 \midrule
-Write                                  & 5\,clk  & 21\,clk\\
-Read                                   & 5\,clk  & 30\,clk\\
-Read, contended (winner / loser)       & 5 / 9   & 30 / 59\\
-Split read (\sig{SPLIT\_LATENCY}${=}6$) & 16\,clk & 79\,clk\\
+Write                                   & 21\\
+Read                                    & 30\\
+Read, contended (winner / loser)        & 30 / 59\\
+Split read (\sig{SPLIT\_LATENCY}${=}6$), uncontended & 57\\
+Split read (\sig{SPLIT\_LATENCY}${=}6$), other master contending & 79\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -905,27 +988,32 @@ time. That is the dominant term, and it is the price of a one-wire address.
 \centering\small
 \caption{Quartus Prime Lite 24.1std, \sig{EP4CE115F29C7}, full
 map / fit / sta / asm flow.}
-\begin{tabular}{@{}lrr@{}}
+\begin{tabular}{@{}lr@{}}
 \toprule
-& \textcolor{legacy}{\textbf{Parallel}} & \textcolor{signal}{\textbf{Serial}}\\
+\textbf{Measure} & \textbf{Result}\\
 \midrule
-Errors               & 0 & 0\\
-Inferred latches     & 0 & \textbf{0}\\
-Combinational loops  & 0 & \textbf{0}\\
-Logic elements       & 721 & \textbf{688}\\
-Registers            & 544 & \textbf{513}\\
-Memory bits (all M9K)& 327{,}680 & 81{,}920\\
-$F_{\max}$ (slow, 1200\,mV, 85\,$^\circ$C) & 117.7\,MHz & \textbf{141.8\,MHz}\\
+Errors               & 0\\
+Inferred latches     & \textbf{0}\\
+Combinational loops  & \textbf{0}\\
+Logic elements       & 688\\
+Registers            & 513\\
+Memory bits (all M9K)& 81{,}920\\
+$F_{\max}$ (slow, 1200\,mV, 85\,$^\circ$C) & \textbf{141.8\,MHz}\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The serial bus is \emph{smaller and faster} than the parallel bus it
-replaced, which was not the expected outcome. Two effects explain it: the
-32-bit forward and return multiplexers cost more logic than the shift
-registers that replaced them, and the widest combinational path on the bus
---- the return multiplexer --- is now one bit wide instead of thirty-two.
-Timing closes with a $2.8\times$ margin on the 50\,MHz requirement.
+Zero inferred latches and zero combinational loops are not incidental: every
+combinational block in the design assigns a default to each of its outputs
+before the case statement that may override it, which is what makes the
+latch count structurally zero rather than luckily zero.
+
+The $F_{\max}$ is worth a note. The widest combinational path on the bus is
+the return multiplexer, and on this design it is \emph{one bit} wide --- the
+reply is a single serial wire plus a two-bit response code. Serialising the
+payload does not merely save wires; it shortens the critical path, which is
+why a bus that costs six times the clocks closes timing with a $2.8\times$
+margin on the 50\,MHz requirement.
 
 %==========================================================================
 \section{Limitations and further work}
@@ -987,11 +1075,13 @@ the entire system. It cost eight cycles of padding on a write --- cycles the
 address phase was going to spend anyway --- and bought a bus with no
 distributed timing state at all.
 
-The second was recognising that serialisation does not merely slow a bus
-down: it changes which mechanisms are worth having. A split transaction that
-saved five clocks on the parallel bus saves thirty on this one, and a
-mechanism that looked like a specification box to tick became the part of the
-design doing the most work.
+The second was recognising that serialisation changes which mechanisms are
+worth having, not just how fast the bus runs. When a slave can decline a
+transfer in one clock but serving it costs thirty, the split mechanism stops
+being a specification box to tick and becomes the part of the design doing
+the most work --- and, for the same reason, the default responder stops being
+a nicety and becomes the only thing standing between an unmapped address and
+a permanently wedged bus.
 
 %==========================================================================
 \appendix

@@ -1,13 +1,13 @@
 //==========================================================================
 // tb_integration.v -- self-checking integration testbench
 //
-// Drives the two master command interfaces directly, exactly as de2_top's
-// scenario sequencer does on the board.
+// Drives the two master command interfaces directly, which is the same way
+// the JTAG debug driver reaches them on the board.
 //
-// The design has no integration wrapper - de2_top instantiates `master',
-// `system_bus' and `slave' side by side - so this testbench builds the same
-// composition itself.  That duplication is the price of having no wrapper:
-// keep this wiring and de2_top's in step.
+// The system under test is one `bus_top' - master x2 + system_bus + slave x3
+// - which is the same instance top_debug builds the board from.  The
+// composition is written once, in rtl/bus_top.v, so this testbench exercises
+// what the board builds by construction rather than by a copy kept in step.
 //
 // Covers, in the order the brief lists them:
 //   1. reset            - no grant, no request, clean mask, bus idle
@@ -41,7 +41,7 @@ module tb_integration;
     localparam DATA_W = `BUS_DATA_W;
     localparam RESP_W = `BUS_RESP_W;
     localparam ID_W   = 1;
-    localparam SPLAT  = 6;           // slave 0 split latency, in cycles
+    localparam SPLAT  = 6;           // split slave (slave 2) latency, cycles
     // A serial transaction is ~21 clocks for a write and ~29 for a read,
     // so the per-transaction budget has to be far larger than it was on
     // the parallel bus.  It is still a budget: a hang is a FAILURE.
@@ -59,7 +59,7 @@ module tb_integration;
     wire [NM*DATA_W-1:0]    rdata_flat;
     wire [NM*RESP_W-1:0]    resp_flat;
     wire [NM*8-1:0]         split_count_flat;
-    reg                     s0_split_en;
+    reg                     split_en_r;
 
     wire [NM-1:0]           gnt;
     wire                    gnt_valid;
@@ -74,210 +74,57 @@ module tb_integration;
     integer errors = 0;
 
     //======================================================================
-    // THE SYSTEM UNDER TEST: masters + bus + slaves, wired directly.
+    // THE SYSTEM UNDER TEST: one `bus_top' - masters + system_bus + slaves.
     //
-    // There is no integration wrapper in the design, so this testbench
-    // builds the composition itself.  It is the SAME wiring de2_top has; if
-    // one changes, the other must too.
-    //
-    // Serial wires between the masters and the bus.
-    // One bit per master per stream - these are the CANDIDATES; the bus
-    // picks one with the grant.
+    // The composition lives in rtl/bus_top.v, so this testbench exercises
+    // exactly what top_debug builds rather than a second copy of the wiring.
     //======================================================================
-    wire [NM-1:0]  m_req;
-    wire [NM-1:0]  m_valid;
-    wire [NM-1:0]  m_we;
-    wire [NM-1:0]  m_astream;
-    wire [NM-1:0]  m_dstream;
-
-    //======================================================================
-    // Serial wires between the bus and the slaves.
-    //======================================================================
-    wire                            bus_we;
-    wire [NS-1:0]             s_sel;
-    wire [NS-1:0]             s_ready;
-    wire [NS*RESP_W-1:0]      s_resp_flat;
-    wire [NS-1:0]             s_dstream;
-
-    //======================================================================
-    // 1. MASTERS
-    //======================================================================
-    genvar gi;
-    generate
-    for (gi = 0; gi < NM; gi = gi + 1) begin : g_master
-        master #(
-            .ADDR_W (ADDR_W),
-            .DATA_W (DATA_W),
-            .RESP_W (RESP_W)
-        ) u_master (
-            .clk         (clk),
-            .rst_n       (rst_n),
-            // parallel, facing the command source
-            .cmd_valid   (cmd_valid[gi]),
-            .cmd_we      (cmd_we[gi]),
-            .cmd_addr    (cmd_addr_flat  [gi*ADDR_W +: ADDR_W]),
-            .cmd_wdata   (cmd_wdata_flat [gi*DATA_W +: DATA_W]),
-            .cmd_accept  (cmd_accept[gi]),
-            .done        (done[gi]),
-            .rdata       (rdata_flat     [gi*DATA_W +: DATA_W]),
-            .resp        (resp_flat      [gi*RESP_W +: RESP_W]),
-            .err         (err[gi]),
-            .split_count (split_count_flat[gi*8 +: 8]),
-            .busy        (mst_busy[gi]),
-            .state       (),                     // waveform only
-            // serial, facing the bus
-            .bus_req     (m_req[gi]),
-            .bus_gnt     (gnt[gi]),
-            .m_valid     (m_valid[gi]),
-            .m_we        (m_we[gi]),
-            .m_astream   (m_astream[gi]),        // ADDRESS, one wire
-            .m_dstream   (m_dstream[gi]),        // WRITE DATA, one wire
-            .bus_ready   (bus_ready),
-            .bus_resp    (bus_resp),
-            .bus_dstream (bus_dstream)           // READ DATA, the shared wire
-        );
-    end
-    endgenerate
-
-    //======================================================================
-    // 2. THE BUS
-    //======================================================================
-    wire [NM-1:0] s0_split_complete;
-
-    // Wake-up pulses from every split-capable slave, OR-ed per master.  Only
-    // slave 0 can raise one today; a second split-capable slave joins here.
-    wire [NM-1:0] s_split_complete = s0_split_complete;
-
-    system_bus #(
-        .N_MASTERS (NM),
-        .ID_W      (ID_W),
-        .N_SLAVES  (NS),
-        .ADDR_W    (ADDR_W),
-        .RESP_W    (RESP_W)
-    ) u_system_bus (
+    bus_top #(
+        .NM(NM), .NS(NS), .ID_W(ID_W),
+        .ADDR_W(ADDR_W), .DATA_W(DATA_W), .RESP_W(RESP_W),
+        .SPLIT_LATENCY(SPLIT_LATENCY)
+    ) u_sys (
         .clk              (clk),
         .rst_n            (rst_n),
 
-        // master side
-        .m_req            (m_req),
-        .m_gnt            (gnt),
-        .m_valid          (m_valid),
-        .m_we             (m_we),
-        .m_astream        (m_astream),
-        .m_dstream        (m_dstream),
-        .bus_ready        (bus_ready),
-        .bus_resp         (bus_resp),
+        .cmd_valid        (cmd_valid),
+        .cmd_we           (cmd_we),
+        .cmd_addr_flat    (cmd_addr_flat),
+        .cmd_wdata_flat   (cmd_wdata_flat),
+        .cmd_accept       (cmd_accept),
+        .done             (done),
+        .rdata_flat       (rdata_flat),
+        .resp_flat        (resp_flat),
+        .err              (err),
+        .split_count_flat (split_count_flat),
+        .mst_busy         (mst_busy),
 
-        // slave side
-        .bus_valid        (bus_valid),
-        .bus_we           (bus_we),
-        .bus_master_id    (master_id),
-        .s_sel            (s_sel),
-        .s_ready          (s_ready),
-        .s_resp_flat      (s_resp_flat),
-        .s_dstream        (s_dstream),
-        .s_split_complete (s_split_complete),
+        .split_en         (split_en_r),
 
-        // the two shared wires
-        .bus_astream      (bus_astream),
-        .bus_dstream      (bus_dstream),
+        // No second board here: master 0's UART link is tied off and every
+        // transaction is local.  tb_uart_remote covers the remote path.
+        .cmd_error        (),
+        .rm_rx            (1'b1),           // an idle UART line sits high
+        .rm_tx            (),
+        .remote_busy      (),
+        .srv_busy         (),
 
-        // status
+        .gnt              (gnt),
         .gnt_valid        (gnt_valid),
         .split_mask       (split_mask),
         .sel_q            (sel_q),
+        .split_busy       (s0_busy),
+        .master_id        (master_id),
+        .bus_valid        (bus_valid),
+        .bus_we           (bus_we),
+        .bus_ready        (bus_ready),
+        .bus_resp         (bus_resp),
         .bus_addr         (bus_addr),
-        .addr_done        (addr_done)
+        .addr_done        (addr_done),
+        .bus_astream      (bus_astream),
+        .bus_dstream      (bus_dstream)
     );
 
-    //======================================================================
-    // 3. SLAVES
-    //
-    // Instantiated one by one rather than in a generate loop, because they
-    // differ in size and in whether they can split - and those differences
-    // are worth reading at a glance.
-    //
-    // All three tap the SAME bus_astream and bus_dstream.
-    //======================================================================
-
-    // Slave 0 - 4 KB at 0x0000, split capable
-    slave #(
-        .DATA_W        (DATA_W),
-        .LADDR_W       (`S0_LADDR_W),
-        .WORDS         (`S0_WORDS),
-        .RESP_W        (RESP_W),
-        .N_MASTERS     (NM),
-        .ID_W          (ID_W),
-        .SPLIT_CAPABLE (1),
-        .SPLIT_LATENCY (SPLIT_LATENCY)
-    ) u_slave0 (
-        .clk            (clk),
-        .rst_n          (rst_n),
-        .frame          (bus_valid),
-        .astream        (bus_astream),
-        .dstream_in     (bus_dstream),
-        .sel            (s_sel[`SEL_S0]),
-        .we             (bus_we),
-        .master_id      (master_id),
-        .split_en       (s0_split_en),
-        .dstream_out    (s_dstream[`SEL_S0]),
-        .ready          (s_ready[`SEL_S0]),
-        .resp           (s_resp_flat[`SEL_S0*RESP_W +: RESP_W]),
-        .split_complete (s0_split_complete),
-        .busy           (s0_busy)
-    );
-
-    // Slave 1 - 4 KB at 0x1000
-    slave #(
-        .DATA_W        (DATA_W),
-        .LADDR_W       (`S1_LADDR_W),
-        .WORDS         (`S1_WORDS),
-        .RESP_W        (RESP_W),
-        .N_MASTERS     (NM),
-        .ID_W          (ID_W),
-        .SPLIT_CAPABLE (0)
-    ) u_slave1 (
-        .clk            (clk),
-        .rst_n          (rst_n),
-        .frame          (bus_valid),
-        .astream        (bus_astream),
-        .dstream_in     (bus_dstream),
-        .sel            (s_sel[`SEL_S1]),
-        .we             (bus_we),
-        .master_id      (master_id),
-        .split_en       (1'b0),
-        .dstream_out    (s_dstream[`SEL_S1]),
-        .ready          (s_ready[`SEL_S1]),
-        .resp           (s_resp_flat[`SEL_S1*RESP_W +: RESP_W]),
-        .split_complete (),
-        .busy           ()
-    );
-
-    // Slave 2 - 2 KB at 0x2000
-    slave #(
-        .DATA_W        (DATA_W),
-        .LADDR_W       (`S2_LADDR_W),
-        .WORDS         (`S2_WORDS),
-        .RESP_W        (RESP_W),
-        .N_MASTERS     (NM),
-        .ID_W          (ID_W),
-        .SPLIT_CAPABLE (0)
-    ) u_slave2 (
-        .clk            (clk),
-        .rst_n          (rst_n),
-        .frame          (bus_valid),
-        .astream        (bus_astream),
-        .dstream_in     (bus_dstream),
-        .sel            (s_sel[`SEL_S2]),
-        .we             (bus_we),
-        .master_id      (master_id),
-        .split_en       (1'b0),
-        .dstream_out    (s_dstream[`SEL_S2]),
-        .ready          (s_ready[`SEL_S2]),
-        .resp           (s_resp_flat[`SEL_S2*RESP_W +: RESP_W]),
-        .split_complete (),
-        .busy           ()
-    );
 
 
     //----------------------------------------------------------------------
@@ -413,7 +260,7 @@ module tb_integration;
         cmd_we         = {NM{1'b0}};
         cmd_addr_flat  = {NM*ADDR_W{1'b0}};
         cmd_wdata_flat = {NM*DATA_W{1'b0}};
-        s0_split_en    = 1'b0;
+        split_en_r     = 1'b0;
 
         //==================================================================
         $display("-- 1. reset ------------------------------------------");
@@ -431,12 +278,12 @@ module tb_integration;
         //==================================================================
         $display("-- 2. one master, all three slaves -------------------");
         m_check_wr(0, 16'h0000, 8'hA0, "slave 0 first word");
-        m_check_wr(0, 16'h0FFF, 8'hAF, "slave 0 last word ");
+        m_check_wr(0, 16'h07FF, 8'hAF, "slave 0 last word ");
         m_check_wr(0, 16'h0040, 8'hA4, "slave 0 word 0x40 ");
         m_check_wr(0, 16'h1000, 8'hB0, "slave 1 first word");
         m_check_wr(0, 16'h1FFF, 8'hBF, "slave 1 last word ");
         m_check_wr(0, 16'h2000, 8'hC0, "slave 2 first word");
-        m_check_wr(0, 16'h27FF, 8'hC7, "slave 2 last word ");
+        m_check_wr(0, 16'h2FFF, 8'hC7, "slave 2 last word ");
         m_run(0, 1'b1, 16'h1500, 8'h01);
         $display("  ..    WRITE latency %0d clocks", lat[0]);
         m_run(0, 1'b0, 16'h1500, {DATA_W{1'b0}});
@@ -480,14 +327,14 @@ module tb_integration;
         //==================================================================
         $display("-- 4. full split transaction, end to end -------------");
         // Seed the split slave while it is not splitting.
-        s0_split_en = 1'b0;
-        m_run(0, 1'b1, 16'h0010, 8'hCE);
+        split_en_r = 1'b0;
+        m_run(0, 1'b1, 16'h2010, 8'hCE);
         m_run(1, 1'b1, 16'h2300, 8'h5A);
 
-        s0_split_en = 1'b1;
+        split_en_r = 1'b1;
         fork
             // master 0 reads the split-capable slave: this WILL be deferred
-            m_run(0, 1'b0, 16'h0010, {DATA_W{1'b0}});
+            m_run(0, 1'b0, 16'h2010, {DATA_W{1'b0}});
             // master 1 does real work in the gap the split opens up
             begin
                 m_run(1, 1'b0, 16'h2300, {DATA_W{1'b0}});
@@ -521,20 +368,27 @@ module tb_integration;
         $display("  ..    split read cost master 0 %0d clocks", lat[0]);
 
         // A write can be split too, and must still take effect exactly once.
-        m_run(0, 1'b1, 16'h0011, 8'h77);
+        m_run(0, 1'b1, 16'h2011, 8'h77);
         chk(msplits(0) >= 8'd2, "the write was split as well");
-        s0_split_en = 1'b0;
-        m_run(0, 1'b0, 16'h0011, {DATA_W{1'b0}});
+        split_en_r = 1'b0;
+        m_run(0, 1'b0, 16'h2011, {DATA_W{1'b0}});
         chk(mrd(0) === 8'h77, "the split write landed exactly once");
 
         //==================================================================
         $display("-- 5. unmapped access: ERROR, and the bus RECOVERS ---");
         // The decode hole above slave 2.
-        m_run(0, 1'b0, 16'h2800, {DATA_W{1'b0}});
-        chk(!timed_out[0],           "0x2800 completed instead of hanging the bus");
-        chk(mresp(0) === `RESP_ERROR,"0x2800 answered ERROR");
+        m_run(0, 1'b0, 16'h0800, {DATA_W{1'b0}});
+        chk(!timed_out[0],           "0x0800 completed instead of hanging the bus");
+        chk(mresp(0) === `RESP_ERROR,"0x0800 answered ERROR");
         chk(err[0]   === 1'b1,       "master 0 reports err");
         chk(gnt      === 2'b00,      "the grant was released, bus not held");
+        // The default responder never drives the data wire, and an ERROR is
+        // answered before any data phase - so without an explicit clear the
+        // master would hand back the PREVIOUS read's bits, shifted along by
+        // the clocks it spent waiting.  That would leak data and put
+        // convincing rubbish on led[7:0].
+        chk(mrd(0) === {DATA_W{1'b0}},
+            "an ERROR read returns zero, not the last read's data");
 
         // The very next transfer must work - that is what "recovers" means.
         m_run(0, 1'b0, 16'h1100, {DATA_W{1'b0}});
@@ -542,35 +396,43 @@ module tb_integration;
         chk(mrd(0) === 8'h11, "and returned correct data");
         chk(mresp(0) === `RESP_OKAY,  "and a clean OKAY");
 
-        m_run(0, 1'b1, 16'h2FFF, 8'hDD);
+        m_run(0, 1'b1, 16'h0FFF, 8'hDD);
         chk(mresp(0) === `RESP_ERROR, "an unmapped WRITE also answers ERROR");
 
-        // The window reserved for the phase-2 remote bridge.
+        // The remote window, seen from master 1.  Master 1 is a plain
+        // `master' with no UART, so addr[15]=1 reaches the local decoder and
+        // is simply unmapped - only master 0 takes that window off-board.
         m_run(1, 1'b0, 16'h8000, {DATA_W{1'b0}});
-        chk(!timed_out[1],            "reserved addr[15]=1 window completed");
-        chk(mresp(1) === `RESP_ERROR, "reserved window answers ERROR");
+        chk(!timed_out[1],            "addr[15]=1 completed on the local-only master");
+        chk(mresp(1) === `RESP_ERROR, "and answers ERROR - nothing up there is mapped");
         m_run(1, 1'b0, 16'hFFFF, {DATA_W{1'b0}});
         chk(mresp(1) === `RESP_ERROR, "top of memory answers ERROR");
         m_run(1, 1'b0, 16'h2300, {DATA_W{1'b0}});
         chk(mrd(1) === 8'h5A, "master 1 recovered too");
 
         // A run of bad addresses back to back must not wedge anything.
-        for (i = 0; i < 4; i = i + 1) m_run(0, 1'b0, 16'h2900 + i[15:0], {DATA_W{1'b0}});
+        // These must be GENUINELY unmapped: 0x2900 was used here once, but
+        // slave 2 is a full 4K (0x2000-0x2FFF) so that swept mapped addresses
+        // and proved nothing.  0x3000+ is above the whole map.
+        for (i = 0; i < 4; i = i + 1) begin
+            m_run(0, 1'b0, 16'h3000 + i[15:0], {DATA_W{1'b0}});
+            chk(mresp(0) === `RESP_ERROR, "consecutive unmapped access answered ERROR");
+        end
         chk(!timed_out[0], "four consecutive unmapped accesses all completed");
         m_run(0, 1'b0, 16'h0000, {DATA_W{1'b0}});
         chk(mrd(0) === 8'hA0, "bus fully healthy afterwards");
 
         //==================================================================
         $display("-- 6. the LOW-priority master can split too ----------");
-        s0_split_en = 1'b0;
-        m_run(1, 1'b1, 16'h0100, 8'h9C);
-        s0_split_en = 1'b1;
-        m_run(1, 1'b0, 16'h0100, {DATA_W{1'b0}});
+        split_en_r = 1'b0;
+        m_run(1, 1'b1, 16'h2100, 8'h9C);
+        split_en_r = 1'b1;
+        m_run(1, 1'b0, 16'h2100, {DATA_W{1'b0}});
         chk(!timed_out[1],             "master 1's split read completed (did not hang)");
         chk(msplits(1) >= 8'd1,        "master 1 recorded a SPLIT");
         chk(mrd(1) === 8'h9C,  "master 1's re-issued transfer got the data");
         chk(mresp(1) === `RESP_OKAY,   "master 1's final response is OKAY");
-        s0_split_en = 1'b0;
+        split_en_r = 1'b0;
 
 
         //==================================================================
@@ -590,17 +452,17 @@ module tb_integration;
 
         // A split forces a re-issue: the SECOND frame must be a full,
         // correct frame too, not a resumption of the first.
-        s0_split_en = 1'b0;
-        m_run(0, 1'b1, 16'h0ABC, 8'h6D);
+        split_en_r = 1'b0;
+        m_run(0, 1'b1, 16'h2ABC, 8'h6D);
         bad_frames  = 0;
         frames_seen = 0;
-        s0_split_en = 1'b1;
-        m_run(0, 1'b0, 16'h0ABC, {DATA_W{1'b0}});
+        split_en_r = 1'b1;
+        m_run(0, 1'b0, 16'h2ABC, {DATA_W{1'b0}});
         chk(frames_seen == 2,  "the split transaction put TWO frames on the wire");
         chk(bad_frames == 0,   "the re-issued frame was full length as well");
-        chk(frame_addr === 16'h0ABC, "the replay re-sent the SAME address");
+        chk(frame_addr === 16'h2ABC, "the replay re-sent the SAME address");
         chk(mrd(0) === 8'h6D,  "and returned the right data");
-        s0_split_en = 1'b0;
+        split_en_r = 1'b0;
 
         //==================================================================
         $display("======================================================");

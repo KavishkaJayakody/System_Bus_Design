@@ -12,10 +12,12 @@ Three kinds of module speak this protocol, and the split is strict:
 |---|---|
 | `system_bus` | the bus: arbiter, decoder, `bus_mux`, the central address deserialiser, the default responder. No master, no memory. |
 | `master` | drives a frame, absorbs a split, reassembles read data. No arbitration, no decoding. |
+| `master_uart` | `master` plus a UART client and server, for transactions run on ANOTHER board (`addr[15] == 1`). It wraps the core; it does not change this protocol. See §15 and §17 of [design_notes.md](design_notes.md). |
 | `slave` | shifts every frame in, acts only on `sel`. No arbitration, no decoding. |
 
-There is no integration wrapper: `de2_top` instantiates the three side by
-side. Everything below describes the two interfaces between them.
+`bus_top` composes the three into a complete system and holds no logic
+itself; `top_debug` and both integration testbenches instantiate it. Everything
+below describes the two interfaces between the three modules above.
 
 ## The shared bus is 8 wires
 
@@ -30,7 +32,9 @@ side. Everything below describes the two interfaces between them.
 | `master_id` | 1 | arbiter → slaves | tag of the granted master |
 
 Plus, point-to-point rather than shared: `bus_req`/`gnt` per master,
-`split_complete` per master, and the decoder's 4 select lines.
+`split_complete` per master, and the decoder's select lines — 3 leave the
+bus for the 3 slaves, and the 4th, the default responder's, stays inside
+`system_bus` because the responder does too.
 
 `bus_dstream` never needs a turnaround, because the two directions cannot
 collide by construction: on a **write** only the master sends, during the
@@ -57,9 +61,8 @@ of its own width, clocked while `bus_valid` is high, and it ends up holding
 
 | Receiver | Width | Ends up holding |
 |---|---|---|
-| central deserialiser → `addr_decoder` | 16 | the whole address |
-| slave 0 / slave 1 address | 12 | `addr[11:0]`, its offset |
-| slave 2 address | 11 | `addr[10:0]`, its offset |
+| slave 0 address | 11 | `addr[10:0]`, its offset |
+| slave 1 / slave 2 address | 12 | `addr[11:0]`, its offset |
 | every slave's write data | 8 | the right-aligned data byte |
 
 The upper address bits shift straight through a slave's narrow register and
@@ -83,8 +86,38 @@ sel[i]       ____________________|‾‾‾‾‾|__________     one-hot, 1 clk
 shared bus at eight wires and keeps the frame length defined in exactly one
 place — the master's counter.
 
-`addr_decoder` itself is **unchanged from the parallel design** and still
-purely combinational. It is merely enabled one cycle per frame.
+**`addr_decoder` is serial too.** It watches the address arrive bit by bit on
+`bus_astream` and narrows which slaves can still match; no 16-bit address is
+ever assembled. It has in fact settled after the 5-bit prefix, eleven clocks
+before the frame ends, and `addr_done` merely strobes the answer out.
+
+### The decoder is the exception to the no-counter rule, and why
+
+The "last W bits" trick works for every receiver that wants a *low-order*
+field. The decoder wants the opposite end — the slave prefix, which is the
+first thing on the wire — and no amount of shifting will leave the first bits
+of a frame in a register.
+
+So the decoder is the one place that must know *which* bit is on the wire. It
+knows by the cheapest available means: a 5-bit one-hot marker that starts at
+the first bit of the frame and shifts once per clock, retiring after the
+prefix. Each slave keeps one `alive` bit that a mismatch clears.
+
+```
+frame    ____|‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾|____
+astream  ----<a15 a14 a13 a12 a11 a10 ....  a1  a0 >-----
+pos       10000 01000 00100 00010 00001 00000 ...  00000
+alive     <-- narrowing -->   settled ------------------>
+                              ^ decided, 11 clocks early
+addr_done ________________________________________|‾‾‾‾|_
+```
+
+That costs **8 flip-flops** — 5 for the marker, 3 for the slave bits. The
+deserialise-then-compare arrangement it replaced needed 16 flops and could
+not decide until the last bit landed. `tb_addr_decoder` still sweeps all
+65,536 addresses for one-hot-ness, now a frame at a time, and additionally
+checks that the decision is settled after 5 bits and that the offset bits
+cannot change it.
 
 Shifting speculatively costs nothing: a slave that was not selected simply
 never acts on what it collected. `tb_slave` test 4 drives a full frame
@@ -98,6 +131,10 @@ with *no* select and checks that no slave answers and no memory changes.
 | SPLIT | S+1 | the slave is getting out of the way, fast |
 | read | S+10 | 1 clock for the M9K output register, 1 to load the output shift register, 8 to shift the data out |
 | unmapped | S+1 | the default slave answers immediately |
+
+A transaction with `addr[15] == 1` never reaches this table at all:
+`master_uart` sends it to the other board over the UART instead. See
+[address_map.md](address_map.md).
 
 (S = the cycle `sel` pulses.)
 
@@ -185,7 +222,16 @@ Points worth keeping straight:
 An address matching no slave selects the **default slave**, which replies
 `ready` + `ERROR` at S+1. It needs no deserialisers — it does not care what
 the address or data were, only that nothing else claimed them — and it never
-drives the data wire, so a read of an unmapped address reassembles zero.
+drives the data wire.
+
+**The data a master captures from an unmapped read is undefined, not zero.**
+The default slave stays silent, but the master's read deserialiser free-runs
+through the whole transfer, so it ends up holding whatever residue was last
+on `bus_dstream` — on hardware, `ra 0800` returns a plausible-looking byte.
+`RESP_ERROR` is what tells you not to trust it, and that is the contract:
+an errored transfer carries no data. (`tb_default_slave` checks the default
+slave's own output is zero, which is a different claim about a different
+signal.)
 
 Without it, an unmapped access would assert no select, no slave would ever
 drive `ready`, and the granted master would hold the bus forever with only a
@@ -211,7 +257,8 @@ Still parameterised on `N_MASTERS` for the phase-2 remote bridge.
 | Write | **21** |
 | Read | **30** |
 | Read while the other master contends | 30 / 59 |
-| Split read, `SPLIT_LATENCY = 6` | 79 |
+| Split read, `SPLIT_LATENCY = 6`, other master contending | 79 |
+| Split read, `SPLIT_LATENCY = 6`, uncontended | 57 |
 
 A write costs 21 and a read 30 — the 9-clock difference is exactly the read
 data phase. The address frame dominates both: 16 of those clocks are the

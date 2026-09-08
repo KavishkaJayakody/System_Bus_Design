@@ -7,6 +7,10 @@
 # Without this file Quartus reports "no clocks defined", analyses nothing,
 # and Fmax is never checked - so the 50 MHz in the testbenches would be an
 # assumption rather than a verified result.
+#
+# The JTAG hub adds a second domain, `altera_reserved_tck', when the ISSP
+# instance is present.  Quartus constrains that itself; nothing here needs to
+# mention it.
 #===========================================================================
 
 create_clock -name CLOCK_50 -period 20.000 [get_ports {CLOCK_50}]
@@ -15,23 +19,26 @@ create_clock -name CLOCK_50 -period 20.000 [get_ports {CLOCK_50}]
 derive_clock_uncertainty
 
 #---------------------------------------------------------------------------
-# All I/O on this board is asynchronous to the bus: slide switches and
-# pushbuttons are set by a person and are synchronised inside the design
-# (reset_ctrl, debouncer and the SW synchroniser in de2_top); LEDs and the
-# seven-segment displays are looked at by a person.  None of it has a setup
-# or hold relationship worth constraining, so cut those paths and let the
-# analyser concentrate on the internal bus logic.
+# `rst_n' is KEY[0], pressed by a person, and the LEDs are looked at by one.
+# Neither has a setup or hold relationship worth constraining, so cut those
+# paths and let the analyser concentrate on the internal bus logic.
+#
+# NOTE: there is no reset synchroniser - `reset_ctrl' went with the board
+# layer - so rst_n reaches every flop's asynchronous clear directly and its
+# RELEASE is unsynchronised.  Cutting it here means recovery/removal is not
+# analysed either.  That is acceptable for a button on a lab board (the worst
+# case is one metastable release, cured by pressing KEY[0] again) but it is a
+# deliberate shortcut, not a verified path.
 #---------------------------------------------------------------------------
-set_false_path -from [get_ports {KEY[*]}] -to [all_registers]
-set_false_path -from [get_ports {SW[*]}]  -to [all_registers]
+set_false_path -from [get_ports {rst_n}] -to [all_registers]
+set_false_path -from * -to [get_ports {led[*]}]
 
-set_false_path -from * -to [get_ports {LEDR[*]}]
-set_false_path -from * -to [get_ports {LEDG[*]}]
-set_false_path -from * -to [get_ports {HEX0[*]}]
-set_false_path -from * -to [get_ports {HEX1[*]}]
-set_false_path -from * -to [get_ports {HEX2[*]}]
-set_false_path -from * -to [get_ports {HEX3[*]}]
-set_false_path -from * -to [get_ports {HEX4[*]}]
-set_false_path -from * -to [get_ports {HEX5[*]}]
-set_false_path -from * -to [get_ports {HEX6[*]}]
-set_false_path -from * -to [get_ports {HEX7[*]}]
+#---------------------------------------------------------------------------
+# The board-to-board link.  `rm_rx' is driven by the far
+# board's oscillator, so it is asynchronous by definition and there is no
+# meaningful setup or hold relationship to constrain - uart_rx double-flops
+# it, which is the correct fix and the only one available.  `rm_tx'
+# changes once per bit period, thousands of clocks apart.
+#---------------------------------------------------------------------------
+set_false_path -from [get_ports {rm_rx}] -to [all_registers]
+set_false_path -from * -to [get_ports {rm_tx}]

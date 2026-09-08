@@ -1,11 +1,11 @@
 
-State Machine - |top_bus_system|bus_interconnect:interconnect_inst|arbiter_2m_split:arbiter_inst|state
+State Machine - |top_debug|top_bus_system:u_bus|bus_interconnect:interconnect_inst|arbiter_2m_split:arbiter_inst|state
 Name state.IDLE state.GRANT_M1 state.GRANT_M0 
 state.IDLE 0 0 0 
 state.GRANT_M0 1 0 1 
 state.GRANT_M1 1 1 0 
 
-State Machine - |top_bus_system|master_node:m1_inst|state
+State Machine - |top_debug|top_bus_system:u_bus|master_node:m1_inst|state
 Name state.DONE state.SPLIT_W state.WAIT state.DRIVE state.REQ state.IDLE 
 state.IDLE 0 0 0 0 0 0 
 state.REQ 0 0 0 0 1 1 
@@ -14,7 +14,31 @@ state.WAIT 0 0 1 0 0 1
 state.SPLIT_W 0 1 0 0 0 1 
 state.DONE 1 0 0 0 0 1 
 
-State Machine - |top_bus_system|master_node:m0_inst|state
+State Machine - |top_debug|top_bus_system:u_bus|master_node_uart:m0_inst|ss
+Name ss.S_IDLE ss.S_RESP ss.S_EXEC 
+ss.S_IDLE 0 0 0 
+ss.S_EXEC 1 0 1 
+ss.S_RESP 1 1 0 
+
+State Machine - |top_debug|top_bus_system:u_bus|master_node_uart:m0_inst|cs
+Name cs.C_IDLE cs.C_WAIT cs.C_SEND 
+cs.C_IDLE 0 0 0 
+cs.C_SEND 1 0 1 
+cs.C_WAIT 1 1 0 
+
+State Machine - |top_debug|top_bus_system:u_bus|master_node_uart:m0_inst|rxs
+Name rxs.R_TAG rxs.R_RESP rxs.R_REQ 
+rxs.R_TAG 0 0 0 
+rxs.R_REQ 1 0 1 
+rxs.R_RESP 1 1 0 
+
+State Machine - |top_debug|top_bus_system:u_bus|master_node_uart:m0_inst|txs
+Name txs.TXS_IDLE txs.TXS_WAIT txs.TXS_SEND 
+txs.TXS_IDLE 0 0 0 
+txs.TXS_SEND 1 0 1 
+txs.TXS_WAIT 1 1 0 
+
+State Machine - |top_debug|top_bus_system:u_bus|master_node_uart:m0_inst|master_node:core|state
 Name state.DONE state.SPLIT_W state.WAIT state.DRIVE state.REQ state.IDLE 
 state.IDLE 0 0 0 0 0 0 
 state.REQ 0 0 0 0 1 1 
@@ -22,3 +46,17 @@ state.DRIVE 0 0 0 1 0 1
 state.WAIT 0 0 1 0 0 1 
 state.SPLIT_W 0 1 0 0 0 1 
 state.DONE 1 0 0 0 0 1 
+
+State Machine - |top_debug|top_bus_system:u_bus|master_node_uart:m0_inst|uart_tx:tx_inst|state
+Name state.STOP state.DATA state.START state.IDLE 
+state.IDLE 0 0 0 0 
+state.START 0 0 1 1 
+state.DATA 0 1 0 1 
+state.STOP 1 0 0 1 
+
+State Machine - |top_debug|top_bus_system:u_bus|master_node_uart:m0_inst|uart_rx:rx_inst|state
+Name state.STOP state.DATA state.START state.IDLE 
+state.IDLE 0 0 0 0 
+state.START 0 0 1 1 
+state.DATA 0 1 0 1 
+state.STOP 1 0 0 1 

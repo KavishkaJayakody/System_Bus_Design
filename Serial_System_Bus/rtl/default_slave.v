@@ -1,9 +1,13 @@
 //==========================================================================
 // default_slave.v
 //
-// The responder for every address the decoder does not map: the 0x2800-
-// 0x2FFF hole above slave 2, and the whole addr[15]==1 window reserved for
-// the phase-2 remote bridge.
+// The responder for every address the decoder does not map: the 0x0800-
+// 0x0FFF hole above the 2K slave 0, and 0x3000-0x7FFF above slave 2.
+//
+// addr[15]==1 does NOT reach here in the assembled system - `master_uart'
+// takes that window to the other board over the UART - but the decoder still
+// treats it as unmapped, so a frame that did arrive with it set is answered
+// rather than left hanging.
 //
 // It exists purely so the bus cannot hang.  Without it an unmapped access
 // would assert no slave select, no slave would ever drive ready, and the
@@ -14,8 +18,10 @@
 //
 // It needs no deserialisers: it does not care what the address or the data
 // were, only that nothing else claimed them.  It never drives the shared
-// data wire, so a read of an unmapped address returns whatever the wire was
-// idling at, which is zero.
+// data wire.  An ERROR is answered in one cycle, long before any data phase,
+// so the master's read deserialiser still holds the PREVIOUS read's bits at
+// that moment - `master' therefore forces rdata to zero on ERROR rather than
+// handing that back.  See master.v.
 //
 //--------------------------------------------------------------------------
 // Port          Dir  Width   Meaning

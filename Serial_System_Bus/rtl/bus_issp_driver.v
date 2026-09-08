@@ -27,11 +27,14 @@
 //     src[52]  soft_rst     clears the sticky done/collision/error/frame flags
 //     src[53]  issp_mode    1 = ISSP owns the master command ports
 //                           (0 = the on-board scenario sequencer owns them)
-//     src[54]  s0_split_en  1 = slave 0 answers SPLIT, OR-ed with SW[16]
-//     src[55]  spare
+//     src[54]  split_en     1 = the split-capable slave (slave 2)
+//                           answers SPLIT
+//     src[55]  spare        (was cmd_remote; the ADDRESS selects the far
+//                           board now - anything at 0x8000+ goes over the
+//                           link, so no command bit is needed)
 //
 //--------------------------------------------------------------------------
-// PROBE map (96 bits, read back by the host)
+// PROBE map (128 bits, read back by the host)
 //--------------------------------------------------------------------------
 //   Per master, base = m*30:
 //     prb[b+7:b+0]    rdata     last read data
@@ -41,18 +44,43 @@
 //     prb[b+12]       err_s     sticky: last transaction answered ERROR
 //     prb[b+20:b+13]  lat       clocks from launch to done, saturating at 0xFF
 //     prb[b+28:b+21]  splits    that master's split_count
-//     prb[b+29]       spare
+//     prb[b+29]       cmd_error sticky: a REMOTE transaction timed out.
+//                               Master 0 only; prb[59] reads 0 always.
 //   so  m0 = prb[29:0]   m1 = prb[59:30]
 //
 //     prb[61:60]  gnt         one-hot grant
 //     prb[63:62]  split_mask  a lit bit = that master is split-deferred
 //     prb[67:64]  sel_q       latched responder {default, s2, s1, s0}
-//     prb[68]     s0_busy     slave 0 has a split in flight
+//     prb[68]     split_busy  the split slave has one in flight
 //     prb[69]     collision   sticky: both masters were in flight at once
 //     prb[85:70]  bus_addr    the address REASSEMBLED off the serial wire
 //     prb[90:86]  frame_len   clocks the last address frame was high
 //     prb[91]     frame_bad   sticky: some frame was not ADDR_W clocks
-//     prb[95:92]  spare
+//     prb[92]     remote_busy a remote transaction is outstanding
+//     prb[93]     srv_busy    serving the other board's request right now
+//     prb[94]     rx_active   the link's RX line is not idle-high
+//     prb[95]     req_overrun sticky: an incoming REQUEST was overwritten
+//                             before the server could run it - the far board
+//                             sent faster than this side drained
+//
+//   LINK DIAGNOSTICS - what you read when the far board says nothing:
+//     prb[103:96]   rx_last     last byte the UART framed
+//     prb[111:104]  rx_count    bytes received since reset (wraps)
+//     prb[119:112]  tx_count    bytes sent since reset (wraps)
+//     prb[121:120]  rx_state    0=hunting for a tag, 1=in REQ, 2=in RESP
+//     prb[122]      req_seen    sticky: a whole REQUEST was parsed
+//     prb[123]      resp_seen   sticky: a whole RESPONSE was parsed
+//     prb[127:124]  spare
+//
+//   rx_count == 0        nothing is arriving: cable, ground or baud
+//   rx_count > 0 but
+//     resp_seen == 0     bytes arrive but never parse: baud slightly off,
+//                        byte order, or a tag/format disagreement
+//   req_overrun == 1     requests ARE parsing but one was thrown away: this
+//                        side was blocked longer than a frame takes to
+//                        arrive (a long split, or our own client queued
+//                        behind the transmitter).  The link has no flow
+//                        control, so this is reported, not prevented.
 //
 // A latency of 0xFF with busy still high means the transaction never
 // completed.  On this bus that should be impossible - every unmapped address
@@ -88,23 +116,36 @@ module bus_issp_driver #(
     input  wire [1:0]            gnt,
     input  wire [1:0]            split_mask,
     input  wire [3:0]            sel_q,
-    input  wire                  s0_busy,
+    input  wire                  split_busy,
     input  wire [ADDR_W-1:0]     bus_addr,
     input  wire                  bus_valid,
 
+    // ---- the UART link to the other board (master 0 only) ---------------
+    input  wire                  cmd_error,      // sticky-ish: last remote failed
+    input  wire                  remote_busy,
+    input  wire                  srv_busy,
+    input  wire [7:0]            dbg_rx_last,
+    input  wire [7:0]            dbg_rx_count,
+    input  wire [7:0]            dbg_tx_count,
+    input  wire [1:0]            dbg_rx_state,
+    input  wire                  dbg_req_seen,
+    input  wire                  dbg_resp_seen,
+    input  wire                  dbg_rx_active,
+    input  wire                  dbg_req_overrun,
+
     // ---- control back out to the board ----------------------------------
     output wire                  issp_mode,
-    output wire                  s0_split_en
+    output wire                  split_en
 );
 
     wire [55:0] src;
-    wire [95:0] prb;
+    wire [127:0] prb;
 
     altsource_probe #(
         .sld_auto_instance_index ("YES"),
         .instance_id             ("SBUS"),
         .source_width            (56),
-        .probe_width             (96),
+        .probe_width             (128),
         .source_initial_value    ("0"),
         .enable_metastability    ("YES")
     ) u_issp (
@@ -131,12 +172,13 @@ module bus_issp_driver #(
     wire [1:0] go       = {src[26], src[0]};
     wire       soft_rst = src[52];
     assign     issp_mode   = src[53];
-    assign     s0_split_en = src[54];
+    assign     split_en    = src[54];
 
     //----------------------------------------------------------------------
     // Per-master launch, completion capture and latency.
     //----------------------------------------------------------------------
     reg  [1:0]  go_d, busy, done_s, err_s;
+    reg         rem_err_s;          // sticky: a REMOTE cmd timed out
     reg  [7:0]  rl   [0:1];
     reg  [1:0]  rp   [0:1];
     reg  [7:0]  lat  [0:1];
@@ -151,6 +193,7 @@ module bus_issp_driver #(
             busy      <= 2'b00;
             done_s    <= 2'b00;
             err_s     <= 2'b00;
+            rem_err_s <= 1'b0;
             cmd_valid <= 2'b00;
             collision <= 1'b0;
             for (i = 0; i < 2; i = i + 1) begin
@@ -181,6 +224,10 @@ module bus_issp_driver #(
                         rl[i]     <= rdata_flat[i*DATA_W +: DATA_W];
                         rp[i]     <= resp_flat [i*RESP_W +: RESP_W];
                         err_s[i]  <= err[i];
+                        // The link timeout is reported separately from a bus
+                        // ERROR: "the far board never answered" is a different
+                        // fault from "that address is not mapped".
+                        if (i == 0) rem_err_s <= cmd_error;
                     end
                 end
 
@@ -236,18 +283,28 @@ module bus_issp_driver #(
     // Probe assembly.  Keep this in step with the header comment and with
     // tcl/issp_bus_lib.tcl - three places, one bit map.
     //----------------------------------------------------------------------
-    assign prb = { 4'b0,                                   // [95:92] spare
+    assign prb = { 4'b0,                                   // [127:124] spare
+                   dbg_resp_seen,                          // [123]
+                   dbg_req_seen,                           // [122]
+                   dbg_rx_state,                           // [121:120]
+                   dbg_tx_count,                           // [119:112]
+                   dbg_rx_count,                           // [111:104]
+                   dbg_rx_last,                            // [103:96]
+                   dbg_req_overrun,                        // [95]
+                   dbg_rx_active,                          // [94]
+                   srv_busy,                               // [93]
+                   remote_busy,                            // [92]
                    frame_bad,                              // [91]
                    frame_len,                              // [90:86]
                    bus_addr,                               // [85:70]
                    collision,                              // [69]
-                   s0_busy,                                // [68]
+                   split_busy,                             // [68]
                    sel_q,                                  // [67:64]
                    split_mask,                             // [63:62]
                    gnt,                                    // [61:60]
                    1'b0, split_count_flat[15:8],           // [59:51] m1
                    lat[1], err_s[1], rp[1], busy[1], done_s[1], rl[1],
-                   1'b0, split_count_flat[7:0],            // [29:21] m0
+                   rem_err_s, split_count_flat[7:0],       // [29:21] m0
                    lat[0], err_s[0], rp[0], busy[0], done_s[0], rl[0] };
 
 endmodule

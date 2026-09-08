@@ -95,8 +95,11 @@
 // split_mask      out  N_MASTERS           Arbiter split mask.
 // sel_q           out  N_SLAVES+1          Latched responder select,
 //                                          {default, s2, s1, s0}.
-// bus_addr        out  ADDR_W              The address reassembled off the
-//                                          wire, valid from addr_done on.
+// bus_addr        out  ADDR_W              DEBUG ONLY.  The address
+//                                          reassembled off the wire, valid
+//                                          from addr_done on, for the JTAG
+//                                          probe.  Nothing in the datapath
+//                                          reads it; zero if OBSERVE_ADDR=0.
 // addr_done       out  1                   End-of-frame / decode strobe.
 //==========================================================================
 `include "bus_defs.vh"
@@ -106,7 +109,11 @@ module system_bus #(
     parameter ID_W      = 1,                  // ceil(log2(N_MASTERS))
     parameter N_SLAVES  = `BUS_N_SLAVES,
     parameter ADDR_W    = `BUS_ADDR_W,
-    parameter RESP_W    = `BUS_RESP_W
+    parameter RESP_W    = `BUS_RESP_W,
+    // Keep the 16-bit address reassembly that feeds the JTAG probe.  It is
+    // observation only - the decoder is serial and does not use it - so 0
+    // removes it and every parallel address with it.
+    parameter OBSERVE_ADDR = 1
 ) (
     input  wire                            clk,
     input  wire                            rst_n,
@@ -214,18 +221,8 @@ module system_bus #(
     );
 
     //----------------------------------------------------------------------
-    // Central address deserialiser and the end-of-frame strobe.
-    //
-    // The decoder is combinational and needs the whole address at once, so
-    // one deserialiser here collects the frame off the shared wire.  Slaves
-    // collect their own low bits off the same wire in parallel - nothing is
-    // broadcast back out in parallel form.
+    // End-of-frame strobe.
     //----------------------------------------------------------------------
-    shift_deser #(.W(ADDR_W)) u_addr_deser (
-        .clk(clk), .rst_n(rst_n),
-        .shift(bus_valid), .din(bus_astream), .dout(bus_addr)
-    );
-
     reg bus_valid_d;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) bus_valid_d <= 1'b0;
@@ -239,18 +236,49 @@ module system_bus #(
     assign addr_done = bus_valid_d & ~bus_valid;
 
     //----------------------------------------------------------------------
-    // Address decoder.  Purely combinational; enabled one cycle per frame.
+    // Address decoder.  SERIAL: it watches the address arrive bit by bit on
+    // the shared wire and narrows which slave can still match, so no 16-bit
+    // address is ever assembled in the datapath.  It settles after the
+    // 5-bit prefix - eleven clocks before the frame ends - and `addr_done'
+    // merely strobes the answer out.
+    //
+    // Nothing here is broadcast back out in parallel form: slaves collect
+    // their own low offset bits off the same single wire.
     //----------------------------------------------------------------------
     addr_decoder #(
         .ADDR_W   (ADDR_W),
         .N_SLAVES (N_SLAVES)
     ) u_decoder (
+        .clk     (clk),
+        .rst_n   (rst_n),
+        .frame   (bus_valid),
+        .astream (bus_astream),
         .en      (addr_done),
-        .addr    (bus_addr),
         .slv_sel (slv_sel),
         .def_sel (def_sel),
         .hit     ()
     );
+
+    //----------------------------------------------------------------------
+    // Address observation for the JTAG probe - DEBUG ONLY.
+    //
+    // Nothing in the datapath reads this.  It exists so a host can compare
+    // the address the bus reassembled off the single wire with the one it
+    // sent, which is the first thing worth looking at when serial framing
+    // misbehaves on silicon.  Set OBSERVE_ADDR = 0 and it disappears, along
+    // with the last parallel address anywhere in the design; the bus works
+    // identically without it and only the probe goes dark.
+    //----------------------------------------------------------------------
+    generate
+        if (OBSERVE_ADDR) begin : g_obs_addr
+            shift_deser #(.W(ADDR_W)) u_addr_deser (
+                .clk(clk), .rst_n(rst_n),
+                .shift(bus_valid), .din(bus_astream), .dout(bus_addr)
+            );
+        end else begin : g_no_obs_addr
+            assign bus_addr = {ADDR_W{1'b0}};
+        end
+    endgenerate
 
     //----------------------------------------------------------------------
     // Default responder - the reason an unmapped address cannot hang the bus.

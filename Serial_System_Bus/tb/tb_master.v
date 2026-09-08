@@ -4,7 +4,7 @@
 // The master is exercised against a behavioural stand-in for the rest of the
 // serial bus: a grant model that mirrors the arbiter (split mask included)
 // and a slave model that answers a write in one cycle and shifts a read back
-// bit by bit, on the same schedule slave_mem does.
+// bit by bit, on the same schedule slave does.
 //
 // The testbench also DESERIALISES what the master puts on the wires, so the
 // checks are on the traffic itself, not just on the command interface.

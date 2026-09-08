@@ -280,8 +280,16 @@ module master #(
                     resp <= bus_resp;
                     // Reads only: a write would otherwise overwrite the
                     // displayed value with whatever was last on the wire.
+                    //
+                    // An ERROR is answered in one cycle, long before any data
+                    // phase, so the deserialiser still holds the PREVIOUS
+                    // read's bits shifted along by the two clocks of WAIT.
+                    // Returning that would leak the last transfer's data and
+                    // put convincing rubbish on led[7:0]; zero is what the
+                    // default responder is documented to give back.
                     if (!r_we)
-                        rdata <= rdata_ser;
+                        rdata <= (bus_resp == `RESP_ERROR) ? {DATA_W{1'b0}}
+                                                           : rdata_ser;
                 end
             end
         end

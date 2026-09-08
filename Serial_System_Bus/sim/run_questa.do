@@ -18,22 +18,32 @@ set TB  tb
 set INC "+incdir+$RTL"
 
 foreach f [list \
-        addr_decoder.v arbiter.v bus_mux.v slave_mem.v default_slave.v \
-        master.v bus_top.v master_prog.v reset_ctrl.v debouncer.v \
-        seg7_hex.v de2_top.v] {
+        shift_ser.v shift_deser.v \
+        addr_decoder.v arbiter.v bus_mux.v default_slave.v system_bus.v \
+        master.v uart_tx.v uart_rx.v master_uart.v slave.v bus_top.v \
+        bus_issp_driver.v top_debug.v] {
     vlog -quiet $INC $RTL/$f
 }
 
+# altsource_probe_stub.v is SIMULATION ONLY - it stands in for the Altera
+# megafunction and must never appear in the .qsf.
+vlog -quiet $INC $TB/altsource_probe_stub.v
+
 foreach f [list \
-        tb_addr_decoder.v tb_arbiter.v tb_bus_mux.v tb_slave_mem.v \
-        tb_default_slave.v tb_master.v tb_bus_top.v tb_de2_top.v] {
+        tb_shift_ser.v tb_shift_deser.v \
+        tb_addr_decoder.v tb_arbiter.v tb_bus_mux.v tb_default_slave.v \
+        tb_system_bus.v tb_master.v tb_slave.v \
+        tb_bus_issp_driver.v tb_integration.v tb_uart_remote.v \
+        tb_top_debug.v] {
     vlog -quiet $INC $TB/$f
 }
 
-set failed 0
 foreach tb [list \
-        tb_addr_decoder tb_arbiter tb_bus_mux tb_slave_mem \
-        tb_default_slave tb_master tb_bus_top tb_de2_top] {
+        tb_shift_ser tb_shift_deser \
+        tb_addr_decoder tb_arbiter tb_bus_mux tb_default_slave \
+        tb_system_bus tb_master tb_slave \
+        tb_bus_issp_driver tb_integration tb_uart_remote \
+        tb_top_debug] {
     echo "### $tb"
     vsim -c -quiet work.$tb
     run -all

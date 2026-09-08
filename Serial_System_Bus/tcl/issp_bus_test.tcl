@@ -2,14 +2,14 @@
 # ===========================================================================
 #  issp_bus_test.tcl
 #
-#  Runs the tb_bus_top.v cases against real hardware through the In-System
+#  Runs the tb_integration.v cases against real hardware through the In-System
 #  Sources & Probes instance "SBUS", plus the two checks that only matter on
 #  a serial bus: the address reassembled off the wire, and the frame length.
 #
 #  Usage:   cd Serial_System_Bus
 #           quartus_stp -t tcl/issp_bus_test.tcl     <-- quartus_stp ONLY
 #
-#  Requires de2_top programmed onto the board, USB-Blaster connected, and the
+#  Requires top_debug programmed onto the board, USB-Blaster connected, and the
 #  In-System Sources & Probes Editor tab CLOSED.
 #  Exits 0 if every case passes, 1 otherwise.
 # ===========================================================================
@@ -68,7 +68,7 @@ if {$fb} {
 }
 
 puts "\n\[TEST 4\] Address transport: what the bus reassembled off ONE wire..."
-foreach a {0x1ABC 0x2345 0x0A5C 0x8DEF} {
+foreach a {0x1ABC 0x2345 0x05C3 0x2FFF} {
     bus_cmd 0 0 $a 0x00
     set got [bits [probe] 85 70]
     if {$got == $a} {
@@ -80,7 +80,7 @@ foreach a {0x1ABC 0x2345 0x0A5C 0x8DEF} {
 
 pause
 puts "\n\[TEST 5\] Unmapped addresses must ANSWER, not hang..."
-foreach a {0x2800 0x2FFF 0x3000 0x8000 0xFFFF} {
+foreach a {0x0800 0x0FFF 0x3000 0x4000 0x7FFF} {
     lassign [bus_cmd 0 0 $a 0x00] ok rd rp lat
     if {!$ok} {
         fail [format "0x%04X never completed (lat=%d) - the bus is wedged" $a $lat]
@@ -99,22 +99,33 @@ if {$ok && $rd == 0xC5} {
 }
 
 pause
-puts "\n\[TEST 6\] Split transaction on slave 0..."
+puts "\n\[TEST 6\] Split transaction on the split slave (slave 2)..."
 set_split_en 0
-bus_cmd 0 1 0x0A5C 0x7E
+bus_cmd 0 1 0x2A5C 0x7E
 soft_reset
 set_split_en 1
-lassign [bus_cmd 0 0 0x0A5C 0x00] ok rd rp lat err splits
+lassign [bus_cmd 0 0 0x2A5C 0x00] ok rd rp lat err splits
 if {!$ok} {
     fail "M0 split read never completed (lat=$lat)"
 } else {
-    check "M0 split read 0x0A5C" $rd 0x7E $lat
+    if {$rd == 0x7E} {
+        pass [format "M0 split read 0x2A5C = 0x%02X - the re-issued transfer got the data" $rd]
+    } else {
+        fail [format "M0 split read 0x2A5C expected 0x7E, got 0x%02X" $rd]
+    }
     if {$splits > 0} {
         pass "split count = $splits - the slave really did defer the transfer"
     } else {
         fail "split count is 0 - the transfer never split"
     }
-    if {$lat > $RD_LAT} {
+    # The `lat' probe is 8 bits and SATURATES at 0xFF.  On hardware
+    # SPLIT_LATENCY is 10,000,000 clocks (0.2 s), so a split read always
+    # saturates it - 255 is not a measurement, it is the ceiling.  Saying
+    # "cost 255 clks" would be reporting the ceiling as a result.
+    if {$lat >= 0xFF} {
+        pass "latency probe saturated, as a 10,000,000-clock split must -\
+              it is >= 255 clks against $RD_LAT for a plain read"
+    } elseif {$lat > $RD_LAT} {
         pass "split read cost $lat clks vs $RD_LAT for a plain read"
     } else {
         fail "split read ($lat clks) was not slower than a plain read ($RD_LAT)"
@@ -150,6 +161,55 @@ if {$ok && $rd == 0x55} { pass "M1's concurrent write landed" } \
 pause
 
 # ----------------------------------------------------------------- summary
+# ---------------------------------------------------------------------------
+# TEST 8 checks the property that holds WHETHER OR NOT a far board is
+# attached: a remote transaction always COMPLETES.  It must never hang the
+# master, and it must never disturb the local bus.
+#
+# It deliberately does not assert "times out" - that was only true while
+# nothing was plugged in.  With a working far board the read succeeds, which
+# is also a pass; with a dead or absent one it comes back 0xFF + cmd_error
+# after ~10 ms.  Both are correct behaviour; hanging is not.
+#
+# For a real verdict on the link itself, run tcl/issp_link_test.tcl.
+# ---------------------------------------------------------------------------
+pause
+puts "\n\[TEST 8\] A remote transaction must COMPLETE, either way..."
+bus_cmd 0 1 0x1ABC 0x9C
+# 0x9ABC = the far board's 0x1ABC.
+set t0 [clock milliseconds]
+lassign [bus_cmd 0 0 0x9ABC 0x00] ok rd rp lat err splits cmderr
+set dt [expr {[clock milliseconds] - $t0}]
+if {!$ok} {
+    fail "the remote read never completed - the master is hung"
+} elseif {$cmderr} {
+    pass "no far board answered; completed in ${dt} ms with cmd_error"
+    if {$rd == 0xFF} {
+        pass "returned 0xFF, as the link spec requires"
+    } else {
+        fail [format "returned 0x%02X, the spec says 0xFF on timeout" $rd]
+    }
+    if {$rp == 1} {
+        pass "resp = ERROR, consistent with cmd_error"
+    } else {
+        fail "resp = [resp_name $rp], expected ERROR after a timeout"
+    }
+} else {
+    pass [format "a far board answered in %d ms with 0x%02X" $dt $rd]
+    if {$rp == 0} {
+        pass "resp = OKAY"
+    } else {
+        fail "resp = [resp_name $rp], expected OKAY on a successful remote read"
+    }
+}
+# Whatever happened out there, the local bus must be untouched.
+lassign [bus_cmd 0 0 0x1ABC 0x00] ok rd rp lat err splits cmderr
+if {$ok && $rd == 0x9C && !$cmderr} {
+    pass [format "local access unaffected by the remote attempt (0x%02X)" $rd]
+} else {
+    fail [format "local access broken after a remote attempt: rd=0x%02X cmd_error=%d" $rd $cmderr]
+}
+
 puts "\n========================================================="
 if {$ERRORS == 0} {
     puts ">> IN-SYSTEM TEST PASSED: the serial bus works on silicon <<"

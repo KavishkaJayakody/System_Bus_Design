@@ -25,7 +25,7 @@ The root `System_Bus_Design.qsf` targets `EP4CE115F29C7`; `System_Bus_Final/Syst
 
 Serial shared bus: 2 masters, 3 memory slaves + a default slave, 16-bit word
 address, 8-bit data, fixed-priority arbitration with bus lock, AHB-style
-split transactions. Target `EP4CE115F29C7` (DE2-115), top `de2_top`.
+split transactions. Target `EP4CE115F29C7` (DE2-115), top `top_debug`.
 
 **The address and the data each travel on one wire.** The whole shared bus is
 8 wires: `bus_astream`, `bus_dstream`, `bus_valid`, `bus_we`, `bus_ready`,
@@ -33,41 +33,65 @@ split transactions. Target `EP4CE115F29C7` (DE2-115), top `de2_top`.
 
 **Three kinds of module.** `system_bus` is the bus and contains no master and
 no memory. `master` and `slave` are peripherals and contain no bus logic.
-**There is no integration wrapper** — `de2_top` instantiates the three side
-by side. Keep the split: a change that wants to put memory in `system_bus`,
-or arbitration in `slave`, is in the wrong module. `tb_system_bus` depends on
+Keep the split: a change that wants to put memory in `system_bus`, or
+arbitration in `slave`, is in the wrong module. `tb_system_bus` depends on
 it — it drives both serial interfaces with nothing attached at either end.
 
-**The composition is duplicated in three places** — `rtl/de2_top.v`,
-`tb/tb_integration.v` and `tb/tb_bus_issp_driver.v` each instantiate
-master x2 + system_bus + slave x3. That is the cost of having no wrapper.
-Change the wiring in one and you must change all three, or the testbenches
-stop testing what the board builds.
+**`bus_top` composes the system** — master x2 + system_bus + slave x3 — and
+contains **no logic of its own**, only instantiation and wiring. Keep it that
+way; it is not a fourth place for behaviour. `rtl/top_debug.v`,
+`tb/tb_integration.v` and `tb/tb_bus_issp_driver.v` all instantiate it, so
+the composition is written once and the testbenches test what the board
+builds by construction. This mirrors `System_Bus_Final` name for name:
+`top_debug` holds `top_bus_system` there, `top_debug` holds `bus_top` here.
 
 ```
-de2_top                          synthesis top (DE2-115)
- +- reset_ctrl / debouncer       KEY[0] reset, KEY[1] single-step
- +- master_prog x2               on-board scenario sequencers (SW[1:0])
+top_debug                        synthesis top (DE2-115)
+ |                               wires, two instances and one assign
  +- bus_issp_driver              JTAG debug front-end, instance "SBUS"
+ |                                  IN FRONT of the system - it drives the
+ |                                  masters' normal parallel command ports
  |
- +- master x2                    1. parallel command in, SERIAL onto the bus
- |                                  cmd_addr[15:0] -> m_astream (1 wire)
- |                                  cmd_wdata[7:0] -> m_dstream (1 wire)
- |
- +- system_bus                   2. THE BUS - no master, no memory in here
- |   +- arbiter                     priority + bus lock + split mask, param on N
- |   +- addr_decoder                combinational, one-hot + default select
- |   +- bus_mux                     who drives the two shared wires
- |   +- shift_deser                 central 16-bit address receiver -> decoder
- |   +- default_slave               unmapped -> ERROR, so the bus never hangs
- |
- +- slave x3                     3. 4 KB @0x0000 (split capable)
- |                                  4 KB @0x1000,  2 KB @0x2000
- +- seg7_hex x8                  displays
+ +- bus_top                      THE SYSTEM - composition only, no logic
+     +- master_uart  (m0)        1. parallel command in, SERIAL onto the bus
+     |   +- master core             cmd_addr[15:0] -> m_astream (1 wire)
+     |   +- uart_tx / uart_rx       cmd_wdata[7:0] -> m_dstream (1 wire)
+     |                              addr[15]=1 -> the OTHER board over UART
+     +- master       (m1)           local only
+     |
+     +- system_bus               2. THE BUS - no master, no memory in here
+     |   +- arbiter                 priority + bus lock + split mask, param on N
+     |   +- addr_decoder            SERIAL prefix matcher, one-hot + default
+     |   +- bus_mux                 who drives the two shared wires
+     |   +- default_slave           unmapped -> ERROR, so the bus never hangs
+     |
+     +- slave x3                 3. 2 KB @0x0000 (id 0)
+                                    4 KB @0x1000 (id 1)
+                                    4 KB @0x2000 (id 2, SPLIT capable)
 ```
 
-`0x2800-0x2FFF` and all of `addr[15]==1` are unmapped and answer ERROR.
-`addr[15]==1` is reserved for the phase-2 remote window — never map it.
+**There is no board layer.** `de2_top`, `board_ctrl`, `status_display`,
+`master_prog`, `seg7_hex`, `reset_ctrl` and `debouncer` were deleted — every
+transaction is issued over JTAG. Five ports leave the device: `CLOCK_50`
+(`Y2`), `rst_n` (`M23`, `KEY[0]`), `led[7:0]`
+(`G19 F19 E19 F21 F18 E18 J19 H19` = `LEDR[7:0]`, master 0's last read data),
+and the board-to-board link `rm_rx` (`AB22`) / `rm_tx` (`AC15`).
+
+**`led[7:0]` is load-bearing, not decoration.** It is the only path from the
+memories to a pin, and the fitter deletes memory bits that cannot reach an
+output. Narrow it and you narrow the memories. `tb_top_debug` checks all 8
+bits are seen high and low at the pins.
+
+`top_debug` and `bus_top` both contain **no logic** — wires and instances
+only. A testbench reaching the ISSP source register goes through
+`dut.u_dbg.u_issp.source`.
+
+`0x0800-0x0FFF` and `0x3000-0x7FFF` are unmapped and answer ERROR.
+
+**`addr[15]==1` is the REMOTE WINDOW.** `master_uart` intercepts it in the
+command path and runs the transaction on the other board; far address = local
+address - 0x8000. It never reaches the local decoder, so `tb_addr_decoder`'s
+64K sweep still asserts nothing up there selects a slave — keep that true.
 
 **Frame format.** `bus_valid` is high for `ADDR_W` = 16 clocks. The address
 goes out MSB-first on `bus_astream`; write data goes out **right-aligned** on
@@ -81,7 +105,41 @@ left-aligning the data or adding counters.
 **Read data is the last `DATA_W` bits on `bus_dstream` before `bus_ready`.**
 The master's deserialiser free-runs through its wait state.
 
-Latency: write 21 clocks, read 30, split read 79. Fmax 141.8 MHz.
+Latency: write 21 clocks, read 30, split read 79. Fmax 141.8 MHz (measured
+before the board layer was removed and the UART added; not re-measured).
+
+**Board-to-board link over UART.** Master 0 is `master_uart` — the `master`
+core plus a UART client and server. It follows an INTERFACE SPEC AGREED WITH
+ANOTHER TEAM; both ends must match or a remote access lands somewhere else.
+`uart_tx.v` / `uart_rx.v` are copied unchanged from `System_Bus_Final`; don't
+rewrite them.
+
+- **Slave sizes 2K/4K/4K and ids 0/1/2 are part of the spec**, not a local
+  choice. So is which slave splits (the third). Changing `bus_defs.vh` breaks
+  interop silently — the response frame carries data but no status, so a
+  mismatch reads back plausible garbage rather than erroring.
+- **The ADDRESS selects the board**, not a command bit. `addr[15]==1` goes
+  remote; far address = local - 0x8000. `0x9ABC` here is `0x1ABC` there.
+- **Writes are POSTED** — no response frame at all, sender retires on send.
+  So a remote write completes BEFORE the far board has executed it; read back
+  only after allowing delivery time.
+- 24-bit command: `wdata[23:16] dev[15:14] offset[13:2] we[1] rsvd[0]`, and
+  dev+offset is just `addr[13:0]`. REQUEST is 4 bytes, RESPONSE 2 (reads
+  only). Little-endian. Tags `0xA5`/`0x5A`.
+- Pins are `rm_tx` AC15 / `rm_rx` AB22 (JP5). The spec's D3/C3 are the FAR
+  board's pins and do not exist on this device.
+
+- **The local path must stay a pure pass-through.** `cmd_accept`/`done`/
+  `rdata`/`resp` come combinationally from the core for a local transaction,
+  so a local write is still 21 clocks and a read 30. `tb_uart_remote` test 1
+  asserts both — a wrapper that adds a cycle to every local transfer fails.
+- **Responses take priority over requests** in the shared transmitter, or two
+  boards commanding each other on the same instant deadlock. Test 7 covers it.
+- **Tag hunting**: hunt a tag, then take exactly 3 more bytes (request) or 1
+  (response). Never re-scan the payload — a payload byte may be 0xA5/0x5A.
+- **`RESP_TIMEOUT` (32-bit counter)** completes a remote read with `0xFF` and
+  `cmd_error` rather than hanging. Same discipline as the default slave.
+- See design_notes §15 and §17.
 
 ### Commands
 
@@ -89,7 +147,7 @@ There IS a run script here — use it.
 
 ```bash
 cd Serial_System_Bus
-./sim/run_icarus.sh              # all 12 testbenches; exit 0 only if all pass
+./sim/run_icarus.sh              # all 13 testbenches; exit 0 only if all pass
 ./sim/run_icarus.sh arbiter      # just one
 ```
 
@@ -108,15 +166,16 @@ quartus_sta Serial_System_Bus
 quartus_asm Serial_System_Bus
 ```
 
-Unlike `System_Bus_Final/`, `de2_top` instantiates no megafunctions, so
-`iverilog` elaborates the real board top level directly — `tb_de2_top` drives
-it through its actual pins.
+`top_debug` does instantiate the `altsource_probe` megafunction, so
+`iverilog` needs `tb/altsource_probe_stub.v` to elaborate it — that stub is
+SIMULATION ONLY and must never be in the `.qsf`. With it, `tb_top_debug`
+drives the real synthesis top through its actual pins.
 
 ### JTAG debug over ISSP
 
 Every bitstream carries an In-System Sources & Probes instance **`SBUS`**
-(56-bit source, 96-bit probe) inside `de2_top`, wired to both masters'
-command ports.
+(56-bit source, 128-bit probe) inside `top_debug`, wired to both masters'
+command ports. It is the **only** command source in the design.
 
 ```bash
 cd Serial_System_Bus
@@ -128,7 +187,7 @@ quartus_stp -t tcl/issp_bus_test.tcl    # scripted, exit 0 = pass
 are absent from `quartus_sh` and from the GUI Tcl console. Close the
 In-System Sources & Probes Editor tab first; an open editor holds the session.
 
-- **`de2_top` must be TOP_LEVEL_ENTITY.** The driver is instantiated there; with
+- **`top_debug` must be TOP_LEVEL_ENTITY.** The driver is instantiated there; with
   anything else as top there is no ISSP in the bitstream at all. Quartus
   rewrites this line when you set a file as top-level in the GUI — check it
   after opening the project.
@@ -138,8 +197,14 @@ In-System Sources & Probes Editor tab first; an open editor holds the session.
 - **Bit 0 of each 26-bit source slice is `go`** and is deliberately excluded
   from the command payload. Widening a concat over it aliases `we` onto `go`
   and makes reads impossible — that bug cost time on the older design.
-- `issp_mode` (src[53]) takes the command ports via an unconditional mux, so
-  the board switches cannot fight it and SW[17] can stay wherever it is.
+- `issp_mode` (src[53]) is left unconnected in `top_debug` — the driver is the
+  only command source now, so it has nothing to arbitrate. The bit stays in
+  the map because the layout is shared with `tcl/issp_bus_lib.tcl`.
+- The UART link adds `prb[29]` = sticky `cmd_error` (master 0 only),
+  `prb[92]` = `remote_busy`, `prb[93]` = `srv_busy`, `prb[95]` = sticky
+  `req_overrun` (an incoming REQUEST was thrown away — the link has no flow
+  control), and `prb[123:96]` = the link diagnostic counters. `src[55]` is spare — the
+  address selects the far board. Same three-places rule applies.
 - `master` takes a LEVEL `cmd_valid` and answers `cmd_accept` — unlike the old
   design's one-cycle start pulse. The driver holds `cmd_valid` until accepted.
 - `tb/altsource_probe_stub.v` is SIMULATION ONLY and must never be in the
@@ -167,11 +232,9 @@ in step.
   inference and builds it from flip-flops instead — the exact bug still
   present in `src/`. The arrays hold no defined value at power-up; every test
   writes before it reads.
-- **`reset_ctrl` has no reset.** It *is* the reset generator; it relies on
-  Cyclone IV registers powering up cleared.
-- **No divided clock.** A derived clock would break the one-domain rule. The
-  bus runs at 50 MHz and the scenario sequencer is throttled by a slow tick
-  enable.
+- **No divided clock, and nothing to throttle.** A derived clock would break
+  the one-domain rule. The bus runs at 50 MHz and the JTAG host sets its own
+  pace. (`reset_ctrl` and the tick enable went with the board layer.)
 - **The read data phase starts at S+2, not S+1.** `mem_q` must stay a plain
   register so Quartus absorbs it as the M9K output register. Merging it with
   the output shift register forces an async array read and drops all three
@@ -182,10 +245,20 @@ in step.
 - **The return select in `bus_mux` is a LATCH, not a one-cycle delay.** A
   write answers in 1 cycle, a split in 1, a read in 10 — the reply is not at
   a fixed offset. A delayed select goes stale before a read reply arrives.
-- **`arbiter.v` and `addr_decoder.v` are shared, unchanged, with the parallel
-  design's structure.** The arbiter only looks at req/ready/resp; the decoder
-  is combinational and merely enabled once per frame by `addr_done`, the
-  falling edge of `bus_valid`.
+- **`arbiter.v` is shared, unchanged, with the parallel design's structure.**
+  It only looks at req/ready/resp, none of which were ever serialised.
+- **`addr_decoder.v` is SERIAL** — a progressive prefix matcher, not a
+  comparator behind a deserialiser. A 5-bit one-hot position marker walks the
+  first bits of the frame and one `alive` bit per slave is cleared on a
+  mismatch; `addr_done` strobes the result. 8 flops, and it settles after the
+  5-bit prefix, 11 clocks before the frame ends. Its prefix constants are
+  DERIVED from `S*_BASE` / `S*_LADDR_W` — don't hand-write range literals back
+  into it.
+- **No 16-bit address exists in the datapath.** The `shift_deser` in
+  `system_bus` that reassembles one is DEBUG ONLY, feeding the JTAG probe
+  `bus_addr`, behind `OBSERVE_ADDR` (default 1). With it set to 0 the whole
+  regression still passes except the four checks that read the probe itself —
+  that is the test that the datapath is serial, so keep it true.
 
 ### Traps that have already cost time here
 
@@ -201,9 +274,9 @@ in step.
 - **The fitter deletes what cannot reach an output, or cannot change.** Two
   separate instances: read data that only partly reached a pin, and a write
   pattern with two identical byte lanes. Both silently produced narrower
-  memories than the design specifies. All 8 data bits now reach `HEX1..HEX0`
-  and the demo pattern varies every one of them. Check `Total memory bits` in
-  the fit report — it must be 81,920.
+  memories than the design specifies. All 8 data bits now reach `led[7:0]`,
+  and `tb_top_debug` checks every one of them is seen high and low at the
+  pins. Check `Total memory bits` in the fit report — it must be 81,920.
 
 ## Critical: `System_Bus_Final/` is gitignored
 

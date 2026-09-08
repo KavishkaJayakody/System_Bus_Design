@@ -331,7 +331,7 @@ module tb_system_bus;
         // Nothing on the slave ports responds here at all.  If the bus did
         // not carry its own default responder, this would hang forever.
         acquire(0);
-        drive_frame(0, 1'b0, 16'h2800, 8'h00);
+        drive_frame(0, 1'b0, 16'h0800, 8'h00);
         chk(s_sel === 3'b000, "no slave select asserted for the decode hole");
         await_ready;
         chk(bus_ready === 1'b1,       "the bus answered by itself");

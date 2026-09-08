@@ -10,12 +10,12 @@
 #  Usage:  cd Serial_System_Bus
 #          quartus_stp -t tcl/issp_console.tcl      <-- quartus_stp ONLY
 #
-#  Requires de2_top programmed onto the board and the In-System Sources &
+#  Requires top_debug programmed onto the board and the In-System Sources &
 #  Probes Editor tab CLOSED (an open editor holds the JTAG session).
 #
-#  The board switches do not need touching: connecting sets issp_mode, and
-#  the command-port mux in de2_top is unconditional, so the on-board
-#  scenario sequencers are disconnected for as long as this console is up.
+#  There is nothing to set on the board: the ISSP driver is the only command
+#  source in top_debug, so the bus is idle until this console issues
+#  something and goes idle again when it quits.
 # ===========================================================================
 
 source [file join [file dirname [file normalize [info script]]] issp_bus_lib.tcl]
@@ -25,10 +25,12 @@ set SPLIT  0
 
 # ---------------------------------------------------------------- slave table
 # index -> {name base size note}
+# Sizes and device ids are fixed by the board-to-board link spec: both ends
+# must agree on 2K / 4K / 4K and ids 0 / 1 / 2.
 array set SLAVES {
-    0 {"Split RAM" 0x0000 0x1000 "split capable - see 'split on'"}
-    1 {"RAM"       0x1000 0x1000 "plain"}
-    2 {"RAM"       0x2000 0x0800 "plain"}
+    0 {"RAM"       0x0000 0x0800 "2K, device id 0"}
+    1 {"RAM"       0x1000 0x1000 "4K, device id 1"}
+    2 {"Split RAM" 0x2000 0x1000 "4K, device id 2 - splits, see 'split on'"}
 }
 
 proc show_map {} {
@@ -41,15 +43,22 @@ proc show_map {} {
         puts [format "    %d    %-10s  0x%04X-0x%04X    %s" \
                   $i $nm $base [expr {$base + $size - 1}] $note]
     }
-    puts "         (hole)      0x2800-0x2FFF    unmapped -> ERROR"
+    puts "         (hole)      0x0800-0x0FFF    unmapped -> ERROR"
     puts "         (unmapped)  0x3000-0x7FFF    unmapped -> ERROR"
-    puts "         (reserved)  0x8000-0xFFFF    phase-2 remote window -> ERROR"
+    puts ""
+    puts "  REMOTE WINDOW - these go to the OTHER board over the UART link:"
+    puts "         far slave 0 0x8000-0x87FF    = its 0x0000-0x07FF"
+    puts "         far slave 1 0x9000-0x9FFF    = its 0x1000-0x1FFF"
+    puts "         far slave 2 0xA000-0xAFFF    = its 0x2000-0x2FFF"
+    puts "         rule: far address = what you type - 0x8000"
+    puts "         writes are POSTED (no reply); a read with no cable"
+    puts "         returns 0xFF and flags cmd_error after 10 ms"
     puts ""
     puts "  Unmapped addresses ANSWER; they do not hang the bus. Try one with"
-    puts "  'ra 2800' - the default responder inside system_bus is what makes"
+    puts "  'ra 0800' - the default responder inside system_bus is what makes"
     puts "  that safe, and proving it is the point of the exercise."
     puts ""
-    puts "  Current master: M$MASTER   slave-0 split: [expr {$SPLIT ? {ON} : {off}}]"
+    puts "  Current master: M$MASTER   split slave: [expr {$SPLIT ? {ON} : {off}}]"
     puts ""
 }
 
@@ -83,7 +92,16 @@ proc resolve {sl off} {
 
 # Report one transaction result.
 proc report {tag a r} {
-    lassign $r ok rd rp lat err splits
+    lassign $r ok rd rp lat err splits cmderr
+    set REMOTE [expr {($a & 0x8000) != 0}]
+    if {$REMOTE && $cmderr} {
+        puts [format "  -> NO ANSWER from the other board for 0x%04X" $a]
+        puts "     It timed out and completed with cmd_error rather than"
+        puts "     hanging.  Run 'link' for a verdict: it will say whether"
+        puts "     anything is arriving at all, which separates a cabling"
+        puts "     fault from a protocol one."
+        return
+    }
     if {!$ok} {
         puts [format "  -> NO ANSWER for 0x%04X (latency saturated at %d)" $a $lat]
         puts "     On this bus that should be impossible - every unmapped address"
@@ -91,8 +109,9 @@ proc report {tag a r} {
         puts "     the bus is genuinely wedged. Press KEY\[0\]."
         return
     }
-    puts [format "  -> %s 0x%04X = 0x%02X   resp %s   %d clks   splits %d" \
-              $tag $a $rd [resp_name $rp] $lat $splits]
+    puts [format "  -> %s%s 0x%04X = 0x%02X   resp %s   %d clks   splits %d" \
+              [expr {$REMOTE ? "REMOTE " : ""}] $tag $a $rd \
+              [resp_name $rp] $lat $splits]
     if {$rp == 1} {
         puts "     ERROR means nothing is mapped there - the bus answered and"
         puts "     released the grant, which is the designed behaviour."
@@ -176,17 +195,24 @@ proc show_help {} {
     puts "  w <slave> <off> <d>  write via slave+offset,  e.g.  w 1 ABC 5A"
     puts "  r <slave> <off>      read  via slave+offset,  e.g.  r 1 ABC"
     puts "  wa <addr> <d>        write an ABSOLUTE address, e.g. wa 1ABC 5A"
-    puts "  ra <addr>            read  an ABSOLUTE address, e.g. ra 2800"
+    puts "  ra <addr>            read  an ABSOLUTE address, e.g. ra 0800"
     puts "                       (absolute lets you hit the unmapped ranges)"
     puts "  both <a0> <d0> <a1> <d1>"
     puts "                       both masters write on the same clock edge"
     puts "  sweep <slave>        write+read 8 words across a slave (0-2)"
     puts "  m <0|1>              choose which master issues commands"
-    puts "  split <on|off>       make slave 0 answer SPLIT"
+    puts "  split <on|off>       make the split slave (slave 2) answer SPLIT"
+    puts ""
+    puts "  -- the other board (any address 0x8000+ is remote) ------------"
+    puts "  rr <far addr>        read  it, spelled far-side"
+    puts "                       e.g. rr 1ABC == ra 9ABC"
+    puts "  wr <far addr> <d>    write it, spelled far-side (POSTED - no reply)"
+    puts "  link                 link counters + a verdict on any failure"
+    puts ""
     puts "  status               dump the bus-side probes"
     puts "  map                  show the address map"
     puts "  h                    this help"
-    puts "  q                    quit (hands the bus back to the switches)"
+    puts "  q                    quit"
     puts ""
     puts "  All values hex. Offsets are relative to the slave base."
     puts ""
@@ -213,7 +239,7 @@ while {1} {
         q - quit - exit { break }
         h - help - "?"  { show_help }
         map             { show_map }
-        status          { bus_status }
+        status          { bus_status ; link_status }
 
         m {
             set v [lindex $argv 1]
@@ -227,13 +253,41 @@ while {1} {
             set v [string tolower [lindex $argv 1]]
             if {$v eq "on" || $v eq "1"} {
                 set SPLIT 1 ; set_split_en 1
-                puts "  slave 0 will now answer SPLIT on a fresh access."
-                puts "  A read of slave 0 should now cost visibly more clocks,"
-                puts "  and 'status' will show the split mask and the count."
+                puts "  slave 2 will now answer SPLIT on a fresh access."
+                puts "  A read of 0x2000-0x2FFF should now cost visibly more"
+                puts "  clocks, and 'status' will show the mask and the count."
             } elseif {$v eq "off" || $v eq "0"} {
                 set SPLIT 0 ; set_split_en 0
-                puts "  slave 0 split disabled."
+                puts "  slave 2 split disabled."
             } else { puts "  ! usage: split on   or   split off" }
+        }
+
+        rr {
+            # read an address on the OTHER board, spelled far-side
+            set a [parse_hex [lindex $argv 1]]
+            if {$a < 0 || $a > 0x7FFF} {
+                puts "  ! usage: rr <far addr>   e.g. rr 1ABC   (0000-7FFF)"
+            } else { do_read [expr {$a + 0x8000}] }
+        }
+
+        wr {
+            # write an address on the OTHER board.  POSTED: it retires as
+            # soon as the request is on the wire, so nothing comes back and
+            # a read-back needs a moment for the far side to execute it.
+            set a [parse_hex [lindex $argv 1]]
+            set d [parse_hex [lindex $argv 2]]
+            if {$a < 0 || $a > 0x7FFF || $d < 0 || $d > 0xFF} {
+                puts "  ! usage: wr <far addr> <data>   e.g. wr 1ABC 5A"
+            } else {
+                do_write [expr {$a + 0x8000}] $d
+                puts "     POSTED: OKAY here means 'the request is on the wire',"
+                puts "     not 'the far board did it' - nothing is sent back."
+                puts "     Give it a moment, then read it back to confirm."
+            }
+        }
+
+        link {
+            link_diagnose
         }
 
         both {
@@ -320,6 +374,6 @@ while {1} {
     }
 }
 
-puts "\nhanding the bus back to the on-board sequencers."
+puts "\nsource register cleared, JTAG session released."
 bus_disconnect
 script_exit 0

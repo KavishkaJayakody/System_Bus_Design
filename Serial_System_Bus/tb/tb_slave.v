@@ -1,5 +1,5 @@
 //==========================================================================
-// tb_slave.v -- self-checking testbench for slave_mem
+// tb_slave.v -- self-checking testbench for slave
 //
 // Two DUTs from the same module: a plain 2K slave and a 4K split-capable
 // slave, so both SPLIT_CAPABLE builds are covered.

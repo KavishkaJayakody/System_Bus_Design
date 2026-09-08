@@ -2,7 +2,7 @@
 // shift_deser.v
 //
 // Serial in, parallel out.  The other half of the serial bus primitives;
-// instantiated in master.v (read data), slave_mem.v (local address and write
+// instantiated in master.v (read data), slave.v (local address and write
 // data) and bus_top.v (the full address, for the decoder).
 //
 // MSB first: after W cycles of `shift', dout holds the W bits received, the
