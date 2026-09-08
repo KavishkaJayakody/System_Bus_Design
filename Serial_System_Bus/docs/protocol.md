@@ -14,8 +14,8 @@ Three kinds of module speak this protocol, and the split is strict:
 | `master` | drives a frame, absorbs a split, reassembles read data. No arbitration, no decoding. |
 | `slave` | shifts every frame in, acts only on `sel`. No arbitration, no decoding. |
 
-`bus_top` wires the three together and holds no logic beyond one OR gate.
-Everything below describes the two interfaces between them.
+There is no integration wrapper: `de2_top` instantiates the three side by
+side. Everything below describes the two interfaces between them.
 
 ## The shared bus is 8 wires
 
@@ -79,7 +79,7 @@ sel[i]       ____________________|‾‾‾‾‾|__________     one-hot, 1 clk
 ```
 
 `addr_done` is simply the falling edge of `bus_valid`, derived inside
-`bus_top`. Deriving it instead of adding an "end of frame" wire keeps the
+`system_bus`. Deriving it instead of adding an "end of frame" wire keeps the
 shared bus at eight wires and keeps the frame length defined in exactly one
 place — the master's counter.
 
@@ -165,7 +165,7 @@ Points worth keeping straight:
   and the bus goes to somebody else for tens of clocks, not a handful.
 
 * **The replay re-sends the complete frame.** It is a genuine re-issue, not a
-  resumption of a half-finished one. `tb_master` test 6 and `tb_bus_top` test
+  resumption of a half-finished one. `tb_master` test 6 and `tb_integration` test
   7 both check that the second frame is full length and carries the identical
   address and data.
 
@@ -189,7 +189,7 @@ drives the data wire, so a read of an unmapped address reassembles zero.
 
 Without it, an unmapped access would assert no select, no slave would ever
 drive `ready`, and the granted master would hold the bus forever with only a
-reset to recover it. `tb_bus_top` test 5 fires four consecutive bad addresses
+reset to recover it. `tb_integration` test 5 fires four consecutive bad addresses
 and then checks the very next transfer still returns correct data.
 
 `ERROR` is reported, never retried — an unmapped address will not become
@@ -204,7 +204,7 @@ which is now 21 to 30 clocks instead of 5, so the lock matters far more.
 
 Still parameterised on `N_MASTERS` for the phase-2 remote bridge.
 
-## Measured latency (simulation, `tb_bus_top`)
+## Measured latency (simulation, `tb_integration`)
 
 | Case | Clocks, command accepted → `done` |
 |---|---|

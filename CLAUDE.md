@@ -33,29 +33,35 @@ split transactions. Target `EP4CE115F29C7` (DE2-115), top `de2_top`.
 
 **Three kinds of module.** `system_bus` is the bus and contains no master and
 no memory. `master` and `slave` are peripherals and contain no bus logic.
-`bus_top` is integration only — no logic beyond wiring and one OR gate. Keep
-that split: a change that wants to put memory in `system_bus`, or arbitration
-in `slave`, is in the wrong module. `tb_system_bus` depends on it — it drives
-both serial interfaces with nothing attached at either end.
+**There is no integration wrapper** — `de2_top` instantiates the three side
+by side. Keep the split: a change that wants to put memory in `system_bus`,
+or arbitration in `slave`, is in the wrong module. `tb_system_bus` depends on
+it — it drives both serial interfaces with nothing attached at either end.
+
+**The composition is duplicated in three places** — `rtl/de2_top.v`,
+`tb/tb_integration.v` and `tb/tb_bus_issp_driver.v` each instantiate
+master x2 + system_bus + slave x3. That is the cost of having no wrapper.
+Change the wiring in one and you must change all three, or the testbenches
+stop testing what the board builds.
 
 ```
 de2_top                          synthesis top (DE2-115)
  +- reset_ctrl / debouncer       KEY[0] reset, KEY[1] single-step
  +- master_prog x2               on-board scenario sequencers (SW[1:0])
- +- bus_top                      integration: masters + bus + slaves, nothing else
+ +- bus_issp_driver              JTAG debug front-end, instance "SBUS"
  |
- |   +- master x2                1. parallel command in, SERIAL onto the bus
- |   |                              cmd_addr[15:0] -> m_astream (1 wire)
- |   |                              cmd_wdata[7:0] -> m_dstream (1 wire)
- |   |
- |   +- system_bus               2. THE BUS - no master, no memory in here
- |   |   +- arbiter                 priority + bus lock + split mask, param on N
- |   |   +- addr_decoder            combinational, one-hot + default select
- |   |   +- bus_mux                 who drives the two shared wires
- |   |   +- shift_deser             central 16-bit address receiver -> decoder
- |   |   +- default_slave           unmapped -> ERROR, so the bus never hangs
- |   |
- |   +- slave x3                 3. 4 KB @0x0000 (split capable)
+ +- master x2                    1. parallel command in, SERIAL onto the bus
+ |                                  cmd_addr[15:0] -> m_astream (1 wire)
+ |                                  cmd_wdata[7:0] -> m_dstream (1 wire)
+ |
+ +- system_bus                   2. THE BUS - no master, no memory in here
+ |   +- arbiter                     priority + bus lock + split mask, param on N
+ |   +- addr_decoder                combinational, one-hot + default select
+ |   +- bus_mux                     who drives the two shared wires
+ |   +- shift_deser                 central 16-bit address receiver -> decoder
+ |   +- default_slave               unmapped -> ERROR, so the bus never hangs
+ |
+ +- slave x3                     3. 4 KB @0x0000 (split capable)
  |                                  4 KB @0x1000,  2 KB @0x2000
  +- seg7_hex x8                  displays
 ```
@@ -123,7 +129,9 @@ are absent from `quartus_sh` and from the GUI Tcl console. Close the
 In-System Sources & Probes Editor tab first; an open editor holds the session.
 
 - **`de2_top` must be TOP_LEVEL_ENTITY.** The driver is instantiated there; with
-  `bus_top` as top there is no ISSP in the bitstream at all.
+  anything else as top there is no ISSP in the bitstream at all. Quartus
+  rewrites this line when you set a file as top-level in the GUI — check it
+  after opening the project.
 - **The bit map lives in THREE places that must agree**: the header comment of
   `rtl/bus_issp_driver.v`, the `assign prb = {...}` at the bottom of that file,
   and `tcl/issp_bus_lib.tcl`. Change one, change all three.
@@ -184,7 +192,7 @@ in step.
 - **`// synthesis` at the start of a comment's text is parsed as a pragma.**
   A comment reading `// synthesis in each instance.` produced three
   "unrecognized synthesis attribute" warnings.
-- **Verilog tasks are STATIC by default.** `tb_bus_top` calls `m_run` from two
+- **Verilog tasks are STATIC by default.** `tb_integration` calls `m_run` from two
   branches of a `fork`; without `task automatic` the two calls share storage
   and corrupt each other. Three tests failed for a reason unrelated to the RTL.
 - **A counter narrower than its own parameter truncates silently.**

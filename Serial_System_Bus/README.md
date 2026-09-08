@@ -23,32 +23,37 @@ master_id    1   tag of the granted master
 16-bit word address, 8-bit data, so the slaves are 4 KB / 4 KB / 2 KB.
 
 ```
-de2_top                          synthesis top (DE2-115 wrapper)
+de2_top                          synthesis top (DE2-115)
  +- reset_ctrl / debouncer       KEY[0] reset, KEY[1] single-step
  +- master_prog x2               on-board scenario sequencers (SW[1:0])
- +- bus_top                      integration: masters + bus + slaves, nothing else
+ +- bus_issp_driver              JTAG debug front-end, instance "SBUS"
  |
- |   +- master x2                1. parallel command in, SERIAL onto the bus
- |   |                              cmd_addr[15:0] -> m_astream (1 wire)
- |   |                              cmd_wdata[7:0] -> m_dstream (1 wire)
- |   |
- |   +- system_bus               2. THE BUS - no master, no memory in here
- |   |   +- arbiter                 priority + bus lock + split mask, param on N
- |   |   +- addr_decoder            combinational, one-hot + default select
- |   |   +- bus_mux                 who drives the two shared wires
- |   |   +- shift_deser             central 16-bit address receiver -> decoder
- |   |   +- default_slave           unmapped -> ERROR, so the bus never hangs
- |   |
- |   +- slave x3                 3. 4 KB @0x0000 (split capable)
+ +- master x2                    1. parallel command in, SERIAL onto the bus
+ |                                  cmd_addr[15:0] -> m_astream (1 wire)
+ |                                  cmd_wdata[7:0] -> m_dstream (1 wire)
+ |
+ +- system_bus                   2. THE BUS - no master, no memory in here
+ |   +- arbiter                     priority + bus lock + split mask, param on N
+ |   +- addr_decoder                combinational, one-hot + default select
+ |   +- bus_mux                     who drives the two shared wires
+ |   +- shift_deser                 central 16-bit address receiver -> decoder
+ |   +- default_slave               unmapped -> ERROR, so the bus never hangs
+ |
+ +- slave x3                     3. 4 KB @0x0000 (split capable)
  |                                  4 KB @0x1000,  2 KB @0x2000
  +- seg7_hex x8                  displays
 ```
 
 **Three kinds of module, and only serial wires between them.** `system_bus`
 is the bus and contains no master and no memory; `master` and `slave` are
-peripherals and contain no bus logic. `bus_top` is integration only. That
-split is what lets `tb_system_bus` test the bus on its own, driving both
-serial interfaces with nothing attached at either end.
+peripherals and contain no bus logic. **There is no integration wrapper** —
+`de2_top` instantiates the three side by side. That split is what lets
+`tb_system_bus` test the bus on its own, driving both serial interfaces with
+nothing attached at either end.
+
+The price of having no wrapper: the master + bus + slave wiring exists in
+three places — `de2_top`, `tb_integration` and `tb_bus_issp_driver` — and if
+one changes the others must too.
 
 | Interface | Address | Data |
 |---|---|---|
@@ -62,7 +67,7 @@ serial interfaces with nothing attached at either end.
 | Path | Contents |
 |---|---|
 | `rtl/` | synthesisable modules, one per file, plus `bus_defs.vh`; `shift_ser.v` / `shift_deser.v` are the two serial primitives everything else is built from |
-| `tb/` | one self-checking testbench per module — including `tb_system_bus`, which exercises the bus with no master and no memory attached — plus `tb_bus_top` and `tb_de2_top` |
+| `tb/` | one self-checking testbench per module — including `tb_system_bus`, which exercises the bus with no master and no memory attached — plus `tb_integration` and `tb_de2_top` |
 | `sim/` | `run_icarus.sh`, `run_questa.do` |
 | `tcl/` | JTAG debug over In-System Sources & Probes — see below |
 | `docs/` | [report.pdf](docs/report.pdf) (the engineering report), [design_notes.md](docs/design_notes.md), [address_map.md](docs/address_map.md), [protocol.md](docs/protocol.md) |

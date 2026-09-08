@@ -98,7 +98,7 @@ See decision 8 above.
 
 Worth not reintroducing.
 
-**Static tasks called from a `fork`.** `tb_bus_top` drives both masters
+**Static tasks called from a `fork`.** `tb_integration` drives both masters
 concurrently. Verilog tasks have *static* storage by default, so the two
 concurrent calls to `m_run` shared `n`, `a` and `d` and corrupted each other —
 three tests failed for a reason that had nothing to do with the RTL. Fixed
@@ -164,10 +164,10 @@ and sets the exit status. Do not trust `vvp`'s exit code.
 | `tb_slave` | both `SPLIT_CAPABLE` builds: reset; write/read-back through the serial path; **response timing** — a write at S+1, a read at S+10; only the **low** address bits reach a slave (`0x2123` and `0xF923` must share offset `0x123` on the 2K slave); **a frame with no select must do nothing** — no ready, no memory change; split read with SPLIT arriving at S+1 while the read it defers costs 10; split of a write not taking effect until the replay; one split outstanding; the data wire left idle |
 | `tb_default_slave` | reset, `ERROR` one cycle after `sel`, `rdata = 0`, quiet while idle, back-to-back bad addresses |
 | `tb_master` | reset; the testbench **deserialises what the master puts on the wires**, so the checks are on the traffic itself: the frame is exactly `ADDR_W` clocks, the address arrives MSB-first, the write data arrives right-aligned; `0x80` and `0x01` both round-trip (catches a bit-order slip); the master does **not** drive the data wire during a read; `ERROR` reported and not retried; `SPLIT` → `bus_req` held, **no frame at all** while masked, then a complete second frame with the identical address *and data*, and exactly **one** `done` |
-| `tb_bus_top` | all five things the brief lists, end to end — see below |
+| `tb_integration` | all five things the brief lists, end to end — see below |
 | `tb_de2_top` | the real board top level driven through its pins: KEY[0] reset, all four scenarios, the mask LED lighting while master 1 keeps completing transactions, the sticky error LED, single-stepping with KEY[1], and the displays |
 
-`tb_bus_top` in particular covers:
+`tb_integration` in particular covers:
 
 1. reset — no grant, no request, clean mask, bus idle
 2. one master — write/read to all three slaves, first and last address of each,
@@ -185,7 +185,7 @@ and sets the exit status. Do not trust `vvp`'s exit code.
    reassembled address matches what was sent, and a split puts **two** full
    frames on the wire rather than one and a resumption
 
-Every wait in `tb_bus_top` has a cycle budget and reports a timeout as a
+Every wait in `tb_integration` has a cycle budget and reports a timeout as a
 FAILURE. That is what makes test 5 meaningful — a hang is detected, not just
 endured.
 
@@ -272,7 +272,7 @@ The 8 shared wires are `bus_astream`, `bus_dstream`, `bus_valid`, `bus_we`,
 `bus_ready`, `bus_resp[1:0]` and `master_id`. The remaining 52 nets are the
 per-master and per-slave stubs into the mux (4 each), arbitration
 (`req`/`gnt`/`split_complete`), the decoder's 4 select lines, and the 16-bit
-reassembled address inside `bus_top` that feeds the (still combinational)
+reassembled address inside `system_bus` that feeds the (still combinational)
 decoder.
 
 ### What it cost in time
@@ -290,7 +290,7 @@ a time. That is the trade the brief's title asked for.
 parallel bus a split freed the bus for a handful of clocks; here the slave
 answers SPLIT in 1 clock and gets out of the way of a transfer that would
 have taken 30, so the other master gets real work done in the gap.
-`tb_bus_top` test 4 and `tb_de2_top` test 4 both check that master 1 completes
+`tb_integration` test 4 and `tb_de2_top` test 4 both check that master 1 completes
 transactions *during* master 0's stall.
 
 ### The choice that made it cheap: right-aligned data
@@ -314,7 +314,7 @@ the padding automatic.
 design. The arbiter only ever looked at `req`, `bus_ready` and `bus_resp`,
 none of which were serialised; the decoder is still purely combinational and
 is simply enabled once per frame instead of once per access. The master
-command interface is still parallel, so `tb_bus_top` and `tb_de2_top` kept
+command interface is still parallel, so `tb_integration` and `tb_de2_top` kept
 their structure — only the data values changed width.
 
 ### Things that had to be got right
@@ -360,15 +360,15 @@ The tests that matter most for a serial bus, and where they live:
 
 | Property | Where |
 |---|---|
-| Every frame is exactly `ADDR_W` clocks, including a replayed one | `tb_bus_top` test 7, `tb_master` tests 2/6 |
-| The address reassembled off the wire matches what was sent | `tb_bus_top` test 7, `tb_master` tests 2/4 |
+| Every frame is exactly `ADDR_W` clocks, including a replayed one | `tb_integration` test 7, `tb_master` tests 2/6 |
+| The address reassembled off the wire matches what was sent | `tb_integration` test 7, `tb_master` tests 2/4 |
 | Write data arrives right-aligned | `tb_master` test 2 |
 | Bit order is MSB-first (0x80 and 0x01 both round-trip) | `tb_master` test 3, `tb_shift_ser` test 2 |
 | A slave ignores a frame it was not selected for | `tb_slave` test 4 |
 | Only the low address bits reach a slave | `tb_slave` test 3 |
 | The master does not drive the data wire during a read | `tb_master` test 3 |
 | The data wire is idle when nobody is sending | `tb_slave` test 8, `tb_bus_mux` test 3 |
-| A split replays a COMPLETE frame, not a resumption | `tb_master` test 6, `tb_bus_top` test 7 |
+| A split replays a COMPLETE frame, not a resumption | `tb_master` test 6, `tb_integration` test 7 |
 | A read reply arriving 10 cycles late still finds the right slave | `tb_bus_mux` test 4 |
 
 Synthesis, `EP4CE115F29C7`, Quartus Prime Lite 24.1std:
@@ -394,8 +394,9 @@ The remaining warnings are the same set as before and are explained in §6.
 
 ## 10. The design was split into three modules
 
-`bus_top` used to contain the masters, the slaves and all the interconnect in
-one file. It is now integration only, and the design is three kinds of module:
+The design used to be one file containing the masters, the slaves and all the
+interconnect. It is now three kinds of module, instantiated side by side by
+`de2_top` with no wrapper between them:
 
 | Module | Contains | Does NOT contain |
 |---|---|---|
@@ -403,8 +404,18 @@ one file. It is now integration only, and the design is three kinds of module:
 | `master` | command FSM, serialisers, deserialiser, replay | arbitration, decoding |
 | `slave` | memory, deserialisers, output shift register, split state | arbitration, decoding |
 
-`bus_top` holds no logic beyond wiring and one OR gate (the split wake-ups
-from every split-capable slave, OR-ed per master).
+**There is no integration wrapper.** `de2_top` instantiates `master` x2,
+`system_bus` and `slave` x3 side by side, along with the one OR gate that
+combines the split wake-ups per master.
+
+That was a deliberate call, and it has a cost worth stating: the same
+composition now appears in three files — `rtl/de2_top.v`,
+`tb/tb_integration.v` and `tb/tb_bus_issp_driver.v`. The two testbenches
+cannot instantiate a wrapper that does not exist, so they build the system
+themselves. Change the wiring in one and the others must follow, or the
+testbenches quietly stop testing what the board builds. A wrapper would have
+removed that duplication at the cost of an extra level of hierarchy; the
+hierarchy was judged the greater cost.
 
 ### Why the default responder lives inside the bus
 
@@ -501,7 +512,8 @@ impossible — a bug the earlier driver's comments still warn about.
 
 ### It was simulated before it was programmed
 
-`tb_bus_issp_driver` wires the driver to a real `bus_top` and drives the ISSP
+`tb_bus_issp_driver` wires the driver to a real bus - master, `system_bus`
+and slave, built in the testbench - and drives the ISSP
 source register through a hierarchical reference, which is exactly what
 `issp_bus_lib.tcl` does over JTAG. Its helper tasks mirror the Tcl library one
 for one, so a sequence that passes in simulation is a sequence that works on

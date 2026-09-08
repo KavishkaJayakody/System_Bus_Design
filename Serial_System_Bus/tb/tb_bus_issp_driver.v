@@ -1,7 +1,8 @@
 //==========================================================================
 // tb_bus_issp_driver.v -- self-checking testbench for bus_issp_driver
 //
-// The driver is wired to a REAL bus_top, and the testbench drives the ISSP
+// The driver is wired to a REAL bus - master + system_bus + slave, built
+// here because the design has no wrapper - and the testbench drives the ISSP
 // source register and reads the probe register through hierarchical
 // references - which is exactly what issp_bus_lib.tcl does over JTAG.  The
 // helper tasks below mirror that library one for one (arm / flush / await /
@@ -33,6 +34,10 @@ module tb_bus_issp_driver;
     localparam ADDR_W = `BUS_ADDR_W;
     localparam DATA_W = `BUS_DATA_W;
     localparam RESP_W = `BUS_RESP_W;
+    localparam NM     = 2;
+    localparam NS     = 3;
+    localparam ID_W   = 1;
+    localparam SPLIT_LATENCY = 6;
 
     reg clk = 1'b0;
     reg rst_n;
@@ -67,23 +72,208 @@ module tb_bus_issp_driver;
         .issp_mode(issp_mode), .s0_split_en(s0_split_en)
     );
 
-    bus_top #(
-        .N_MASTERS(2), .ID_W(1), .N_SLAVES(3),
-        .ADDR_W(ADDR_W), .DATA_W(DATA_W), .RESP_W(RESP_W),
-        .SPLIT_LATENCY(6)
-    ) u_bus (
-        .clk(clk), .rst_n(rst_n),
-        .cmd_valid(cmd_valid), .cmd_we(cmd_we),
-        .cmd_addr_flat(cmd_addr_flat), .cmd_wdata_flat(cmd_wdata_flat),
-        .cmd_accept(cmd_accept), .done(done),
-        .rdata_flat(rdata_flat), .resp_flat(resp_flat), .err(err),
-        .split_count_flat(split_count_flat), .mst_busy(mst_busy),
-        .s0_split_en(s0_split_en),
-        .gnt(gnt), .gnt_valid(gnt_valid), .master_id(master_id),
-        .split_mask(split_mask), .sel_q(sel_q),
-        .bus_valid(bus_valid), .bus_astream(bus_astream),
-        .bus_dstream(bus_dstream), .bus_addr(bus_addr), .addr_done(addr_done),
-        .bus_ready(bus_ready), .bus_resp(bus_resp), .s0_busy(s0_busy)
+    //======================================================================
+    // THE BUS UNDER THE DRIVER: masters + system_bus + slaves, wired here
+    // because the design has no integration wrapper.  Same wiring as
+    // de2_top; keep the two in step.
+    //
+    // Serial wires between the masters and the bus.
+    // One bit per master per stream - these are the CANDIDATES; the bus
+    // picks one with the grant.
+    //======================================================================
+    wire [NM-1:0]  m_req;
+    wire [NM-1:0]  m_valid;
+    wire [NM-1:0]  m_we;
+    wire [NM-1:0]  m_astream;
+    wire [NM-1:0]  m_dstream;
+
+    //======================================================================
+    // Serial wires between the bus and the slaves.
+    //======================================================================
+    wire                            bus_we;
+    wire [NS-1:0]             s_sel;
+    wire [NS-1:0]             s_ready;
+    wire [NS*RESP_W-1:0]      s_resp_flat;
+    wire [NS-1:0]             s_dstream;
+
+    //======================================================================
+    // 1. MASTERS
+    //======================================================================
+    genvar gi;
+    generate
+    for (gi = 0; gi < NM; gi = gi + 1) begin : g_master
+        master #(
+            .ADDR_W (ADDR_W),
+            .DATA_W (DATA_W),
+            .RESP_W (RESP_W)
+        ) u_master (
+            .clk         (clk),
+            .rst_n       (rst_n),
+            // parallel, facing the command source
+            .cmd_valid   (cmd_valid[gi]),
+            .cmd_we      (cmd_we[gi]),
+            .cmd_addr    (cmd_addr_flat  [gi*ADDR_W +: ADDR_W]),
+            .cmd_wdata   (cmd_wdata_flat [gi*DATA_W +: DATA_W]),
+            .cmd_accept  (cmd_accept[gi]),
+            .done        (done[gi]),
+            .rdata       (rdata_flat     [gi*DATA_W +: DATA_W]),
+            .resp        (resp_flat      [gi*RESP_W +: RESP_W]),
+            .err         (err[gi]),
+            .split_count (split_count_flat[gi*8 +: 8]),
+            .busy        (mst_busy[gi]),
+            .state       (),                     // waveform only
+            // serial, facing the bus
+            .bus_req     (m_req[gi]),
+            .bus_gnt     (gnt[gi]),
+            .m_valid     (m_valid[gi]),
+            .m_we        (m_we[gi]),
+            .m_astream   (m_astream[gi]),        // ADDRESS, one wire
+            .m_dstream   (m_dstream[gi]),        // WRITE DATA, one wire
+            .bus_ready   (bus_ready),
+            .bus_resp    (bus_resp),
+            .bus_dstream (bus_dstream)           // READ DATA, the shared wire
+        );
+    end
+    endgenerate
+
+    //======================================================================
+    // 2. THE BUS
+    //======================================================================
+    wire [NM-1:0] s0_split_complete;
+
+    // Wake-up pulses from every split-capable slave, OR-ed per master.  Only
+    // slave 0 can raise one today; a second split-capable slave joins here.
+    wire [NM-1:0] s_split_complete = s0_split_complete;
+
+    system_bus #(
+        .N_MASTERS (NM),
+        .ID_W      (ID_W),
+        .N_SLAVES  (NS),
+        .ADDR_W    (ADDR_W),
+        .RESP_W    (RESP_W)
+    ) u_system_bus (
+        .clk              (clk),
+        .rst_n            (rst_n),
+
+        // master side
+        .m_req            (m_req),
+        .m_gnt            (gnt),
+        .m_valid          (m_valid),
+        .m_we             (m_we),
+        .m_astream        (m_astream),
+        .m_dstream        (m_dstream),
+        .bus_ready        (bus_ready),
+        .bus_resp         (bus_resp),
+
+        // slave side
+        .bus_valid        (bus_valid),
+        .bus_we           (bus_we),
+        .bus_master_id    (master_id),
+        .s_sel            (s_sel),
+        .s_ready          (s_ready),
+        .s_resp_flat      (s_resp_flat),
+        .s_dstream        (s_dstream),
+        .s_split_complete (s_split_complete),
+
+        // the two shared wires
+        .bus_astream      (bus_astream),
+        .bus_dstream      (bus_dstream),
+
+        // status
+        .gnt_valid        (gnt_valid),
+        .split_mask       (split_mask),
+        .sel_q            (sel_q),
+        .bus_addr         (bus_addr),
+        .addr_done        (addr_done)
+    );
+
+    //======================================================================
+    // 3. SLAVES
+    //
+    // Instantiated one by one rather than in a generate loop, because they
+    // differ in size and in whether they can split - and those differences
+    // are worth reading at a glance.
+    //
+    // All three tap the SAME bus_astream and bus_dstream.
+    //======================================================================
+
+    // Slave 0 - 4 KB at 0x0000, split capable
+    slave #(
+        .DATA_W        (DATA_W),
+        .LADDR_W       (`S0_LADDR_W),
+        .WORDS         (`S0_WORDS),
+        .RESP_W        (RESP_W),
+        .N_MASTERS     (NM),
+        .ID_W          (ID_W),
+        .SPLIT_CAPABLE (1),
+        .SPLIT_LATENCY (SPLIT_LATENCY)
+    ) u_slave0 (
+        .clk            (clk),
+        .rst_n          (rst_n),
+        .frame          (bus_valid),
+        .astream        (bus_astream),
+        .dstream_in     (bus_dstream),
+        .sel            (s_sel[`SEL_S0]),
+        .we             (bus_we),
+        .master_id      (master_id),
+        .split_en       (s0_split_en),
+        .dstream_out    (s_dstream[`SEL_S0]),
+        .ready          (s_ready[`SEL_S0]),
+        .resp           (s_resp_flat[`SEL_S0*RESP_W +: RESP_W]),
+        .split_complete (s0_split_complete),
+        .busy           (s0_busy)
+    );
+
+    // Slave 1 - 4 KB at 0x1000
+    slave #(
+        .DATA_W        (DATA_W),
+        .LADDR_W       (`S1_LADDR_W),
+        .WORDS         (`S1_WORDS),
+        .RESP_W        (RESP_W),
+        .N_MASTERS     (NM),
+        .ID_W          (ID_W),
+        .SPLIT_CAPABLE (0)
+    ) u_slave1 (
+        .clk            (clk),
+        .rst_n          (rst_n),
+        .frame          (bus_valid),
+        .astream        (bus_astream),
+        .dstream_in     (bus_dstream),
+        .sel            (s_sel[`SEL_S1]),
+        .we             (bus_we),
+        .master_id      (master_id),
+        .split_en       (1'b0),
+        .dstream_out    (s_dstream[`SEL_S1]),
+        .ready          (s_ready[`SEL_S1]),
+        .resp           (s_resp_flat[`SEL_S1*RESP_W +: RESP_W]),
+        .split_complete (),
+        .busy           ()
+    );
+
+    // Slave 2 - 2 KB at 0x2000
+    slave #(
+        .DATA_W        (DATA_W),
+        .LADDR_W       (`S2_LADDR_W),
+        .WORDS         (`S2_WORDS),
+        .RESP_W        (RESP_W),
+        .N_MASTERS     (NM),
+        .ID_W          (ID_W),
+        .SPLIT_CAPABLE (0)
+    ) u_slave2 (
+        .clk            (clk),
+        .rst_n          (rst_n),
+        .frame          (bus_valid),
+        .astream        (bus_astream),
+        .dstream_in     (bus_dstream),
+        .sel            (s_sel[`SEL_S2]),
+        .we             (bus_we),
+        .master_id      (master_id),
+        .split_en       (1'b0),
+        .dstream_out    (s_dstream[`SEL_S2]),
+        .ready          (s_ready[`SEL_S2]),
+        .resp           (s_resp_flat[`SEL_S2*RESP_W +: RESP_W]),
+        .split_complete (),
+        .busy           ()
     );
 
     task chk;

@@ -28,7 +28,9 @@ BUS="$RTL/system_bus.v $RTL/arbiter.v $RTL/addr_decoder.v $RTL/bus_mux.v \
      $RTL/default_slave.v $RTL/shift_deser.v"
 
 # The whole system: masters + bus + slaves.
-COMMON="$RTL/bus_top.v $RTL/master.v $RTL/slave.v $BUS $RTL/shift_ser.v"
+# The whole system.  There is no integration wrapper: de2_top and the
+# integration testbench each instantiate master + system_bus + slave.
+COMMON="$RTL/master.v $RTL/slave.v $BUS $RTL/shift_ser.v"
 
 # The board layer.  altsource_probe_stub.v is SIMULATION ONLY - it stands in
 # for the Altera megafunction, which iverilog cannot elaborate.
@@ -84,7 +86,7 @@ try slave         "$RTL/slave.v" "$RTL/shift_deser.v"
 try bus_issp_driver "$RTL/bus_issp_driver.v" "$TB/altsource_probe_stub.v" $COMMON
 
 # --- integration ---------------------------------------------------------
-try bus_top       $COMMON
+try integration   $COMMON
 try de2_top       $COMMON $BOARD
 
 echo

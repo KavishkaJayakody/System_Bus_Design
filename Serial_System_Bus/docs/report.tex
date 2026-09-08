@@ -707,8 +707,13 @@ arbitration, decoding\\
 \end{tabularx}
 \end{table}
 
-\sig{bus\_top} wires the three together and holds no logic beyond one OR gate
-(the split wake-ups from every split-capable slave, combined per master).
+There is no integration wrapper. \sig{de2\_top} instantiates the three side by
+side, along with the one OR gate that combines the split wake-ups per master.
+That was a deliberate call and it has a cost: the same composition appears in
+\sig{de2\_top} and in both integration testbenches, which cannot instantiate a
+wrapper that does not exist. Change the wiring in one and the others must
+follow. A wrapper would remove that duplication at the price of an extra level
+of hierarchy; the hierarchy was judged the greater cost.
 
 Both interfaces are serial --- nothing wide crosses either boundary.
 
@@ -770,7 +775,7 @@ than inferred from system behaviour.
 \textbf{Property} & \textbf{Testbench}\\
 \midrule
 Every frame is exactly \sig{ADDR\_W} clocks, including a replayed one &
-\sig{tb\_bus\_top}, \sig{tb\_master}\\
+\sig{tb\_integration}, \sig{tb\_master}\\
 The address reassembled off one wire matches what was sent &
 \sig{tb\_system\_bus}, \sig{tb\_master}\\
 Write data arrives right-aligned & \sig{tb\_master}\\
@@ -786,11 +791,11 @@ A reply arriving ten cycles late still routes from the right slave &
 A masked master is excluded while still requesting &
 \sig{tb\_arbiter}, \sig{tb\_system\_bus}\\
 A split puts \emph{two} complete frames on the wire &
-\sig{tb\_bus\_top}, \sig{tb\_master}\\
+\sig{tb\_integration}, \sig{tb\_master}\\
 Exactly one responder for all 65{,}536 addresses & \sig{tb\_addr\_decoder}\\
 An unmapped frame is answered \sig{ERROR} \emph{by the bus alone} &
 \sig{tb\_system\_bus}\\
-Four consecutive bad addresses do not wedge the bus & \sig{tb\_bus\_top}\\
+Four consecutive bad addresses do not wedge the bus & \sig{tb\_integration}\\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -1013,8 +1018,9 @@ design doing the most work.
 \sig{master}         & endpoint    & serialises, replays after \sig{SPLIT}\\
 \sig{slave}          & endpoint    & memory; \sig{SPLIT\_CAPABLE} adds split
                                      state\\
-\sig{bus\_top}       & integration & masters + bus + slaves, no logic\\
-\sig{de2\_top}       & board       & clocking, buttons, switches, displays\\
+\sig{de2\_top}       & board       & clocking, buttons, switches, displays,
+                                     and the composition of the three above\\
+\sig{bus\_issp\_driver} & debug    & JTAG front-end, ISSP instance ``SBUS''\\
 \bottomrule
 \end{tabularx}
 \end{table}

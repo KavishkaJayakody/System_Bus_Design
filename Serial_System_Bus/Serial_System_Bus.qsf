@@ -76,7 +76,6 @@ set_global_assignment -name VERILOG_FILE rtl/slave.v
 set_global_assignment -name VERILOG_FILE rtl/default_slave.v
 set_global_assignment -name VERILOG_FILE rtl/master.v
 set_global_assignment -name VERILOG_FILE rtl/system_bus.v
-set_global_assignment -name VERILOG_FILE rtl/bus_top.v
 set_global_assignment -name VERILOG_FILE rtl/master_prog.v
 set_global_assignment -name VERILOG_FILE rtl/reset_ctrl.v
 set_global_assignment -name VERILOG_FILE rtl/debouncer.v
@@ -94,7 +93,7 @@ set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_slave.v -section_id eda_si
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_default_slave.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_master.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_system_bus.v -section_id eda_simulation
-set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_bus_top.v -section_id eda_simulation
+set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_integration.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_bus_issp_driver.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/altsource_probe_stub.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_de2_top.v -section_id eda_simulation
@@ -249,59 +248,7 @@ set_location_assignment PIN_AA14 -to HEX7[6]
 
 set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
 
-set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
-set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
-set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[0]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[1]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[2]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[3]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[0]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[1]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[2]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[3]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[4]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[5]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[6]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[7]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[8]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[9]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[10]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[11]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[12]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[13]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[14]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[15]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[16]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[17]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[0]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[1]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[2]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[3]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[4]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[5]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[6]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[7]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[8]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[9]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[10]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[11]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[12]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[13]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[14]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[15]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[16]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[17]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[0]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[1]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[2]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[3]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[4]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[5]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[6]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[7]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[8]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX0[0]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX0[1]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX0[2]
@@ -358,4 +305,56 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX7[3]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX7[4]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX7[5]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX7[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[7]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDG[8]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[10]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[11]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[12]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[13]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[14]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[15]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[16]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[17]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[7]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[8]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to LEDR[9]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[10]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[11]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[12]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[13]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[14]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[15]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[16]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[17]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[6]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[7]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[8]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[9]
+set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

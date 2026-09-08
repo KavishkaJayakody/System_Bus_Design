@@ -170,7 +170,7 @@ module tb_de2_top;
         chk(saw_mask,        "arbiter masked master 0 on a split");
         chk(saw_m1_progress, "master 1 completed transactions DURING the split");
         chk(m0_xacts > 16'd2,"master 0 still finished its split transactions");
-        chk(dut.u_bus.split_count_flat[7:0] > 8'd0,
+        chk(dut.split_count_flat[7:0] > 8'd0,
             "master 0 recorded SPLIT responses");
         chk(LEDG[8] === 1'b0, "no error flagged in the split scenario");
         SW[16] = 1'b0;
