@@ -26,7 +26,20 @@
 //   SW[14]      display master: 0 = master 0, 1 = master 1
 //   SW[15]      0 = free run at 50 MHz, 1 = slow (one transaction per tick)
 //   SW[16]      slave 0 split enable - the "slave is busy" model
+//               (OR-ed with the JTAG host's own split-enable bit)
 //   SW[17]      run.  0 = stopped, use KEY[1] to step one transaction
+//
+//--------------------------------------------------------------------------
+// JTAG debug
+//--------------------------------------------------------------------------
+//   An In-System Sources & Probes instance, ID "SBUS", is built into every
+//   bitstream (see bus_issp_driver.v for the bit map).  It is inert until a
+//   host sets its issp_mode bit, at which point it takes the masters'
+//   command ports away from the on-board sequencers and drives the bus over
+//   JTAG instead.  The mux is unconditional, so the switches cannot fight it
+//   and SW[17] can stay wherever it is:
+//
+//       cd Serial_System_Bus && quartus_stp -t tcl/issp_console.tcl
 //
 //--------------------------------------------------------------------------
 // Displays
@@ -135,7 +148,7 @@ module de2_top #(
     wire [1:0] scenario    = sw_sync[1:0];
     wire       disp_sel    = sw_sync[14];
     wire       slow_mode   = sw_sync[15];
-    wire       s0_split_en = sw_sync[16];
+    wire       sw_split_en = sw_sync[16];
     wire       run_sw      = sw_sync[17];
 
     //======================================================================
@@ -155,11 +168,24 @@ module de2_top #(
     //======================================================================
     // Master command interfaces
     //======================================================================
+    // The masters' command ports have TWO possible owners: the on-board
+    // scenario sequencers, and the JTAG debug front-end.  `issp_mode' (a
+    // source bit) decides.  Out of reset it is low, so the board demo works
+    // with nothing connected.
     wire [NM-1:0]        cmd_valid, cmd_we, cmd_accept, done, err, mst_busy;
     wire [NM*ADDR_W-1:0] cmd_addr_flat;
     wire [NM*DATA_W-1:0] cmd_wdata_flat, rdata_flat;
     wire [NM*RESP_W-1:0] resp_flat;
     wire [NM*8-1:0]      split_count_flat;
+
+    wire [NM-1:0]        prog_valid, prog_we;
+    wire [NM*ADDR_W-1:0] prog_addr_flat;
+    wire [NM*DATA_W-1:0] prog_wdata_flat;
+
+    wire [NM-1:0]        issp_valid, issp_we;
+    wire [NM*ADDR_W-1:0] issp_addr_flat;
+    wire [NM*DATA_W-1:0] issp_wdata_flat;
+    wire                 issp_mode, issp_split_en;
 
     wire [1:0]  m0_step,  m1_step;
     wire [15:0] m0_pass,  m1_pass;
@@ -168,25 +194,69 @@ module de2_top #(
     master_prog #(.MID(0), .ADDR_W(ADDR_W), .DATA_W(DATA_W)) u_prog0 (
         .clk(clk), .rst_n(rst_n),
         .run_req(run_req), .scenario(scenario),
-        .cmd_valid (cmd_valid[0]),
-        .cmd_we    (cmd_we[0]),
-        .cmd_addr  (cmd_addr_flat [0*ADDR_W +: ADDR_W]),
-        .cmd_wdata (cmd_wdata_flat[0*DATA_W +: DATA_W]),
-        .cmd_accept(cmd_accept[0]),
-        .done      (done[0]),
+        .cmd_valid (prog_valid[0]),
+        .cmd_we    (prog_we[0]),
+        .cmd_addr  (prog_addr_flat [0*ADDR_W +: ADDR_W]),
+        .cmd_wdata (prog_wdata_flat[0*DATA_W +: DATA_W]),
+        // Gated so a JTAG-issued transaction cannot advance the sequencer.
+        .cmd_accept(cmd_accept[0] & ~issp_mode),
+        .done      (done[0]      & ~issp_mode),
         .step(m0_step), .pass_count(m0_pass), .xact_count(m0_xacts)
     );
 
     master_prog #(.MID(1), .ADDR_W(ADDR_W), .DATA_W(DATA_W)) u_prog1 (
         .clk(clk), .rst_n(rst_n),
         .run_req(run_req), .scenario(scenario),
-        .cmd_valid (cmd_valid[1]),
-        .cmd_we    (cmd_we[1]),
-        .cmd_addr  (cmd_addr_flat [1*ADDR_W +: ADDR_W]),
-        .cmd_wdata (cmd_wdata_flat[1*DATA_W +: DATA_W]),
-        .cmd_accept(cmd_accept[1]),
-        .done      (done[1]),
+        .cmd_valid (prog_valid[1]),
+        .cmd_we    (prog_we[1]),
+        .cmd_addr  (prog_addr_flat [1*ADDR_W +: ADDR_W]),
+        .cmd_wdata (prog_wdata_flat[1*DATA_W +: DATA_W]),
+        // Gated so a JTAG-issued transaction cannot advance the sequencer.
+        .cmd_accept(cmd_accept[1] & ~issp_mode),
+        .done      (done[1]      & ~issp_mode),
         .step(m1_step), .pass_count(m1_pass), .xact_count(m1_xacts)
+    );
+
+    //======================================================================
+    // Command-port owner
+    //======================================================================
+    assign cmd_valid      = issp_mode ? issp_valid      : prog_valid;
+    assign cmd_we         = issp_mode ? issp_we         : prog_we;
+    assign cmd_addr_flat  = issp_mode ? issp_addr_flat  : prog_addr_flat;
+    assign cmd_wdata_flat = issp_mode ? issp_wdata_flat : prog_wdata_flat;
+
+    // Either the switch or the JTAG host can make slave 0 busy.
+    wire s0_split_en = sw_split_en | issp_split_en;
+
+    //======================================================================
+    // JTAG debug front-end (In-System Sources & Probes, instance "SBUS")
+    //
+    // Present in every build.  It costs a couple of hundred LEs and stays
+    // out of the way until a host sets issp_mode, so there is no separate
+    // "debug" bitstream to keep in step with this one.
+    //======================================================================
+    bus_issp_driver #(
+        .ADDR_W(ADDR_W), .DATA_W(DATA_W), .RESP_W(RESP_W)
+    ) u_issp (
+        .clk(clk), .rst_n(rst_n),
+        .cmd_valid        (issp_valid),
+        .cmd_we           (issp_we),
+        .cmd_addr_flat    (issp_addr_flat),
+        .cmd_wdata_flat   (issp_wdata_flat),
+        .cmd_accept       (cmd_accept),
+        .done             (done),
+        .rdata_flat       (rdata_flat),
+        .resp_flat        (resp_flat),
+        .err              (err),
+        .split_count_flat (split_count_flat),
+        .gnt              (gnt),
+        .split_mask       (split_mask),
+        .sel_q            (sel_q),
+        .s0_busy          (s0_busy),
+        .bus_addr         (bus_addr),
+        .bus_valid        (bus_valid),
+        .issp_mode        (issp_mode),
+        .s0_split_en      (issp_split_en)
     );
 
     //======================================================================
@@ -266,7 +336,7 @@ module de2_top #(
     assign LEDR[11]    = gnt_valid;
     assign LEDR[13:12] = err_sticky;
     assign LEDR[15:14] = mst_busy;
-    assign LEDR[16]    = s0_split_en;
+    assign LEDR[16]    = s0_split_en;   // either source
     assign LEDR[17]    = run_sw;
 
     assign LEDG[0]     = |act0;

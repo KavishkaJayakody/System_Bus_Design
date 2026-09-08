@@ -354,7 +354,7 @@ out in the comment so the next reader can check it.
 
 ## 9. Verification and synthesis after the conversion
 
-Eleven self-checking testbenches, all passing (`./sim/run_icarus.sh`).
+Twelve self-checking testbenches, all passing (`./sim/run_icarus.sh`).
 
 The tests that matter most for a serial bus, and where they live:
 
@@ -457,3 +457,69 @@ observable through a full system:
 **It cost nothing in hardware.** The build before and after the split is
 identical: 688 logic elements, 513 registers, 81,920 memory bits, Fmax
 141.8 MHz. It is a pure refactor, and the fitter agrees.
+
+---
+
+## 11. Debugging the bus on silicon
+
+The board demo proves the bus runs, but it proves it with switches and LEDs:
+you can see *that* something happened, not *what*. An In-System Sources &
+Probes instance (`SBUS`, 56-bit source / 96-bit probe) is built into every
+bitstream and wired to both masters' command ports, so any transaction can be
+issued from a host and the result read back.
+
+It drives the masters' **normal command ports**, which are parallel — the
+serialisation happens inside `master`. So this is the bus's front door, not a
+back door onto the wires, and a transaction issued over JTAG takes exactly the
+path a transaction from the on-board sequencer takes.
+
+### Three probes that only matter because the bus is serial
+
+| Probe | Says |
+|---|---|
+| `bus_addr` | the address the bus **reassembled off the single wire** |
+| `frame_len` | clocks the last address frame lasted — must read 16 |
+| `frame_bad` | sticky: some frame was not `ADDR_W` clocks |
+
+Frame length is the one thing the LEDs cannot show and simulation cannot
+prove: whether the framing holds on real silicon at real temperature. If
+`frame_bad` is ever set, nothing downstream can be trusted, and that is worth
+knowing before chasing a data mismatch.
+
+### Two things the older design's driver got wrong, avoided here
+
+**The command handshake changed.** The parallel design's master took a
+one-cycle `cmd_start` pulse. `master` takes a *level* `cmd_valid` and answers
+`cmd_accept`, so the driver holds the request until it is taken. Pulsing it
+would have worked most of the time and dropped commands when the master was
+briefly busy.
+
+**Bit 0 of each source slice is `go`, not payload.** The command fields are
+assigned individually rather than as one wide concatenation over the whole
+slice. A concat that includes bit 0 aliases `we` onto `go`, which makes reads
+impossible — a bug the earlier driver's comments still warn about.
+
+### It was simulated before it was programmed
+
+`tb_bus_issp_driver` wires the driver to a real `bus_top` and drives the ISSP
+source register through a hierarchical reference, which is exactly what
+`issp_bus_lib.tcl` does over JTAG. Its helper tasks mirror the Tcl library one
+for one, so a sequence that passes in simulation is a sequence that works on
+the board. `tb/altsource_probe_stub.v` stands in for the Altera megafunction,
+which `iverilog` cannot elaborate; it is simulation-only and is not in the
+`.qsf`.
+
+### Cost
+
+| | Without ISSP | With ISSP |
+|---|---|---|
+| Logic elements | 688 | 1,275 |
+| Registers | 513 | 937 |
+| $F_{max}$, `CLOCK_50` | 141.8 MHz | 157.3 MHz |
+| Clock domains | 1 | 2 (`altera_reserved_tck` added by the JTAG hub) |
+
+About 590 logic elements and 420 registers for the instance plus the JTAG
+endpoint — under 1% of the device, and worth it for being able to interrogate
+the bus without rebuilding. Quartus constrains the TCK domain itself; both
+domains meet timing with positive slack (`CLOCK_50` +13.6 ns setup,
+`altera_reserved_tck` +45.5 ns).

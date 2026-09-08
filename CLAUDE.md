@@ -83,7 +83,7 @@ There IS a run script here — use it.
 
 ```bash
 cd Serial_System_Bus
-./sim/run_icarus.sh              # all 11 testbenches; exit 0 only if all pass
+./sim/run_icarus.sh              # all 12 testbenches; exit 0 only if all pass
 ./sim/run_icarus.sh arbiter      # just one
 ```
 
@@ -105,6 +105,40 @@ quartus_asm Serial_System_Bus
 Unlike `System_Bus_Final/`, `de2_top` instantiates no megafunctions, so
 `iverilog` elaborates the real board top level directly — `tb_de2_top` drives
 it through its actual pins.
+
+### JTAG debug over ISSP
+
+Every bitstream carries an In-System Sources & Probes instance **`SBUS`**
+(56-bit source, 96-bit probe) inside `de2_top`, wired to both masters'
+command ports.
+
+```bash
+cd Serial_System_Bus
+quartus_stp -t tcl/issp_console.tcl     # interactive
+quartus_stp -t tcl/issp_bus_test.tcl    # scripted, exit 0 = pass
+```
+
+`quartus_stp` is the ONLY interpreter that works — the JTAG/ISSP Tcl packages
+are absent from `quartus_sh` and from the GUI Tcl console. Close the
+In-System Sources & Probes Editor tab first; an open editor holds the session.
+
+- **`de2_top` must be TOP_LEVEL_ENTITY.** The driver is instantiated there; with
+  `bus_top` as top there is no ISSP in the bitstream at all.
+- **The bit map lives in THREE places that must agree**: the header comment of
+  `rtl/bus_issp_driver.v`, the `assign prb = {...}` at the bottom of that file,
+  and `tcl/issp_bus_lib.tcl`. Change one, change all three.
+- **Bit 0 of each 26-bit source slice is `go`** and is deliberately excluded
+  from the command payload. Widening a concat over it aliases `we` onto `go`
+  and makes reads impossible — that bug cost time on the older design.
+- `issp_mode` (src[53]) takes the command ports via an unconditional mux, so
+  the board switches cannot fight it and SW[17] can stay wherever it is.
+- `master` takes a LEVEL `cmd_valid` and answers `cmd_accept` — unlike the old
+  design's one-cycle start pulse. The driver holds `cmd_valid` until accepted.
+- `tb/altsource_probe_stub.v` is SIMULATION ONLY and must never be in the
+  `.qsf`. Quartus supplies the real megafunction.
+- Cost: about 590 LEs and 420 registers for the ISSP plus the JTAG endpoint,
+  and a second clock domain `altera_reserved_tck` that Quartus constrains
+  itself. Both domains meet timing.
 
 The engineering report is LaTeX, not Markdown:
 

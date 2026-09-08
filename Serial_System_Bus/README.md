@@ -64,6 +64,7 @@ serial interfaces with nothing attached at either end.
 | `rtl/` | synthesisable modules, one per file, plus `bus_defs.vh`; `shift_ser.v` / `shift_deser.v` are the two serial primitives everything else is built from |
 | `tb/` | one self-checking testbench per module — including `tb_system_bus`, which exercises the bus with no master and no memory attached — plus `tb_bus_top` and `tb_de2_top` |
 | `sim/` | `run_icarus.sh`, `run_questa.do` |
+| `tcl/` | JTAG debug over In-System Sources & Probes — see below |
 | `docs/` | [report.pdf](docs/report.pdf) (the engineering report), [design_notes.md](docs/design_notes.md), [address_map.md](docs/address_map.md), [protocol.md](docs/protocol.md) |
 | `Serial_System_Bus.qsf/.qpf/.sdc` | Quartus project, pin assignments and timing constraints |
 
@@ -71,7 +72,7 @@ serial interfaces with nothing attached at either end.
 
 ```bash
 cd Serial_System_Bus
-./sim/run_icarus.sh              # all 11 testbenches; exit 0 only if all pass
+./sim/run_icarus.sh              # all 12 testbenches; exit 0 only if all pass
 ./sim/run_icarus.sh arbiter      # just one
 ```
 
@@ -171,3 +172,50 @@ latexmk -pdf report.tex        # or: pdflatex report.tex, twice
 ```
 
 Needs TeX Live with `tikz`, `booktabs`, `listings` and `newtx`.
+
+## Debugging on the board over JTAG
+
+Every bitstream carries an In-System Sources & Probes instance, **`SBUS`**,
+wired to both masters' command ports. It is inert until a host claims it, so
+the switch-driven demo is unaffected.
+
+```bash
+cd Serial_System_Bus
+quartus_stp -t tcl/issp_console.tcl     # interactive
+quartus_stp -t tcl/issp_bus_test.tcl    # scripted regression, exit 0 = pass
+```
+
+`quartus_stp` is the **only** interpreter that works — the JTAG and ISSP Tcl
+packages are absent from `quartus_sh` and from the Quartus GUI's Tcl console.
+**Close the In-System Sources & Probes Editor tab first**; an open editor
+holds the JTAG session.
+
+Connecting sets `issp_mode`, and the command-port mux in `de2_top` is
+unconditional, so the on-board sequencers are disconnected for as long as the
+console is up. The switches need no attention. Quitting hands the bus back.
+
+```
+bus[M0]> w 1 ABC 5A          write 0x5A to slave 1 offset 0xABC
+bus[M0]> r 1 ABC             read it back
+bus[M0]> ra 2800             read an UNMAPPED address - answers ERROR
+bus[M0]> split on            make slave 0 answer SPLIT
+bus[M0,split]> r 0 A5C       watch the latency jump
+bus[M0]> both 1200 AA 2200 55   both masters on the same clock edge
+bus[M0]> status              dump the bus-side probes
+```
+
+Three probes exist only because this bus is serial, and they are the ones
+worth looking at first:
+
+| Probe | Says |
+|---|---|
+| `bus_addr` | the address the bus **reassembled off the single wire** — compare it with what you sent |
+| `frame_len` | how many clocks the last address frame lasted; **must read 16** |
+| `frame_bad` | sticky: some frame was not 16 clocks, so the serial framing is broken on silicon |
+
+The bit map lives in three places that must agree: the header of
+[`rtl/bus_issp_driver.v`](rtl/bus_issp_driver.v), that file's probe assembly,
+and [`tcl/issp_bus_lib.tcl`](tcl/issp_bus_lib.tcl).
+
+`de2_top` must be the top-level entity — the ISSP driver is instantiated
+there.

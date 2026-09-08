@@ -81,6 +81,7 @@ set_global_assignment -name VERILOG_FILE rtl/master_prog.v
 set_global_assignment -name VERILOG_FILE rtl/reset_ctrl.v
 set_global_assignment -name VERILOG_FILE rtl/debouncer.v
 set_global_assignment -name VERILOG_FILE rtl/seg7_hex.v
+set_global_assignment -name VERILOG_FILE rtl/bus_issp_driver.v
 set_global_assignment -name VERILOG_FILE rtl/de2_top.v
 
 # --- Testbenches (simulation only, never compiled into the fitter) --------
@@ -94,6 +95,8 @@ set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_default_slave.v -section_i
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_master.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_system_bus.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_bus_top.v -section_id eda_simulation
+set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_bus_issp_driver.v -section_id eda_simulation
+set_global_assignment -name EDA_TEST_BENCH_FILE tb/altsource_probe_stub.v -section_id eda_simulation
 set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_de2_top.v -section_id eda_simulation
 
 # --- Timing ---------------------------------------------------------------
@@ -242,6 +245,13 @@ set_location_assignment PIN_AG18 -to HEX7[5]
 set_location_assignment PIN_AA14 -to HEX7[6]
 
 # --- I/O standard on every used pin --------------------------------------
+
+
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
+
+set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[0]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY[1]
@@ -348,11 +358,4 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX7[3]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX7[4]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX7[5]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to HEX7[6]
-
-
-set_global_assignment -name NUM_PARALLEL_PROCESSORS 4
-
-set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
-set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
-set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

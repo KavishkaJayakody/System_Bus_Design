@@ -30,8 +30,10 @@ BUS="$RTL/system_bus.v $RTL/arbiter.v $RTL/addr_decoder.v $RTL/bus_mux.v \
 # The whole system: masters + bus + slaves.
 COMMON="$RTL/bus_top.v $RTL/master.v $RTL/slave.v $BUS $RTL/shift_ser.v"
 
+# The board layer.  altsource_probe_stub.v is SIMULATION ONLY - it stands in
+# for the Altera megafunction, which iverilog cannot elaborate.
 BOARD="$RTL/de2_top.v $RTL/master_prog.v $RTL/reset_ctrl.v $RTL/debouncer.v \
-       $RTL/seg7_hex.v"
+       $RTL/seg7_hex.v $RTL/bus_issp_driver.v $TB/altsource_probe_stub.v"
 
 # name : sources
 run_one () {
@@ -77,6 +79,9 @@ try system_bus    $BUS
 # --- the peripherals -----------------------------------------------------
 try master        "$RTL/master.v" $SER
 try slave         "$RTL/slave.v" "$RTL/shift_deser.v"
+
+# --- JTAG debug front-end ------------------------------------------------
+try bus_issp_driver "$RTL/bus_issp_driver.v" "$TB/altsource_probe_stub.v" $COMMON
 
 # --- integration ---------------------------------------------------------
 try bus_top       $COMMON
