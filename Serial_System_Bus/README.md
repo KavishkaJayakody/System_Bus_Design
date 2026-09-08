@@ -262,6 +262,25 @@ quartus_stp -t tcl/issp_link_test.tcl             # diagnose the link
 quartus_stp -t tcl/issp_link_test.tcl -loopback   # jumper AC15 to AB22
 ```
 
+Once the link answers at all, `issp_remote_rw_test.tcl` verifies that what it
+carries is *correct*. It is self-verifying — every check writes a value across
+the link and reads that same value back, so nothing has to be seeded on the
+far side and nothing has to be agreed in advance:
+
+```bash
+quartus_stp -t tcl/issp_remote_rw_test.tcl            # write/read-back
+quartus_stp -t tcl/issp_remote_rw_test.tcl -loopback  # same, one board
+quartus_stp -t tcl/issp_remote_rw_test.tcl -full      # all 256 byte values
+```
+
+It is the hardware counterpart of `tb_uart_remote` tests 12–17 and looks for
+the same faults: walking bits, every carried address bit, the tag bytes
+`0xA5`/`0x5A` as data, adjacent words, and `0x00` as a real answer. When
+something fails it diagnoses the *pattern* rather than reporting one byte —
+bit-reversed, a stuck bit, one fixed location, or an aliased address each
+produce a different verdict. **In two-board mode it writes into the far
+board's memory**, in the scratch window `0x1F00–0x1F1F`, `0x07F0`, `0x2F00`.
+
 | What you see | What it means |
 |---|---|
 | bytes sent = 0 | our transmitter never ran — a fault on **this** board |

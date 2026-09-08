@@ -181,7 +181,17 @@ command ports. It is the **only** command source in the design.
 cd Serial_System_Bus
 quartus_stp -t tcl/issp_console.tcl     # interactive
 quartus_stp -t tcl/issp_bus_test.tcl    # scripted, exit 0 = pass
+quartus_stp -t tcl/issp_link_test.tcl   # is the board-to-board link alive?
+quartus_stp -t tcl/issp_remote_rw_test.tcl   # is what it carries correct?
 ```
+
+`issp_link_test.tcl` answers "is the link alive"; `issp_remote_rw_test.tcl`
+answers "is the data right", by writing a value across the link and reading
+that same value back — self-verifying, so nothing has to be seeded on the far
+board. Both take `-loopback` (jumper AC15 to AB22, one board answers itself),
+which is the first thing to run: if loopback fails the fault is local. The
+read/write test **writes into the far board's memory** at `0x1F00-0x1F1F`,
+`0x07F0` and `0x2F00`.
 
 `quartus_stp` is the ONLY interpreter that works — the JTAG/ISSP Tcl packages
 are absent from `quartus_sh` and from the GUI Tcl console. Close the
