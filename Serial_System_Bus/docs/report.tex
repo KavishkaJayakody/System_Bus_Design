@@ -123,7 +123,8 @@ The headline result is a shared bus in which \textbf{the address and the data
 each travel on a single wire}. The shared segment is nine wires and the whole
 interconnect is sixty nets. The cost is time --- a write takes 21 clocks and a
 read 30, of which sixteen are the address going out one bit per clock --- and
-the design closes timing at 141.8\,MHz against a 50\,MHz requirement.
+the design closes timing at 124.36\,MHz against a 50\,MHz requirement, fully
+constrained.
 
 \begin{table}[htb]
 \centering\small
@@ -137,9 +138,9 @@ Total interconnect nets & \textbf{60}\\
 Write latency           & 21\,clk\\
 Read latency            & 30\,clk\\
 Split read latency (contended) & 79\,clk\\
-Logic elements          & 688\\
-Registers               & 513\\
-$F_{\max}$              & \textbf{141.8\,MHz}\\
+Logic elements          & 1{,}651\\
+Registers               & 1{,}297\\
+$F_{\max}$              & \textbf{124.36\,MHz}\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -992,13 +993,16 @@ map / fit / sta / asm flow.}
 \toprule
 \textbf{Measure} & \textbf{Result}\\
 \midrule
-Errors               & 0\\
-Inferred latches     & \textbf{0}\\
-Combinational loops  & \textbf{0}\\
-Logic elements       & 688\\
-Registers            & 513\\
-Memory bits (all M9K)& 81{,}920\\
-$F_{\max}$ (slow, 1200\,mV, 85\,$^\circ$C) & \textbf{141.8\,MHz}\\
+Errors                & 0\\
+Inferred latches      & \textbf{0}\\
+Combinational loops   & \textbf{0}\\
+Unconstrained paths   & \textbf{0}\\
+Logic elements        & 1{,}651 / 114{,}480\\
+Registers             & 1{,}297\\
+Memory bits (all M9K) & 81{,}920\\
+Worst setup slack     & 11.959\,ns\\
+Worst hold slack      & 0.360\,ns\\
+$F_{\max}$ (slow, 1200\,mV, 85\,$^\circ$C) & \textbf{124.36\,MHz}\\
 \bottomrule
 \end{tabular}
 \end{table}

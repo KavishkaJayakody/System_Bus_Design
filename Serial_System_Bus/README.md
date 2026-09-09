@@ -143,16 +143,21 @@ quartus_sta Serial_System_Bus
 quartus_asm Serial_System_Bus
 ```
 
-Result before the board layer was removed: 0 errors, **0 inferred latches,
-0 combinational loops**, 81,920 memory bits in M9K, and timing closed against
-the 50 MHz requirement — 1,275 LEs and 937 registers at 157.3 MHz with the
-ISSP instance in the bitstream, of which 688 LEs and 513 registers were the
-bus itself.
+Measured on the current design (`top_debug` with the ISSP instance, after
+the bridge refactor), Quartus Prime Lite 24.1std, `EP4CE115F29C7`:
 
-Deleting the scenario sequencers, the debounce and display logic removes
-several hundred of those logic elements. **The figures above have not been
-re-measured since**; the memory bits are unchanged, and `Total memory bits`
-in the fit report must still read **81,920**.
+| | |
+|---|---|
+| Logic elements | 1,651 / 114,480 (1 %) |
+| Registers | 1,297 |
+| Memory bits | **81,920** / 3,981,312 — 2 KB + 4 KB + 4 KB, all M9K |
+| Pins | 12 / 529 |
+| $F_{max}$, `CLOCK_50` (slow 1200 mV 85 °C) | **124.36 MHz** |
+| Worst setup / hold slack | 11.959 ns / 0.360 ns |
+| Unconstrained paths | **0** — fully constrained for setup and hold |
+
+`Total memory bits` must read **81,920**; anything less means the fitter
+trimmed memory that could not reach an output.
 
 Measured transaction cost (simulation): **write 21 clocks, read 30, split
 read 79** — the split figure is measured with the other master contending

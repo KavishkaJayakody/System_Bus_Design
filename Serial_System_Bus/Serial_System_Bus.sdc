@@ -42,3 +42,26 @@ set_false_path -from * -to [get_ports {led[*]}]
 #---------------------------------------------------------------------------
 set_false_path -from [get_ports {rm_rx}] -to [all_registers]
 set_false_path -from * -to [get_ports {rm_tx}]
+
+#---------------------------------------------------------------------------
+# The JTAG pins.
+#
+# `top_debug' instantiates the In-System Sources & Probes megafunction, which
+# drags in the JTAG hub and with it altera_reserved_tdi / tms / tdo.  Quartus
+# constrains the altera_reserved_tck DOMAIN itself, but it does NOT constrain
+# these three PORTS - so without the cuts below they are the only genuinely
+# unconstrained paths in the design.  Verified with report_ucp: two
+# unconstrained input ports (tdi, tms) and one output port (tdo), with 40
+# unconstrained input port paths behind them.
+#
+# Cutting them is correct rather than merely convenient.  JTAG is driven by
+# the USB-Blaster at its own pace, asynchronously to CLOCK_50, and nothing in
+# the bus has a timing relationship with it; the hub is Altera's and is not
+# ours to constrain.  There is no arrival time that would mean anything.
+#
+# `tcl/sta_check.tcl' fails the build if anything else ever becomes
+# unconstrained, so this cut cannot quietly grow to cover a real path.
+#---------------------------------------------------------------------------
+set_false_path -from [get_ports {altera_reserved_tdi}] -to [all_registers]
+set_false_path -from [get_ports {altera_reserved_tms}] -to [all_registers]
+set_false_path -from * -to [get_ports {altera_reserved_tdo}]

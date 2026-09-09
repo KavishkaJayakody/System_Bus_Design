@@ -200,8 +200,32 @@ Synthesis — run on a **copy** in a scratch directory:
 quartus_map Serial_System_Bus --part=EP4CE115F29C7
 quartus_fit Serial_System_Bus
 quartus_sta Serial_System_Bus
+quartus_sta -t tcl/sta_check.tcl     # unconstrained paths = BUILD FAILURE
 quartus_asm Serial_System_Bus
 ```
+
+**`quartus_sta` exits 0 even when it analysed nothing.** An unconstrained
+path is reported as an Info, so a build script that only checks the exit
+status cannot tell "everything passed" from "I was never asked". That is not
+hypothetical: the earlier parallel project has no `.sdc` at all, so its `clk`
+was never constrained and its Fmax was never verified.
+
+`tcl/sta_check.tcl` closes that: it runs `check_timing` and `report_ucp` and
+**exits 1** if anything is unconstrained or timing is not met. Run it with
+`quartus_sta -t`, after the fit. Verified both ways — it exits 0 on the
+current design and 1 with the JTAG cuts removed.
+
+- `no_clock`, `latches` and `loops` are FATAL — they are always defects.
+- `no_input_delay` / `no_output_delay` are INFORMATIONAL. They fire on every
+  port lacking a `set_input/output_delay`, including ones deliberately cut
+  with `set_false_path`, which is a legitimate answer. `report_ucp` is the
+  authority on what is genuinely unanalysed.
+- **The JTAG ports needed cutting.** `altera_reserved_tdi`/`tms`/`tdo` come
+  in with the ISSP megafunction. Quartus constrains the `altera_reserved_tck`
+  *domain* itself but not these *ports*, so they were the only genuinely
+  unconstrained paths in the design — 2 input ports, 1 output, 40 input port
+  paths. The `.sdc` now cuts them, and the design reports **fully constrained
+  for setup and hold**.
 
 `top_debug` does instantiate the `altsource_probe` megafunction, so
 `iverilog` needs `tb/altsource_probe_stub.v` to elaborate it — that stub is

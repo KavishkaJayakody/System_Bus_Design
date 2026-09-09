@@ -221,6 +221,13 @@ quartus_asm Serial_System_Bus
 | Pins | 106 / 529 |
 | **Fmax** | **141.8 MHz** (slow 1200 mV 85 °C) against a 50 MHz requirement |
 
+> **Superseded.** The table above is the measurement taken at that point in
+> the design's history and is kept as a record. For the CURRENT design — the
+> bridge on the bus, three masters, four decoded targets, ISSP included — the
+> measured figures are **1,651 LEs, 1,297 registers, 81,920 memory bits,
+> 12 pins, Fmax 124.36 MHz**, with worst setup slack 11.959 ns, worst hold
+> slack 0.360 ns, and **zero unconstrained paths**. See §Timing constraints.
+
 These are the figures for the bus and the board layer alone. **Every
 bitstream also carries the ISSP debug instance** (§11), which is
 instantiated unconditionally in the top level, so what actually gets programmed
@@ -1010,3 +1017,56 @@ the timeout and the probe bit on real silicon.
 
 Build: 1,426 logic elements, 1,103 registers, 81,920 memory bits, 12 pins,
 Fmax 166.8 MHz on `CLOCK_50` and 116.0 MHz on `altera_reserved_tck`.
+
+## Timing constraints, and making an unconstrained path fail the build
+
+`quartus_sta` exits 0 even when it analysed nothing. An unconstrained path is
+reported as an *Info*, so a build script that checks only the exit status
+cannot tell "everything passed" from "I was never asked". That is not a
+hypothetical failure: the earlier parallel project in this repository has no
+`.sdc` at all, so its `clk` was never constrained and its Fmax was never
+verified — the 50 MHz in its testbenches was simulation-only.
+
+An unconstrained path is not a slow path. It is a path with **no answer**,
+and the fitter is free to route it as badly as it likes.
+
+`tcl/sta_check.tcl` runs after the fit, calls `check_timing` and `report_ucp`,
+and **exits 1** if anything is unconstrained or if timing is not met. It is
+verified in both directions: exit 0 on the current design, exit 1 with the
+JTAG cuts removed, and exit 1 again with `create_clock` removed (which
+reports 1,067 registers with no clock).
+
+Not every `check_timing` category is a defect:
+
+| Category | Treated as |
+|---|---|
+| `no_clock`, `latches`, `loops` | **fatal** — always a defect |
+| `no_input_delay`, `no_output_delay` | informational — they fire on every port without a `set_input/output_delay`, including ones deliberately cut with `set_false_path`, which is a legitimate answer |
+| `report_ucp` non-zero | **fatal** — this is the authority on what is genuinely unanalysed |
+
+`generated_clocks` appears in some documentation as a `check_timing`
+category. It is **not** one on Quartus 24.1std; passing it makes the tool
+warn and ignore the entire `-include` list.
+
+### What was actually unconstrained
+
+Running this for the first time found the design was *not* fully constrained.
+The offenders were not the bus at all — they were the JTAG pins:
+
+```
+Unconstrained Input Ports       2      altera_reserved_tdi, altera_reserved_tms
+Unconstrained Input Port Paths  40
+Unconstrained Output Ports      1      altera_reserved_tdo
+```
+
+They arrive with the ISSP megafunction. Quartus constrains the
+`altera_reserved_tck` **domain** itself, but not these three **ports**.
+Cutting them is correct rather than merely convenient: JTAG is driven by the
+USB-Blaster at its own pace, asynchronously to `CLOCK_50`, and no arrival
+time relative to the bus clock would mean anything. With those cuts the
+design reports **fully constrained for setup and hold**.
+
+The design's own I/O never appeared here — `rst_n`, `rm_rx`, `rm_tx` and
+`led[7:0]` are already cut in the `.sdc` with the reasoning written beside
+them. That is the distinction the check preserves: it catches what nobody
+thought about, not what somebody decided.
