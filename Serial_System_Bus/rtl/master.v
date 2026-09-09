@@ -136,6 +136,9 @@ module master #(
     reg [ADDR_W-1:0]  r_addr;
     reg [DATA_W-1:0]  r_wdata;
     reg [CNT_W-1:0]   bitcnt;
+    // How long the wait state lasted.  A responder that answered before it
+    // could have sent DATA_W bits did not send any - see the rdata capture.
+    reg [CNT_W-1:0]   wcnt;
 
     reg               ser_load, ser_shift, rd_shift;
 
@@ -255,6 +258,7 @@ module master #(
             resp        <= `RESP_OKAY;
             split_count <= 8'd0;
             bitcnt      <= {CNT_W{1'b0}};
+            wcnt        <= {CNT_W{1'b0}};
         end else begin
             cs <= ns;
 
@@ -263,6 +267,10 @@ module master #(
             // including a replay.
             if (cs == ST_ASHIFT) bitcnt <= bitcnt + 1'b1;
             else                 bitcnt <= {CNT_W{1'b0}};
+
+            // Saturating, so a long wait cannot wrap back under DATA_W.
+            if (cs != ST_WAIT)             wcnt <= {CNT_W{1'b0}};
+            else if (wcnt != {CNT_W{1'b1}}) wcnt <= wcnt + 1'b1;
 
             if (cs == ST_IDLE && cmd_valid) begin
                 r_we    <= cmd_we;
@@ -281,15 +289,22 @@ module master #(
                     // Reads only: a write would otherwise overwrite the
                     // displayed value with whatever was last on the wire.
                     //
-                    // An ERROR is answered in one cycle, long before any data
-                    // phase, so the deserialiser still holds the PREVIOUS
-                    // read's bits shifted along by the two clocks of WAIT.
-                    // Returning that would leak the last transfer's data and
-                    // put convincing rubbish on led[7:0]; zero is what the
-                    // default responder is documented to give back.
+                    // An ERROR from the default responder is answered in ONE
+                    // cycle, long before any data phase, so the deserialiser
+                    // still holds the PREVIOUS read's bits shifted along by
+                    // the clocks of WAIT.  Returning that would leak the last
+                    // transfer's data and put convincing rubbish on led[7:0].
+                    //
+                    // But not every ERROR is like that.  The remote bridge
+                    // shifts a real byte out and THEN reports ERROR when the
+                    // far board never answered - 0xFF, which the link spec
+                    // requires the host to see.  So the test is not "was it
+                    // an ERROR" but "could a byte have arrived at all": a
+                    // responder that answered in fewer than DATA_W clocks
+                    // cannot have sent one.
                     if (!r_we)
-                        rdata <= (bus_resp == `RESP_ERROR) ? {DATA_W{1'b0}}
-                                                           : rdata_ser;
+                        rdata <= (bus_resp == `RESP_ERROR && wcnt < DATA_W)
+                                     ? {DATA_W{1'b0}} : rdata_ser;
                 end
             end
         end

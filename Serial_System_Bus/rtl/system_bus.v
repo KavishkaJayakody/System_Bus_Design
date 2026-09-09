@@ -106,7 +106,7 @@
 
 module system_bus #(
     parameter N_MASTERS = `BUS_N_MASTERS,
-    parameter ID_W      = 1,                  // ceil(log2(N_MASTERS))
+    parameter ID_W      = `BUS_ID_W,                  // ceil(log2(N_MASTERS))
     parameter N_SLAVES  = `BUS_N_SLAVES,
     parameter ADDR_W    = `BUS_ADDR_W,
     parameter RESP_W    = `BUS_RESP_W,
@@ -231,7 +231,7 @@ module system_bus #(
 
     // Falling edge of the frame: the address is complete this cycle.
     // Deriving it here rather than adding an "end of frame" wire keeps the
-    // shared bus at eight wires and leaves the frame length defined in
+    // shared bus narrow and leaves the frame length defined in
     // exactly one place - the master's counter.
     assign addr_done = bus_valid_d & ~bus_valid;
 

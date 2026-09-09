@@ -29,7 +29,7 @@ BUS="$RTL/system_bus.v $RTL/arbiter.v $RTL/addr_decoder.v $RTL/bus_mux.v \
 
 # The whole system: masters + bus + slaves, composed once in bus_top.v.
 # top_debug and both integration testbenches instantiate that one wrapper.
-COMMON="$RTL/bus_top.v $RTL/master.v $RTL/master_uart.v $RTL/slave.v \
+COMMON="$RTL/bus_top.v $RTL/master.v $RTL/bus_bridge.v $RTL/slave.v \
         $RTL/uart_tx.v $RTL/uart_rx.v $BUS $RTL/shift_ser.v"
 
 # The JTAG debug layer.  altsource_probe_stub.v is SIMULATION ONLY - it

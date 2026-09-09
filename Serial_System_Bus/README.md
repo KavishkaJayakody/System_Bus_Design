@@ -1,14 +1,15 @@
-# Serial_System_Bus — 2-master / 3-slave shared bus with split transactions
+# Serial_System_Bus — multi-master serial shared bus with split transactions
 
 Synthesisable **serial** shared-bus interconnect for the **Terasic DE2-115**
 (`EP4CE115F29C7`, Cyclone IV E), Quartus Prime Lite 24.1std, Verilog-2001.
 
-Two masters, three memory slaves plus a default slave, fixed-priority
-arbitration with bus lock, and AHB-style split transactions.
+Three bus masters — two local plus the remote bridge's master face — four
+decoded targets (three memory slaves and the bridge) plus a default slave,
+fixed-priority arbitration with bus lock, and AHB-style split transactions.
 
 **The address and the data each travel on a single wire**, MSB first, one bit
 per clock, shared by every master and every slave. The whole shared bus is
-**8 wires**:
+**9 wires**:
 
 ```
 bus_astream  1   serial address, 16 bits per frame
@@ -17,10 +18,11 @@ bus_valid    1   frame marker, high for 16 clocks
 bus_we       1   1 = write; also the data wire's direction control
 bus_ready    1   completion strobe
 bus_resp     2   OKAY / ERROR / SPLIT
-master_id    1   tag of the granted master
+master_id    2   tag of the granted master (3 masters)
 ```
 
-16-bit word address, 8-bit data, so the slaves are 4 KB / 4 KB / 2 KB.
+16-bit word address, 8-bit data, so the memories are 2 KB / 4 KB / 4 KB at
+`0x0000` / `0x1000` / `0x2000`, and the third is the split-capable one.
 
 **Nothing in the datapath ever assembles a 16-bit address.** Slaves shift in
 only their own offset — 12 bits or 11 — and the decoder matches the slave
@@ -36,11 +38,10 @@ top_debug                        synthesis top (DE2-115)
  |                                  masters' normal command ports
  |
  +- bus_top                      THE SYSTEM - composition only, no logic
-     +- master_uart  (m0)        1. parallel command in, SERIAL onto the bus
-     |   +- master core             cmd_addr[15:0] -> m_astream (1 wire)
-     |   +- uart_tx / uart_rx       cmd_wdata[7:0] -> m_dstream (1 wire)
-     |                              plus REMOTE access to the other board
-     +- master       (m1)           local only
+     +- master  (m0, m1)         1. parallel command in, SERIAL onto the bus
+     |                              cmd_addr[15:0] -> m_astream (1 wire)
+     |                              cmd_wdata[7:0] -> m_dstream (1 wire)
+     |                              PLAIN masters - neither owns a UART
      |
      +- system_bus               2. THE BUS - no master, no memory in here
      |   +- arbiter                 priority + bus lock + split mask, param on N
@@ -48,9 +49,21 @@ top_debug                        synthesis top (DE2-115)
      |   +- bus_mux                 who drives the two shared wires
      |   +- default_slave           unmapped -> ERROR, so the bus never hangs
      |
-     +- slave x3                 3. 4 KB @0x0000 (split capable)
-                                    4 KB @0x1000,  2 KB @0x2000
+     +- slave x3                 3. 2 KB @0x0000 (id 0)
+     |                              4 KB @0x1000 (id 1)
+     |                              4 KB @0x2000 (id 2, SPLIT capable)
+     |
+     +- bus_bridge               4. THE LINK, as a DEVICE with TWO FACES
+         +- uart_tx / uart_rx       slave face  = target 3, 0x8000-0xBFFF
+                                    master face = bus master 2, LOWEST priority
 ```
+
+**The link is a device on the bus, not a passenger inside a master.** Either
+local master reaches the far board by addressing `0x8000-0xBFFF`, exactly as
+it addresses a memory; the bridge answers SPLIT and frees the bus for the
+whole round trip. The far board reaches all three local memories through the
+bridge's master face, which sits at the lowest arbiter priority so remote
+traffic can never out-rank local traffic.
 
 **Five things leave the device**: `CLOCK_50`, `rst_n` (`KEY[0]`), `led[7:0]`
 (`LEDR[7:0]`, master 0's last read data) and the two UART bridge pins that
@@ -98,7 +111,7 @@ instantiate it.
 
 | Path | Contents |
 |---|---|
-| `rtl/` | synthesisable modules, one per file, plus `bus_defs.vh`; `shift_ser.v` / `shift_deser.v` are the two serial primitives everything else is built from; `bus_top.v` composes the system; `top_debug.v` is the synthesis top; `master_uart.v` + `uart_tx.v` / `uart_rx.v` are the link to a second board |
+| `rtl/` | synthesisable modules, one per file, plus `bus_defs.vh`; `shift_ser.v` / `shift_deser.v` are the two serial primitives everything else is built from; `bus_top.v` composes the system; `top_debug.v` is the synthesis top; `bus_bridge.v` + `uart_tx.v` / `uart_rx.v` are the link to a second board, a device on the bus rather than part of a master |
 | `tb/` | a self-checking testbench per module — including `tb_system_bus`, which exercises the bus with no master and no memory attached — plus `tb_integration`, `tb_uart_remote` (two whole boards on a crossed UART link) and `tb_top_debug`, which drives the real synthesis top through its pins and its JTAG source register |
 | `sim/` | `run_icarus.sh`, `run_questa.do` |
 | `tcl/` | JTAG debug over In-System Sources & Probes — see below |
@@ -181,7 +194,7 @@ JTAG. See **Debugging on the board over JTAG** below.
 
 ## The board-to-board link
 
-Master 0 is a `master_uart`: the ordinary master core with a UART **client**
+The bridge is a device on the bus with a UART **client**
 and **server** wrapped around it. **The address selects the board** — there
 is no remote-mode bit:
 

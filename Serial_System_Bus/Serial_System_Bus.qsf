@@ -76,7 +76,7 @@ set_global_assignment -name VERILOG_FILE rtl/default_slave.v
 set_global_assignment -name VERILOG_FILE rtl/master.v
 set_global_assignment -name VERILOG_FILE rtl/uart_tx.v
 set_global_assignment -name VERILOG_FILE rtl/uart_rx.v
-set_global_assignment -name VERILOG_FILE rtl/master_uart.v
+set_global_assignment -name VERILOG_FILE rtl/bus_bridge.v
 set_global_assignment -name VERILOG_FILE rtl/system_bus.v
 set_global_assignment -name VERILOG_FILE rtl/bus_top.v
 set_global_assignment -name VERILOG_FILE rtl/bus_issp_driver.v

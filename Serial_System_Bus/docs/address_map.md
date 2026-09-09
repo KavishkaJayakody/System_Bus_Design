@@ -11,7 +11,8 @@ transfer spends 16 clocks shifting it. See [protocol.md](protocol.md).
 | Slave 0 | `0x0000`–`0x07FF` | 2048 x 8 = **2 KB** | 0 | `addr[15:11] == 5'b00000` | plain memory |
 | Slave 1 | `0x1000`–`0x1FFF` | 4096 x 8 = **4 KB** | 1 | `addr[15:12] == 4'h1` | plain memory |
 | Slave 2 | `0x2000`–`0x2FFF` | 4096 x 8 = **4 KB** | 2 | `addr[15:12] == 4'h2` | **split capable** |
-| Default slave | everything else below `0x8000` | — | — | no other match | answers `ERROR` |
+| Bridge | `0x8000`–`0xBFFF` | 16 K | 3 | `addr[15:14] == 2'b10` | the other board; answers SPLIT, then the far board's data |
+| Default slave | everything else | — | — | no other match | answers `ERROR` |
 
 **The sizes and the device ids are fixed by the board-to-board link spec.**
 Both ends must agree on 2 KB / 4 KB / 4 KB and ids 0/1/2, or a remote access
@@ -20,7 +21,7 @@ them here means changing them on the other board too.
 
 ## The remote window
 
-`addr[15] == 1` is not a slave at all. `master_uart` takes those
+`addr[15] == 1` is not a slave at all. `bus_bridge` takes those
 transactions off to the other board over the UART link instead of putting
 them on the local bus, and the far address is the local one minus `0x8000`:
 
@@ -31,7 +32,7 @@ them on the local bus, and the far address is the local one minus `0x8000`:
 | `0xA000`–`0xAFFF` | the far board's `0x2000`–`0x2FFF` | slave 2, 4 KB, id 2 |
 
 `0x9ABC` here is `0x1ABC` there. Because slave 0 is only 2 KB,
-`0x8800`–`0x8FFF` mirrors `0x8000`–`0x87FF` on the far side.
+`0x8800`–`0x8FFF` reaches the far board's `0x0800`–`0x0FFF`, which is a hole on its map, so the far board answers ERROR — and because a response carries data but no status, a remote read of it returns plausible garbage rather than an error.
 
 The window never reaches the local decoder, so the decoder still treats
 `addr[15] == 1` as unmapped — which is what `tb_addr_decoder`'s 64K sweep
@@ -44,7 +45,8 @@ there would answer `ERROR` rather than hang.
 |---|---|
 | `0x0800`–`0x0FFF` | the hole above slave 0, because slave 0 is 2K inside a 4K-aligned decode |
 | `0x3000`–`0x7FFF` | nothing mapped there |
-| `0xB000`–`0xFFFF` | above the remote window; leaves over the link and the far board answers nothing useful |
+| `0xB000`–`0xBFFF` | inside the bridge window but above the far board's map; it leaves over the link and the far board answers nothing useful |
+| `0xC000`–`0xFFFF` | **above the bridge window** — a local decode hole, answered `ERROR` by the default slave. It does not reach the link at all |
 
 Every one of the first two decodes to the default slave, which completes the
 transfer in the normal one cycle with `RESP_ERROR`. The bus therefore cannot

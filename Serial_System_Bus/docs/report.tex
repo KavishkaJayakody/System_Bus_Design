@@ -120,7 +120,7 @@ memory slaves are treated as endpoints: they appear where they define or
 constrain the bus contract, and not otherwise.
 
 The headline result is a shared bus in which \textbf{the address and the data
-each travel on a single wire}. The shared segment is eight wires and the whole
+each travel on a single wire}. The shared segment is nine wires and the whole
 interconnect is sixty nets. The cost is time --- a write takes 21 clocks and a
 read 30, of which sixteen are the address going out one bit per clock --- and
 the design closes timing at 141.8\,MHz against a 50\,MHz requirement.
@@ -323,7 +323,7 @@ the design is built to preserve them:
       parameter.
 \end{enumerate}
 
-\subsection{Eight wires}
+\subsection{Nine wires}
 
 \begin{table}[htb]
 \centering\small
@@ -553,7 +553,7 @@ assign addr_done = bus_valid_d & ~bus_valid;   // falling edge of the frame
 \end{lstlisting}
 
 Using the falling edge of \sig{bus\_valid} rather than adding an
-``end of frame'' wire keeps the shared bus at eight wires and --- more
+``end of frame'' wire keeps the shared bus narrow and --- more
 usefully --- leaves the frame length defined in exactly one place. Nothing
 else on the bus knows or cares how long a frame is.
 

@@ -23,7 +23,7 @@
 module tb_arbiter;
 
     localparam N       = `BUS_N_MASTERS;
-    localparam ID_W    = 1;
+    localparam ID_W    = `BUS_ID_W;
     localparam RESP_W  = `BUS_RESP_W;
 
     reg               clk = 1'b0;

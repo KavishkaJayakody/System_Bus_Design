@@ -14,7 +14,7 @@ them and this file is the place to record it.
 | 1 | Board | **DE2-115**, device `EP4CE115F29C7` | The brief said DE0, but the Quartus project in this folder targets `EP4CE115F29C7`. The device string was read out of `Serial_System_Bus.qsf`, not guessed, as the brief required. Pin names were cross-checked against the DE2-115 assignments already used elsewhere in this repo. |
 | 2 | HDL | **Verilog-2001** throughout | Matches the rest of the repo, and it lets the whole regression run under Icarus Verilog, which does not handle SystemVerilog well. No file mixes the two. |
 | 3 | Data width | **8 bits**, parameterised | On a serial bus the data width is a direct latency cost — one clock per bit, on every transfer. 8 bits also makes the slaves 4 KB / 4 KB / 2 KB, which is the natural reading of "slave memory sizes 4K, 4K, 2K". Superseded the original 32-bit choice when the bus went serial; see §8. |
-| 3b | Bus signalling | **serial**: one wire for the address, one for the data, control parallel | The project is called `Serial_System_Bus`. The address and data buses are serialised onto one wire each; `valid`/`we`/`ready`/`resp`/`master_id` stay parallel, which keeps the arbiter and decoder unchanged. Shared bus = 8 wires. See §8. |
+| 3b | Bus signalling | **serial**: one wire for the address, one for the data, control parallel | The project is called `Serial_System_Bus`. The address and data buses are serialised onto one wire each; `valid`/`we`/`ready`/`resp`/`master_id` stay parallel, which keeps the arbiter and decoder unchanged. Shared bus = 9 wires (8 while there were only two masters). See §8. |
 | 4 | Response encoding | `OKAY=2'b00`, `ERROR=2'b01`, `SPLIT=2'b10` | AHB-flavoured. `OKAY` is all-zero so a reset or an idle bus reads as "nothing wrong". |
 | 5 | Handshake polarity | everything active high except `rst_n` and the board's `_n` pins | One rule, no exceptions to remember. |
 | 6 | Memory initial contents | **none** | Initialising would need an `initial` block or a MIF, and the brief forbids `initial` in synthesisable code. Every test writes a location before reading it instead. The arrays are also not reset — see §3. |
@@ -249,7 +249,7 @@ human and are synchronised inside the design.
 
 *The remote link has since shipped, and §17 put it exactly here after all:
 `addr[15] == 1` IS the remote window. It is reached through a sideband inside
-`master_uart` rather than as a bus slave, so the two readiness claims below
+`bus_bridge` rather than as a bus slave, so the two readiness claims below
 still hold and the window is still unmapped as far as the decoder is
 concerned. See §15 and §17.*
 
@@ -741,7 +741,7 @@ unchanged and must still total 81,920.
 > interface spec replaced both. The structure described here — core, client,
 > server, one shared transmitter — is unchanged and still accurate.
 
-The board can now reach a second board's memory. Master 0 is a `master_uart`
+The board can now reach a second board's memory. Master 0 is a `bus_bridge`
 — the ordinary `master` core with a UART client and server wrapped around it
 — and a transaction is either local or, with `cmd_remote` set, carried over
 the link and executed on the far board's bus.
@@ -926,7 +926,7 @@ the information, so the JTAG console needs no mode and `wa 9ABC 5A` simply
 works.
 
 This is where §7 said the remote window would be, so the reserved range is
-finally in use. It is still not a *slave*: `master_uart` intercepts it in the
+finally in use. It is still not a *slave*: `bus_bridge` intercepts it in the
 command path, so the local decoder never sees `addr[15] == 1` and
 `tb_addr_decoder`'s 64K sweep still asserts that nothing up there selects a
 slave. If the link were removed, a stray access would answer ERROR rather

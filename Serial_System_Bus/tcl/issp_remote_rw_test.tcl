@@ -385,7 +385,7 @@ if {$ok && $rd == 0x5A && !$cmderr} {
 # no flow control to push back with.  Worth saying out loud after a run that
 # hammered the link.
 set p [probe]
-if {[bits $p 95 95]} {
+if {[bits $p 98 98]} {
     note "req_overrun is SET: at least one INCOMING request was thrown"
     note "away because this side was still busy with the previous one."
     note "That is the far board sending faster than we drain, not a"

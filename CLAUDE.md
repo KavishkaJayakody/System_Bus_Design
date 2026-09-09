@@ -23,13 +23,17 @@ The root `System_Bus_Design.qsf` targets `EP4CE115F29C7`; `System_Bus_Final/Syst
 
 ## `Serial_System_Bus/` — the active design
 
-Serial shared bus: 2 masters, 3 memory slaves + a default slave, 16-bit word
-address, 8-bit data, fixed-priority arbitration with bus lock, AHB-style
-split transactions. Target `EP4CE115F29C7` (DE2-115), top `top_debug`.
+Serial shared bus: **3 bus masters** (2 local + the remote bridge's master
+face), **4 decoded targets** (3 memory slaves + the bridge) plus a default
+slave, 16-bit word address, 8-bit data, fixed-priority arbitration with bus
+lock, AHB-style split transactions. Target `EP4CE115F29C7` (DE2-115), top
+`top_debug`.
 
 **The address and the data each travel on one wire.** The whole shared bus is
-8 wires: `bus_astream`, `bus_dstream`, `bus_valid`, `bus_we`, `bus_ready`,
-`bus_resp[1:0]`, `master_id`. Everything else is point-to-point.
+9 wires: `bus_astream`, `bus_dstream`, `bus_valid`, `bus_we`, `bus_ready`,
+`bus_resp[1:0]`, `master_id[1:0]`. Everything else is point-to-point. (It was
+8 while there were two masters; `master_id` widened to 2 bits when the bridge
+became the third.)
 
 **Three kinds of module.** `system_bus` is the bus and contains no master and
 no memory. `master` and `slave` are peripherals and contain no bus logic.
@@ -50,14 +54,13 @@ top_debug                        synthesis top (DE2-115)
  |                               wires, two instances and one assign
  +- bus_issp_driver              JTAG debug front-end, instance "SBUS"
  |                                  IN FRONT of the system - it drives the
- |                                  masters' normal parallel command ports
+ |                                  two LOCAL masters' parallel command ports
  |
  +- bus_top                      THE SYSTEM - composition only, no logic
-     +- master_uart  (m0)        1. parallel command in, SERIAL onto the bus
-     |   +- master core             cmd_addr[15:0] -> m_astream (1 wire)
-     |   +- uart_tx / uart_rx       cmd_wdata[7:0] -> m_dstream (1 wire)
-     |                              addr[15]=1 -> the OTHER board over UART
-     +- master       (m1)           local only
+     +- master  (m0, m1)         1. parallel command in, SERIAL onto the bus
+     |                              cmd_addr[15:0] -> m_astream (1 wire)
+     |                              cmd_wdata[7:0] -> m_dstream (1 wire)
+     |                              PLAIN masters - neither owns a UART
      |
      +- system_bus               2. THE BUS - no master, no memory in here
      |   +- arbiter                 priority + bus lock + split mask, param on N
@@ -66,8 +69,12 @@ top_debug                        synthesis top (DE2-115)
      |   +- default_slave           unmapped -> ERROR, so the bus never hangs
      |
      +- slave x3                 3. 2 KB @0x0000 (id 0)
-                                    4 KB @0x1000 (id 1)
-                                    4 KB @0x2000 (id 2, SPLIT capable)
+     |                              4 KB @0x1000 (id 1)
+     |                              4 KB @0x2000 (id 2, SPLIT capable)
+     |
+     +- bus_bridge               4. THE LINK, as a DEVICE with TWO FACES
+         +- uart_tx / uart_rx       slave face  = target 3, 0x8000-0xBFFF
+                                    master face = bus master 2, LOWEST priority
 ```
 
 **There is no board layer.** `de2_top`, `board_ctrl`, `status_display`,
@@ -86,12 +93,18 @@ bits are seen high and low at the pins.
 only. A testbench reaching the ISSP source register goes through
 `dut.u_dbg.u_issp.source`.
 
-`0x0800-0x0FFF` and `0x3000-0x7FFF` are unmapped and answer ERROR.
+`0x0800-0x0FFF`, `0x3000-0x7FFF` and `0xC000-0xFFFF` are unmapped and answer
+ERROR.
 
-**`addr[15]==1` is the REMOTE WINDOW.** `master_uart` intercepts it in the
-command path and runs the transaction on the other board; far address = local
-address - 0x8000. It never reaches the local decoder, so `tb_addr_decoder`'s
-64K sweep still asserts nothing up there selects a slave — keep that true.
+**`0x8000-0xBFFF` is the BRIDGE, and it IS decoded.** A master reaches the
+other board by addressing the bridge exactly as it addresses a memory; the
+bridge answers SPLIT, frees the bus for the whole round trip, and wakes the
+master when the far board replies. far address = local - 0x8000.
+
+This INVERTED when the UART moved out of master 0: `tb_addr_decoder`'s 64K
+sweep now asserts that the bridge window selects target 3 and *only* target 3,
+and that nothing outside it selects the bridge. `0xC000-0xFFFF` is a genuine
+decode hole answering ERROR — the old `addr[14]` aliasing is gone.
 
 **Frame format.** `bus_valid` is high for `ADDR_W` = 16 clocks. The address
 goes out MSB-first on `bus_astream`; write data goes out **right-aligned** on
@@ -108,11 +121,32 @@ The master's deserialiser free-runs through its wait state.
 Latency: write 21 clocks, read 30, split read 79. Fmax 141.8 MHz (measured
 before the board layer was removed and the UART added; not re-measured).
 
-**Board-to-board link over UART.** Master 0 is `master_uart` — the `master`
-core plus a UART client and server. It follows an INTERFACE SPEC AGREED WITH
-ANOTHER TEAM; both ends must match or a remote access lands somewhere else.
-`uart_tx.v` / `uart_rx.v` are copied unchanged from `System_Bus_Final`; don't
-rewrite them.
+**Board-to-board link over UART.** The link is `rtl/bus_bridge.v` — a DEVICE
+ON THE BUS, not part of any master. There is exactly one UART in the design
+and it lives in there. It follows an INTERFACE SPEC AGREED WITH ANOTHER TEAM;
+both ends must match or a remote access lands somewhere else. `uart_tx.v` /
+`uart_rx.v` are copied unchanged from `System_Bus_Final`; don't rewrite them.
+
+- **TWO FACES.** The slave face is decoded target 3 at `0x8000-0xBFFF`, so
+  EITHER local master can reach the far board. The master face is bus master
+  2 with the LOWEST arbiter priority, so remote traffic can never out-rank
+  local traffic. This is why `bus_top` has 3 masters but only 2 command
+  ports (`NLM = NM-1`).
+- **A remote transaction IS a split transaction.** A round trip costs ~347 us
+  each way; holding the bus would be absurd. The bridge answers SPLIT, the
+  arbiter masks that master and releases the bus, and `split_complete` wakes
+  it for the replay. A replayed read then answers at S+10 exactly like a
+  memory read, so nothing upstream knows it went over a wire.
+- **Writes split too**, completing once the request bytes are on the wire.
+  That is deliberate back-pressure: the far board's single-byte receiver
+  cannot be overrun by us, which the wire format itself cannot prevent.
+- **One transaction at a time.** A second master addressing the bridge while
+  a round trip is in flight is answered ERROR, not deferred - there is one
+  set of deferred state and one `split_complete` to release it with. It
+  completes, so the bus never hangs. `tb_uart_remote` test 19 covers it.
+- **A timed-out round trip completes with `resp = ERROR`**, data `0xFF`, and
+  latches `br_error`. Both channels matter: ERROR says the transaction
+  failed, `br_error` says it was the *link* rather than an unmapped address.
 
 - **Slave sizes 2K/4K/4K and ids 0/1/2 are part of the spec**, not a local
   choice. So is which slave splits (the third). Changing `bus_defs.vh` breaks
@@ -129,16 +163,19 @@ rewrite them.
 - Pins are `rm_tx` AC15 / `rm_rx` AB22 (JP5). The spec's D3/C3 are the FAR
   board's pins and do not exist on this device.
 
-- **The local path must stay a pure pass-through.** `cmd_accept`/`done`/
-  `rdata`/`resp` come combinationally from the core for a local transaction,
-  so a local write is still 21 clocks and a read 30. `tb_uart_remote` test 1
-  asserts both — a wrapper that adds a cycle to every local transfer fails.
+- **Local transfers are untouched by the link.** Both masters are plain
+  `master`s with nothing wrapped around them, so a local write is 21 clocks
+  and a read 30 by construction. `tb_uart_remote` test 1 asserts both.
 - **Responses take priority over requests** in the shared transmitter, or two
   boards commanding each other on the same instant deadlock. Test 7 covers it.
 - **Tag hunting**: hunt a tag, then take exactly 3 more bytes (request) or 1
   (response). Never re-scan the payload — a payload byte may be 0xA5/0x5A.
 - **`RESP_TIMEOUT` (32-bit counter)** completes a remote read with `0xFF` and
-  `cmd_error` rather than hanging. Same discipline as the default slave.
+  `br_error` rather than hanging. Same discipline as the default slave.
+- **`br_error` belongs to the BRIDGE, not to a master's command stream.** It
+  says "the last thing that went over the wire failed" and stays set until
+  another remote transaction is attempted; a local transfer no longer clears
+  it. That changed with the refactor and is the more useful reading.
 - See design_notes §15 and §17.
 
 ### Commands
@@ -210,11 +247,18 @@ In-System Sources & Probes Editor tab first; an open editor holds the session.
 - `issp_mode` (src[53]) is left unconnected in `top_debug` — the driver is the
   only command source now, so it has nothing to arbitrate. The bit stays in
   the map because the layout is shared with `tcl/issp_bus_lib.tcl`.
-- The UART link adds `prb[29]` = sticky `cmd_error` (master 0 only),
-  `prb[92]` = `remote_busy`, `prb[93]` = `srv_busy`, `prb[95]` = sticky
-  `req_overrun` (an incoming REQUEST was thrown away — the link has no flow
-  control), and `prb[123:96]` = the link diagnostic counters. `src[55]` is spare — the
-  address selects the far board. Same three-places rule applies.
+- **The bit map moved when the bridge joined the bus.** `gnt` and
+  `split_mask` are 3 bits now and `sel_q` is 5, so everything above them
+  shifted up by 3: `gnt` `prb[62:60]`, `split_mask` `prb[65:63]`, `sel_q`
+  `prb[70:66]` = `{def, BRIDGE, s2, s1, s0}`, `split_busy` `prb[71]`,
+  `collision` `prb[72]`, `bus_addr` `prb[88:73]`, `frame_len` `prb[93:89]`,
+  `frame_bad` `prb[94]`.
+- The link adds `prb[29]` = sticky `br_error` (master 0's slice),
+  `prb[95]` = `remote_busy`, `prb[96]` = `srv_busy`, `prb[97]` = `rx_active`,
+  `prb[98]` = sticky `req_overrun` (an incoming REQUEST was thrown away — the
+  link has no flow control), and `prb[126:99]` = the link diagnostic
+  counters. `src[55]` is spare — the address selects the far board. Same
+  three-places rule applies.
 - `master` takes a LEVEL `cmd_valid` and answers `cmd_accept` — unlike the old
   design's one-cycle start pulse. The driver holds `cmd_valid` until accepted.
 - `tb/altsource_probe_stub.v` is SIMULATION ONLY and must never be in the
@@ -281,6 +325,13 @@ in step.
 - **A counter narrower than its own parameter truncates silently.**
   `SPLIT_LATENCY = 10_000_000` into a 16-bit counter became 38,528. The
   counter is now 32 bits.
+- **AN INDEX NARROWER THAN ITS LOOP TRUNCATES THE SAME WAY.** `arbiter.v`
+  used to identify the split master with `master_id == i[ID_W-1:0]`. With
+  `ID_W` too small for `N_MASTERS`, `i=2` narrows to `0`, so splitting master
+  0 ALSO masked master 2 — permanently, and silently: it was never granted
+  again and its requests simply vanished. The mask now keys off `gnt[i]`,
+  the one-hot grant, which cannot alias. A testbench overriding `ID_W = 1`
+  is what exposed it; every testbench now takes `ID_W` from `BUS_ID_W`.
 - **The fitter deletes what cannot reach an output, or cannot change.** Two
   separate instances: read data that only partly reached a pin, and a write
   pattern with two identical byte lanes. Both silently produced narrower

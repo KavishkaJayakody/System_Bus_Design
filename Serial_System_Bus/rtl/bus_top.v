@@ -1,8 +1,15 @@
 //==========================================================================
 // bus_top.v
 //
-// THE COMPLETE BUS SYSTEM: 2 masters + system_bus + 3 memory slaves, wired
-// together and nothing else.  No board, no switches, no JTAG, no displays.
+// THE COMPLETE BUS SYSTEM: 2 local masters + system_bus + 3 memory slaves +
+// the remote BRIDGE, wired together and nothing else.  No board, no switches,
+// no JTAG, no displays.
+//
+// The bridge is a DEVICE ON THE BUS, not part of a master.  It has two faces:
+// a slave face at 0x8000-0xBFFF that either local master can address, and a
+// master face at arbiter index 2 - the lowest priority - through which the
+// far board reaches all three local memories.  So this system has THREE bus
+// masters but only TWO command ports.
 //
 // This is the serial design's equivalent of `top_bus_system' in the parallel
 // System_Bus_Final project, and it plays the same role: the synthesis top
@@ -46,17 +53,19 @@
 // clk               in   1           Bus clock, one domain for everything.
 // rst_n             in   1           Asynchronous active-low reset.
 //
-// cmd_valid         in   NM          LEVEL, held until cmd_accept.
-// cmd_we            in   NM          1 = write, 0 = read.
-// cmd_addr_flat     in   NM*ADDR_W   Command addresses, packed.
-// cmd_wdata_flat    in   NM*DATA_W   Command write data, packed.
-// cmd_accept        out  NM          The master took the command, one clock.
-// done              out  NM          Transaction finished, one clock.
-// rdata_flat        out  NM*DATA_W   Last read data per master, packed.
-// resp_flat         out  NM*RESP_W   Final response per master, packed.
-// err               out  NM          That transaction answered ERROR.
-// split_count_flat  out  NM*8        Splits absorbed per master, packed.
-// mst_busy          out  NM          Master has a command in flight.
+// cmd_valid         in   NLM         LEVEL, held until cmd_accept.
+// cmd_we            in   NLM         1 = write, 0 = read.
+// cmd_addr_flat     in   NLM*ADDR_W  Command addresses, packed.
+// cmd_wdata_flat    in   NLM*DATA_W  Command write data, packed.
+// cmd_accept        out  NLM         The master took the command, one clock.
+// done              out  NLM         Transaction finished, one clock.
+// rdata_flat        out  NLM*DATA_W  Last read data per master, packed.
+// resp_flat         out  NLM*RESP_W  Final response per master, packed.
+// err               out  NLM         That transaction answered ERROR.
+// split_count_flat  out  NLM*8       Splits absorbed per master, packed.
+// mst_busy          out  NLM         Master has a command in flight.
+//
+// NLM = NM-1: the bridge's master face is a bus master with no command port.
 //
 // split_en          in   1           Make the split-capable slave (slave 2)
 //                                    answer SPLIT - the "slave is busy"
@@ -82,14 +91,14 @@
 `include "bus_defs.vh"
 
 module bus_top #(
-    parameter NM            = `BUS_N_MASTERS,
-    parameter NS            = `BUS_N_SLAVES,
-    parameter ID_W          = 1,
+    parameter NM            = `BUS_N_MASTERS,   // bus masters, incl. the bridge
+    parameter NS            = `BUS_N_SLAVES,    // decoded targets, incl. the bridge
+    parameter ID_W          = `BUS_ID_W,
     parameter ADDR_W        = `BUS_ADDR_W,
     parameter DATA_W        = `BUS_DATA_W,
     parameter RESP_W        = `BUS_RESP_W,
-    // Slave 0 stays "busy" for this many clocks per split.  The board build
-    // uses ~0.2 s so a split is visible from the host; testbenches shrink it.
+    // The split-capable memory stays "busy" for this many clocks per split.
+    // The board build uses ~0.2 s so a split is visible from the host.
     parameter SPLIT_LATENCY = 10_000_000,
     // UART link to the other board.  50 MHz / 115200 baud = 434.
     parameter CLKS_PER_BIT  = 434,
@@ -105,29 +114,32 @@ module bus_top #(
     input  wire                    rst_n,
 
     // ---- master command ports (parallel) ---------------------------------
-    input  wire [NM-1:0]           cmd_valid,
-    input  wire [NM-1:0]           cmd_we,
-    input  wire [NM*ADDR_W-1:0]    cmd_addr_flat,
-    input  wire [NM*DATA_W-1:0]    cmd_wdata_flat,
-    output wire [NM-1:0]           cmd_accept,
-    output wire [NM-1:0]           done,
-    output wire [NM*DATA_W-1:0]    rdata_flat,
-    output wire [NM*RESP_W-1:0]    resp_flat,
-    output wire [NM-1:0]           err,
-    output wire [NM*8-1:0]         split_count_flat,
-    output wire [NM-1:0]           mst_busy,
+    // NLM of them, one per LOCAL master.  The bridge's master face is bus
+    // master NM-1 and is driven by the far board, not from here.
+    input  wire [NLM-1:0]          cmd_valid,
+    input  wire [NLM-1:0]          cmd_we,
+    input  wire [NLM*ADDR_W-1:0]   cmd_addr_flat,
+    input  wire [NLM*DATA_W-1:0]   cmd_wdata_flat,
+    output wire [NLM-1:0]          cmd_accept,
+    output wire [NLM-1:0]          done,
+    output wire [NLM*DATA_W-1:0]   rdata_flat,
+    output wire [NLM*RESP_W-1:0]   resp_flat,
+    output wire [NLM-1:0]          err,
+    output wire [NLM*8-1:0]        split_count_flat,
+    output wire [NLM-1:0]          mst_busy,
 
-    // ---- the "slave is busy" model, on the split-capable slave -----------
+    // ---- the "slave is busy" model, on the split-capable memory ----------
     input  wire                    split_en,
 
-    // ---- board-to-board link over UART (master 0 only) -------------------
-    // There is no "remote" input: addr[15] selects the far board.
+    // ---- board-to-board link (THE BRIDGE) --------------------------------
+    // There is no "remote" input: the ADDRESS selects the far board, and
+    // 0x8000-0xBFFF is decoded to the bridge like any other target.
     output wire                    cmd_error,      // remote read timed out
     input  wire                    rm_rx,
     output wire                    rm_tx,
     output wire                    remote_busy,
     output wire                    srv_busy,
-    // link diagnostics - observation only, see master_uart.v
+    // link diagnostics - observation only, see bus_bridge.v
     output wire [7:0]              dbg_rx_last,
     output wire [7:0]              dbg_rx_count,
     output wire [7:0]              dbg_tx_count,
@@ -154,10 +166,12 @@ module bus_top #(
     output wire                    bus_dstream
 );
 
+    // Locally commanded masters.  The last bus master is the bridge.
+    localparam NLM = NM - 1;
+
     //======================================================================
-    // Serial wires between the masters and the bus.
-    // One bit per master per stream - these are the CANDIDATES; the bus
-    // picks one with the grant.
+    // Serial wires between the masters and the bus.  One bit per master per
+    // stream - these are the CANDIDATES; the bus picks one with the grant.
     //======================================================================
     wire [NM-1:0]  m_req;
     wire [NM-1:0]  m_valid;
@@ -166,7 +180,7 @@ module bus_top #(
     wire [NM-1:0]  m_dstream;
 
     //======================================================================
-    // Wires between the bus and the slaves.
+    // Wires between the bus and the decoded targets.
     //======================================================================
     wire [NS-1:0]          s_sel;
     wire [NS-1:0]          s_ready;
@@ -174,73 +188,15 @@ module bus_top #(
     wire [NS-1:0]          s_dstream;
 
     //======================================================================
-    // 1. MASTERS
+    // 1. LOCAL MASTERS
     //
-    // Parallel command in, SERIAL onto the bus: cmd_addr goes out one bit
-    // at a time on m_astream, cmd_wdata on m_dstream.
-    //
-    // Master 0 is a `master_uart' - the ordinary master core plus a UART
-    // client and server for reaching the OTHER board.  Master 1 is a plain
-    // `master', local only.  That asymmetry is the same one System_Bus_Final
-    // has, and it is why these are instantiated one by one instead of in a
-    // generate loop.
-    //
-    // For a LOCAL transaction the wrapper is a pass-through: master 0 costs
-    // exactly what master 1 costs.
+    // Parallel command in, SERIAL onto the bus.  Both are plain `master's -
+    // there is no UART inside either of them any more.  A master reaches the
+    // other board by addressing the bridge, exactly as it addresses memory.
     //======================================================================
-
-    // Master 0 - with the UART link
-    master_uart #(
-        .ADDR_W       (ADDR_W),
-        .DATA_W       (DATA_W),
-        .RESP_W       (RESP_W),
-        .CLKS_PER_BIT (CLKS_PER_BIT),
-        .RESP_TIMEOUT (RESP_TIMEOUT)
-    ) u_master0 (
-        .clk         (clk),
-        .rst_n       (rst_n),
-        // parallel, facing the command source
-        .cmd_valid   (cmd_valid[0]),
-        .cmd_we      (cmd_we[0]),
-        .cmd_addr    (cmd_addr_flat  [0*ADDR_W +: ADDR_W]),
-        .cmd_wdata   (cmd_wdata_flat [0*DATA_W +: DATA_W]),
-        .cmd_accept  (cmd_accept[0]),
-        .done        (done[0]),
-        .rdata       (rdata_flat     [0*DATA_W +: DATA_W]),
-        .resp        (resp_flat      [0*RESP_W +: RESP_W]),
-        .err         (err[0]),
-        .cmd_error   (cmd_error),
-        .split_count (split_count_flat[0*8 +: 8]),
-        .busy        (mst_busy[0]),
-        // serial, facing the bus
-        .bus_req     (m_req[0]),
-        .bus_gnt     (gnt[0]),
-        .m_valid     (m_valid[0]),
-        .m_we        (m_we[0]),
-        .m_astream   (m_astream[0]),          // ADDRESS, one wire
-        .m_dstream   (m_dstream[0]),          // WRITE DATA, one wire
-        .bus_ready   (bus_ready),
-        .bus_resp    (bus_resp),
-        .bus_dstream (bus_dstream),           // READ DATA, the shared wire
-        // the link to the other board
-        .rm_rx          (rm_rx),
-        .rm_tx          (rm_tx),
-        .remote_busy    (remote_busy),
-        .srv_busy       (srv_busy),
-        .dbg_rx_last    (dbg_rx_last),
-        .dbg_rx_count   (dbg_rx_count),
-        .dbg_tx_count   (dbg_tx_count),
-        .dbg_rx_state   (dbg_rx_state),
-        .dbg_req_seen   (dbg_req_seen),
-        .dbg_resp_seen  (dbg_resp_seen),
-        .dbg_rx_active  (dbg_rx_active),
-        .dbg_req_overrun(dbg_req_overrun)
-    );
-
-    // Masters 1..NM-1 - local only
     genvar gi;
     generate
-    for (gi = 1; gi < NM; gi = gi + 1) begin : g_master
+    for (gi = 0; gi < NLM; gi = gi + 1) begin : g_master
         master #(
             .ADDR_W (ADDR_W),
             .DATA_W (DATA_W),
@@ -248,7 +204,6 @@ module bus_top #(
         ) u_master (
             .clk         (clk),
             .rst_n       (rst_n),
-            // parallel, facing the command source
             .cmd_valid   (cmd_valid[gi]),
             .cmd_we      (cmd_we[gi]),
             .cmd_addr    (cmd_addr_flat  [gi*ADDR_W +: ADDR_W]),
@@ -261,7 +216,6 @@ module bus_top #(
             .split_count (split_count_flat[gi*8 +: 8]),
             .busy        (mst_busy[gi]),
             .state       (),                     // waveform only
-            // serial, facing the bus
             .bus_req     (m_req[gi]),
             .bus_gnt     (gnt[gi]),
             .m_valid     (m_valid[gi]),
@@ -279,17 +233,18 @@ module bus_top #(
     // 2. THE BUS - no master and no memory inside it
     //======================================================================
     wire [NM-1:0] s2_split_complete;
+    wire [NM-1:0] br_split_complete;
 
-    // Wake-up pulses from every split-capable slave, OR-ed per master.  Only
-    // slave 2 can raise one today; a second split-capable slave joins here.
-    wire [NM-1:0] s_split_complete = s2_split_complete;
+    // Wake-up pulses from every split-capable target, OR-ed per master: the
+    // split memory and the bridge both defer transfers and both release them.
+    wire [NM-1:0] s_split_complete = s2_split_complete | br_split_complete;
 
     system_bus #(
-        .N_MASTERS (NM),
-        .ID_W      (ID_W),
-        .N_SLAVES  (NS),
-        .ADDR_W    (ADDR_W),
-        .RESP_W    (RESP_W),
+        .N_MASTERS    (NM),
+        .ID_W         (ID_W),
+        .N_SLAVES     (NS),
+        .ADDR_W       (ADDR_W),
+        .RESP_W       (RESP_W),
         .OBSERVE_ADDR (OBSERVE_ADDR)
     ) u_system_bus (
         .clk              (clk),
@@ -305,7 +260,7 @@ module bus_top #(
         .bus_ready        (bus_ready),
         .bus_resp         (bus_resp),
 
-        // slave side
+        // target side
         .bus_valid        (bus_valid),
         .bus_we           (bus_we),
         .bus_master_id    (master_id),
@@ -328,13 +283,11 @@ module bus_top #(
     );
 
     //======================================================================
-    // 3. SLAVES
+    // 3. MEMORY SLAVES
     //
     // Instantiated one by one rather than in a generate loop, because they
     // differ in size and in whether they can split - and those differences
-    // are worth reading at a glance.
-    //
-    // All three tap the SAME bus_astream and bus_dstream.
+    // are worth reading at a glance.  All three tap the SAME two wires.
     //======================================================================
 
     // Slave 0 - 2 KB at 0x0000.  Device id 0 on the board-to-board link.
@@ -390,7 +343,7 @@ module bus_top #(
     );
 
     // Slave 2 - 4 KB at 0x2000, SPLIT CAPABLE.  Device id 2 on the link, and
-    // the spec's "S3 splits on read": the splitter is the THIRD slave.
+    // the spec's "S3 splits on read": the splitter is the THIRD memory.
     slave #(
         .DATA_W        (DATA_W),
         .LADDR_W       (`S2_LADDR_W),
@@ -415,6 +368,66 @@ module bus_top #(
         .resp           (s_resp_flat[`SEL_S2*RESP_W +: RESP_W]),
         .split_complete (s2_split_complete),
         .busy           (split_busy)
+    );
+
+    //======================================================================
+    // 4. THE BRIDGE - target 3 on the slave side, bus master NM-1 on the
+    //    other.  The only UART in the design lives in here.
+    //======================================================================
+    bus_bridge #(
+        .ADDR_W       (ADDR_W),
+        .DATA_W       (DATA_W),
+        .RESP_W       (RESP_W),
+        .N_MASTERS    (NM),
+        .ID_W         (ID_W),
+        .LADDR_W      (`S3_LADDR_W),
+        .CLKS_PER_BIT (CLKS_PER_BIT),
+        .RESP_TIMEOUT (RESP_TIMEOUT)
+    ) u_bridge (
+        .clk             (clk),
+        .rst_n           (rst_n),
+
+        // slave face - addressed at 0x8000-0xBFFF like any other target
+        .frame           (bus_valid),
+        .astream         (bus_astream),
+        .dstream_in      (bus_dstream),
+        .sel             (s_sel[`SEL_BR]),
+        .we              (bus_we),
+        .master_id       (master_id),
+        .dstream_out     (s_dstream[`SEL_BR]),
+        .ready           (s_ready[`SEL_BR]),
+        .resp            (s_resp_flat[`SEL_BR*RESP_W +: RESP_W]),
+        .split_complete  (br_split_complete),
+        .busy            (),
+
+        // master face - bus master NM-1, the LOWEST arbiter priority, so
+        // remote traffic can never out-rank the local masters
+        .bus_req         (m_req[NM-1]),
+        .bus_gnt         (gnt[NM-1]),
+        .m_valid         (m_valid[NM-1]),
+        .m_we            (m_we[NM-1]),
+        .m_astream       (m_astream[NM-1]),
+        .m_dstream       (m_dstream[NM-1]),
+        .bus_ready       (bus_ready),
+        .bus_resp        (bus_resp),
+        .bus_dstream     (bus_dstream),
+
+        // the wire
+        .rm_rx           (rm_rx),
+        .rm_tx           (rm_tx),
+
+        // status
+        .br_error        (cmd_error),
+        .remote_busy     (remote_busy),
+        .srv_busy        (srv_busy),
+        .dbg_rx_last     (dbg_rx_last),
+        .dbg_rx_count    (dbg_rx_count),
+        .dbg_tx_count    (dbg_tx_count),
+        .dbg_rx_state    (dbg_rx_state),
+        .dbg_req_seen    (dbg_req_seen),
+        .dbg_resp_seen   (dbg_resp_seen),
+        .dbg_rx_active   (dbg_rx_active),
+        .dbg_req_overrun (dbg_req_overrun)
     );
 
 endmodule

@@ -20,7 +20,7 @@ set INC "+incdir+$RTL"
 foreach f [list \
         shift_ser.v shift_deser.v \
         addr_decoder.v arbiter.v bus_mux.v default_slave.v system_bus.v \
-        master.v uart_tx.v uart_rx.v master_uart.v slave.v bus_top.v \
+        master.v uart_tx.v uart_rx.v bus_bridge.v slave.v bus_top.v \
         bus_issp_driver.v top_debug.v] {
     vlog -quiet $INC $RTL/$f
 }

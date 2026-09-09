@@ -36,7 +36,7 @@ module tb_system_bus;
     localparam ADDR_W = `BUS_ADDR_W;
     localparam DATA_W = `BUS_DATA_W;
     localparam RESP_W = `BUS_RESP_W;
-    localparam ID_W   = 1;
+    localparam ID_W   = `BUS_ID_W;
 
     reg clk = 1'b0;
     reg rst_n;
@@ -211,12 +211,12 @@ module tb_system_bus;
         //==================================================================
         $display("-- 2. arbitration ------------------------------------");
         acquire(0);
-        chk(m_gnt === 2'b01,          "master 0 granted");
+        chk(m_gnt === 4'b0001,          "master 0 granted");
         chk(bus_master_id === 1'b0,   "master_id tag = 0");
         chk(gnt_valid === 1'b1,       "gnt_valid asserted");
         drive_frame(0, 1'b1, 16'h1ABC, 8'h5D);
         // the grant must survive the whole 16-clock frame
-        chk(m_gnt === 2'b01,          "grant HELD across the whole frame");
+        chk(m_gnt === 4'b0001,          "grant HELD across the whole frame");
         // frame_len is checked in section 4: the monitor only retires a
         // frame on the edge AFTER bus_valid falls, and the checks below are
         // on one-cycle pulses that cannot wait a clock.
@@ -226,14 +226,14 @@ module tb_system_bus;
         chk(addr_done === 1'b1,       "decode strobe pulsed at the end of the frame");
         chk(bus_addr === 16'h1ABC,    "address reassembled from the single wire");
         chk(rx_addr  === 16'h1ABC,    "and that is what was on the wire");
-        chk(s_sel === 3'b010,         "0x1ABC selected slave 1");
+        chk(s_sel === 4'b0010,         "0x1ABC selected slave 1");
 
         //==================================================================
         $display("-- 4. write direction: the master owns the data wire --");
         chk(bus_we === 1'b1,          "bus_we high for a write");
         chk(rx_wdata === 8'h5D,       "the write data arrived RIGHT-ALIGNED in the frame");
         slave_answer(1, `RESP_OKAY, 0);
-        chk(m_gnt === 2'b00,          "grant released after completion");
+        chk(m_gnt === 4'b0000,          "grant released after completion");
         chk(frames == 1,              "exactly one frame went out");
         chk(frame_len == ADDR_W,      "and it was exactly ADDR_W clocks");
 
@@ -241,36 +241,36 @@ module tb_system_bus;
         $display("-- 5. decode: every range and both boundaries --------");
         // {expected s_sel} for each address
         acquire(0); drive_frame(0, 1'b0, `S0_BASE, 8'h00);
-        chk(s_sel === 3'b001, "0x0000 -> slave 0");
+        chk(s_sel === 4'b0001, "0x0000 -> slave 0");
         slave_answer(0, `RESP_OKAY, 0);
         acquire(0); drive_frame(0, 1'b0, `S0_TOP, 8'h00);
-        chk(s_sel === 3'b001, "0x0FFF -> slave 0");
+        chk(s_sel === 4'b0001, "0x0FFF -> slave 0");
         slave_answer(0, `RESP_OKAY, 0);
         acquire(0); drive_frame(0, 1'b0, `S1_BASE, 8'h00);
-        chk(s_sel === 3'b010, "0x1000 -> slave 1");
+        chk(s_sel === 4'b0010, "0x1000 -> slave 1");
         slave_answer(1, `RESP_OKAY, 0);
         acquire(0); drive_frame(0, 1'b0, `S2_BASE, 8'h00);
-        chk(s_sel === 3'b100, "0x2000 -> slave 2");
+        chk(s_sel === 4'b0100, "0x2000 -> slave 2");
         slave_answer(2, `RESP_OKAY, 0);
         acquire(0); drive_frame(0, 1'b0, `S2_TOP, 8'h00);
-        chk(s_sel === 3'b100, "0x27FF -> slave 2");
+        chk(s_sel === 4'b0100, "0x27FF -> slave 2");
         slave_answer(2, `RESP_OKAY, 0);
 
         //==================================================================
         $display("-- 6. read direction: the slave owns the data wire ---");
         acquire(0);
         drive_frame(0, 1'b0, 16'h2100, 8'h00);
-        chk(s_sel === 3'b100, "slave 2 selected");
+        chk(s_sel === 4'b0100, "slave 2 selected");
         chk(bus_we === 1'b0,  "bus_we low for a read");
         @(posedge clk); #1;                 // sel_q now latched onto slave 2
-        s_dstream = 3'b100; #1;             // slave 2 drives a 1
+        s_dstream = 4'b0100; #1;             // slave 2 drives a 1
         chk(bus_dstream === 1'b1, "the data wire carries the SELECTED SLAVE's bit");
-        s_dstream = 3'b000; #1;
+        s_dstream = 4'b0000; #1;
         chk(bus_dstream === 1'b0, "and follows it down again");
         // a master driving must not disturb a read
-        m_dstream = 2'b01; #1;
+        m_dstream = 4'b0001; #1;
         chk(bus_dstream === 1'b0, "a master cannot disturb the wire during a read");
-        m_dstream = 2'b00;
+        m_dstream = 4'b0000;
 
         //==================================================================
         $display("-- 7. the return select is LATCHED -------------------");
@@ -283,46 +283,46 @@ module tb_system_bus;
             end
         end
         $display("  ok    sel_q held onto slave 2 for 9 cycles with no new pulse");
-        s_dstream = 3'b100;
+        s_dstream = 4'b0100;
         slave_answer(2, `RESP_OKAY, 0);
         chk(bus_resp === `RESP_OKAY, "the late reply still routed back from slave 2");
-        s_dstream = 3'b000;
+        s_dstream = 4'b0000;
 
         //==================================================================
         $display("-- 8. two masters, priority and the split mask -------");
         // Both request on the same clock.
-        @(posedge clk); m_req <= 2'b11;
+        @(posedge clk); m_req <= 4'b0011;
         repeat (3) @(posedge clk); #1;
-        chk(m_gnt === 2'b01, "master 0 wins on a tie");
+        chk(m_gnt === 4'b0001, "master 0 wins on a tie");
         drive_frame(0, 1'b0, 16'h0010, 8'h00);
-        chk(s_sel === 3'b001, "slave 0 selected");
+        chk(s_sel === 4'b0001, "slave 0 selected");
         // slave 0 answers SPLIT: master 0 keeps m_req high
         slave_answer(0, `RESP_SPLIT, 0);
-        chk(split_mask === 2'b01, "mask[0] set by the SPLIT");
-        chk(m_gnt      === 2'b00, "grant dropped on the SPLIT");
+        chk(split_mask === 4'b0001, "mask[0] set by the SPLIT");
+        chk(m_gnt      === 4'b0000, "grant dropped on the SPLIT");
 
         repeat (3) @(posedge clk); #1;
-        chk(m_gnt === 2'b10, "master 1 granted while master 0 is masked");
+        chk(m_gnt === 4'b0010, "master 1 granted while master 0 is masked");
         chk(bus_master_id === 1'b1, "master_id tag = 1");
         drive_frame(1, 1'b1, 16'h2345, 8'hC7);
         chk(rx_addr === 16'h2345, "master 1's address reached the wire");
         chk(rx_wdata === 8'hC7,   "and its write data");
-        chk(s_sel === 3'b100,     "and decoded to slave 2");
+        chk(s_sel === 4'b0100,     "and decoded to slave 2");
         slave_answer(2, `RESP_OKAY, 1);
 
         repeat (3) @(posedge clk); #1;
-        chk(m_gnt === 2'b00, "still no grant - master 0 is masked and master 1 is done");
-        chk(split_mask === 2'b01, "master 0 still masked");
+        chk(m_gnt === 4'b0000, "still no grant - master 0 is masked and master 1 is done");
+        chk(split_mask === 4'b0001, "master 0 still masked");
 
         // the slave finishes: wake master 0
-        @(posedge clk); s_split_complete <= 2'b01;
-        @(posedge clk); s_split_complete <= 2'b00;
+        @(posedge clk); s_split_complete <= 4'b0001;
+        @(posedge clk); s_split_complete <= 4'b0000;
         #1;
-        chk(split_mask === 2'b00, "mask cleared by split_complete[0]");
+        chk(split_mask === 4'b0000, "mask cleared by split_complete[0]");
         repeat (3) @(posedge clk); #1;
-        chk(m_gnt === 2'b01, "master 0 re-granted to replay");
+        chk(m_gnt === 4'b0001, "master 0 re-granted to replay");
         drive_frame(0, 1'b0, 16'h0010, 8'h00);
-        chk(s_sel === 3'b001, "the replayed frame decoded the same way");
+        chk(s_sel === 4'b0001, "the replayed frame decoded the same way");
         slave_answer(0, `RESP_OKAY, 0);
         chk(frames > 0 && bad_len == 0, "every frame so far was ADDR_W clocks");
 
@@ -332,25 +332,34 @@ module tb_system_bus;
         // not carry its own default responder, this would hang forever.
         acquire(0);
         drive_frame(0, 1'b0, 16'h0800, 8'h00);
-        chk(s_sel === 3'b000, "no slave select asserted for the decode hole");
+        chk(s_sel === 4'b0000, "no slave select asserted for the decode hole");
         await_ready;
         chk(bus_ready === 1'b1,       "the bus answered by itself");
         chk(bus_resp  === `RESP_ERROR,"and answered ERROR");
         @(posedge clk); m_req[0] <= 1'b0;
         repeat (2) @(posedge clk); #1;
-        chk(m_gnt === 2'b00, "grant released - the bus recovered");
+        chk(m_gnt === 4'b0000, "grant released - the bus recovered");
+
+        // 0x8000-0xBFFF is the BRIDGE.  It is a decoded target now, so with
+        // nothing attached to the slave ports the bus correctly selects it
+        // and simply gets no answer - which is why the ERROR case below uses
+        // 0xC000, genuinely above the whole map.
+        acquire(1);
+        drive_frame(1, 1'b0, 16'h9003, 8'h00);
+        chk(s_sel === (1 << `SEL_BR), "0x9003 selects the BRIDGE, target 3");
+        @(posedge clk); m_req[1] <= 1'b0; repeat (2) @(posedge clk); #1;
 
         acquire(1);
-        drive_frame(1, 1'b0, 16'h8000, 8'h00);
-        chk(s_sel === 3'b000, "reserved addr[15]=1 window selects no slave");
+        drive_frame(1, 1'b0, 16'hC000, 8'h00);
+        chk(s_sel === 4'b0000, "0xC000 is above the map - selects nothing");
         await_ready;
-        chk(bus_resp === `RESP_ERROR, "reserved window answers ERROR");
+        chk(bus_resp === `RESP_ERROR, "and the bus answers ERROR by itself");
         @(posedge clk); m_req[1] <= 1'b0;
 
         // and the bus still works afterwards
         acquire(0);
         drive_frame(0, 1'b0, 16'h1234, 8'h00);
-        chk(s_sel === 3'b010, "the very next frame decoded normally");
+        chk(s_sel === 4'b0010, "the very next frame decoded normally");
         slave_answer(1, `RESP_OKAY, 0);
 
         $display("======================================================");

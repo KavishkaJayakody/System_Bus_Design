@@ -88,7 +88,7 @@ module slave #(
     parameter WORDS         = 4096,
     parameter RESP_W        = `BUS_RESP_W,
     parameter N_MASTERS     = `BUS_N_MASTERS,
-    parameter ID_W          = 1,
+    parameter ID_W          = `BUS_ID_W,
     parameter SPLIT_CAPABLE = 0,
     parameter SPLIT_LATENCY = 4,
     // Width of the busy counter.  32 bits so any SPLIT_LATENCY an integer

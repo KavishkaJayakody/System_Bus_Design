@@ -34,9 +34,9 @@ module tb_bus_issp_driver;
     localparam ADDR_W = `BUS_ADDR_W;
     localparam DATA_W = `BUS_DATA_W;
     localparam RESP_W = `BUS_RESP_W;
-    localparam NM     = 2;
-    localparam NS     = 3;
-    localparam ID_W   = 1;
+    localparam NM     = `BUS_N_MASTERS;
+    localparam NS     = `BUS_N_SLAVES;
+    localparam ID_W   = `BUS_ID_W;
     localparam SPLIT_LATENCY = 6;
 
     reg clk = 1'b0;
@@ -225,8 +225,8 @@ module tb_bus_issp_driver;
         chk(cmd_valid === 2'b00, "no command issued out of reset");
         chk(PRB[8]  === 1'b0,    "m0 done sticky clear");
         chk(PRB[9]  === 1'b0,    "m0 not busy");
-        chk(PRB[69] === 1'b0,    "collision clear");
-        chk(PRB[91] === 1'b0,    "frame_bad clear");
+        chk(PRB[72] === 1'b0,    "collision clear");
+        chk(PRB[94] === 1'b0,    "frame_bad clear");
         chk(issp_mode   === 1'b0, "issp_mode low until the host sets it");
         chk(s0_split_en === 1'b0, "s0_split_en low until the host sets it");
         @(posedge clk); rst_n = 1'b1;
@@ -299,14 +299,14 @@ module tb_bus_issp_driver;
         //==================================================================
         $display("-- 7. serial framing watchdog ------------------------");
         probe;
-        chk(PRB[90:86] === 5'd16, "frame_len reads 16 - the address frame is right");
-        chk(PRB[91]    === 1'b0,  "frame_bad clear - no frame was ever the wrong length");
+        chk(PRB[93:89] === 5'd16, "frame_len reads 16 - the address frame is right");
+        chk(PRB[94]    === 1'b0,  "frame_bad clear - no frame was ever the wrong length");
 
         //==================================================================
         $display("-- 8. the reassembled address is visible -------------");
         bus_cmd(0, 1'b0, 16'h2345, 8'h00);
         probe;
-        chk(PRB[85:70] === 16'h2345,
+        chk(PRB[88:73] === 16'h2345,
             "bus_addr probe shows the address reassembled off the serial wire");
 
         //==================================================================
@@ -321,7 +321,7 @@ module tb_bus_issp_driver;
         $display("-- 10. collision flag --------------------------------");
         soft_reset;
         probe;
-        chk(PRB[69] === 1'b0, "collision clear after soft_rst");
+        chk(PRB[72] === 1'b0, "collision clear after soft_rst");
         // Fire both from one source write, as bus_cmd_pair does.
         SRC[0*26 +: 26] = {8'h11, 16'h1200, 1'b1, 1'b0};
         SRC[1*26 +: 26] = {8'h22, 16'h2200, 1'b1, 1'b0};
@@ -332,7 +332,7 @@ module tb_bus_issp_driver;
         await_done(0);
         await_done(1);
         probe;
-        chk(PRB[69] === 1'b1, "collision set - both masters were in flight together");
+        chk(PRB[72] === 1'b1, "collision set - both masters were in flight together");
         SRC[0] = 1'b0; SRC[26] = 1'b0; src_flush; @(posedge clk);
         bus_cmd(0, 1'b0, 16'h1200, 8'h00);
         chk(r_rdata === 8'h11, "m0's concurrent write landed");
@@ -347,8 +347,8 @@ module tb_bus_issp_driver;
         soft_reset;
         probe;
         chk(PRB[12] === 1'b0, "error sticky cleared");
-        chk(PRB[69] === 1'b0, "collision cleared");
-        chk(PRB[91] === 1'b0, "frame_bad cleared");
+        chk(PRB[72] === 1'b0, "collision cleared");
+        chk(PRB[94] === 1'b0, "frame_bad cleared");
 
         $display("======================================================");
         if (errors == 0) $display(" tb_bus_issp_driver: PASSED (0 errors)");

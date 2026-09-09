@@ -13,7 +13,7 @@
 // The bridge pins carry REMOTE transactions to a second board: cross them
 // over (each board's rm_tx to the other's rm_rx, plus a COMMON GROUND) and
 // an address with bit 15 set is executed on the far board instead of this
-// one - far address = local address - 0x8000.  See master_uart.v.
+// one - far address = local address - 0x8000.  See bus_bridge.v.
 //
 // This is the same shape as `top_debug' in the parallel System_Bus_Final
 // project, and for the same reason: the debug front-end sits IN FRONT of the
@@ -86,8 +86,9 @@ module top_debug #(
     output wire [7:0] led
 );
 
-    localparam NM     = `BUS_N_MASTERS;
-    localparam NS     = `BUS_N_SLAVES;
+    localparam NM     = `BUS_N_MASTERS;   // bus masters, incl. the bridge
+    localparam NLM    = NM - 1;           // masters with a command port
+    localparam NS     = `BUS_N_SLAVES;    // decoded targets, incl. the bridge
     localparam ID_W   = 1;
     localparam ADDR_W = `BUS_ADDR_W;
     localparam DATA_W = `BUS_DATA_W;
@@ -98,11 +99,11 @@ module top_debug #(
     //======================================================================
     // Command ports, driver -> system.  Parallel: `master' serialises.
     //======================================================================
-    wire [NM-1:0]        cmd_valid, cmd_we, cmd_accept, done, err, mst_busy;
-    wire [NM*ADDR_W-1:0] cmd_addr_flat;
-    wire [NM*DATA_W-1:0] cmd_wdata_flat, rdata_flat;
-    wire [NM*RESP_W-1:0] resp_flat;
-    wire [NM*8-1:0]      split_count_flat;
+    wire [NLM-1:0]        cmd_valid, cmd_we, cmd_accept, done, err, mst_busy;
+    wire [NLM*ADDR_W-1:0] cmd_addr_flat;
+    wire [NLM*DATA_W-1:0] cmd_wdata_flat, rdata_flat;
+    wire [NLM*RESP_W-1:0] resp_flat;
+    wire [NLM*8-1:0]      split_count_flat;
     wire                 split_en;
     wire                 cmd_error, remote_busy, srv_busy;
     wire [7:0]           dbg_rx_last, dbg_rx_count, dbg_tx_count;

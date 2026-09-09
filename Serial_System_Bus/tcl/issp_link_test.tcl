@@ -88,7 +88,7 @@ set dt [expr {[clock milliseconds] - $t0}]
 
 if {!$ok} {
     fail "the master never completed at all - RESP_TIMEOUT did not fire"
-    puts "     That is a fault in master_uart, not in the link."
+    puts "     That is a fault in bus_bridge, not in the link."
     link_status
     script_exit 1
 }

@@ -57,7 +57,7 @@ module arbiter #(
     parameter N_MASTERS = `BUS_N_MASTERS,
     // ID_W must equal ceil(log2(N_MASTERS)).  It is a parameter rather than a
     // $clog2 call to stay inside Verilog-2001.  N_MASTERS=3 => ID_W=2.
-    parameter ID_W      = 1,
+    parameter ID_W      = `BUS_ID_W,
     parameter RESP_W    = `BUS_RESP_W
 ) (
     input  wire                    clk,
@@ -125,9 +125,18 @@ module arbiter #(
             // bit; that combination cannot occur in practice because a slave
             // only pulses split_complete at least one cycle after it issued
             // the SPLIT response that sets the bit.
+            //
+            // The master being deferred is identified by `gnt', the one-hot
+            // grant, NOT by comparing master_id against the loop index.  That
+            // comparison used to read `master_id == i[ID_W-1:0]', which
+            // TRUNCATES the index: with ID_W too small for N_MASTERS, i=2
+            // narrows to 0 and splitting master 0 silently masks master 2 as
+            // well, permanently - it is never granted again and its requests
+            // simply vanish.  gnt is one-hot by construction and cannot
+            // alias, so the mask is now correct for any N_MASTERS/ID_W pair.
             //--------------------------------------------------------------
             for (i = 0; i < N_MASTERS; i = i + 1) begin
-                if (xfer_split && (master_id == i[ID_W-1:0]))
+                if (xfer_split && gnt[i])
                     split_mask[i] <= 1'b1;
                 else if (split_complete[i])
                     split_mask[i] <= 1'b0;

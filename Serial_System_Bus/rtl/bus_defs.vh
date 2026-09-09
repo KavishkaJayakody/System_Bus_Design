@@ -28,8 +28,13 @@
 `define BUS_DATA_W     8      // one bus word.  Serial, so this is also the
                               // number of clocks a data phase costs.
 `define BUS_RESP_W     2      // slave response code, see below
-`define BUS_N_MASTERS  2      // arbiter is parameterised; 3 is the phase-2 size
-`define BUS_N_SLAVES   3      // mapped slaves, excluding the default slave
+// Three requesters: the two local masters, plus the remote bridge's MASTER
+// FACE at index 2.  The bridge is a bus device, not part of a master.
+`define BUS_N_MASTERS  3
+`define BUS_ID_W       2      // ceil(log2(BUS_N_MASTERS))
+// Four decoded targets: three memories and the bridge's SLAVE FACE.  The
+// default responder is separate and always occupies the top select bit.
+`define BUS_N_SLAVES   4
 
 //--------------------------------------------------------------------------
 // Slave response encoding (driven with `ready')
@@ -58,20 +63,21 @@
 //                                 read".  The splitter is the THIRD slave.
 //   default   everything else: 0x0800-0x0FFF, 0x3000-0x7FFF
 //
-// addr[15] == 1'b1 is the REMOTE WINDOW.  It never reaches this decoder:
-// `master_uart' takes those transactions off to the other board over the
-// UART instead, and far address = local address - 0x8000.  Locally the
-// window stays unmapped, so a stray access still answers ERROR rather than
-// hanging.
+// 0x8000-0xBFFF is the REMOTE WINDOW, and it IS decoded - it selects the
+// BRIDGE, which is an ordinary device on this bus (target 3).  A master
+// reaches the other board by addressing it, exactly as it addresses a
+// memory; the bridge answers SPLIT, frees the bus for the whole round trip,
+// and wakes the master when the far board replies.
+//
+// far address = local address - 0x8000, and only addr[13:0] travels.
 //
 //   0x8000-0x87FF -> the far board's slave 0 (2K, id 0)
 //   0x9000-0x9FFF -> the far board's slave 1 (4K, id 1)
 //   0xA000-0xAFFF -> the far board's slave 2 (4K, id 2)
 //
-// ONLY addr[13:0] TRAVELS.  The link command carries 14 address bits, so the
-// usable remote window is 0x8000-0xBFFF; addr[14] is dropped, and 0xC000 and
-// above ALIAS back onto it (0xC000 reads as 0x8000).  Nothing rejects an
-// address up there - keep remote accesses inside 0x8000-0xBFFF.
+// The window is exactly 16K, which is the 14 address bits the link carries -
+// so nothing is silently truncated.  0xC000-0xFFFF is OUTSIDE it and answers
+// ERROR from the default responder like any other decode hole.
 //--------------------------------------------------------------------------
 `define S0_BASE       16'h0000
 `define S0_TOP        16'h07FF
@@ -89,6 +95,16 @@
 `define S2_LADDR_W    12
 
 //--------------------------------------------------------------------------
+// Target 3: the REMOTE BRIDGE's slave face.  Not a memory - a window onto
+// the other board.  16K at 0x8000, so its prefix is just addr[15:14]==2'b10
+// and the 14 offset bits it collects are precisely the 14 the link carries.
+//--------------------------------------------------------------------------
+`define S3_BASE       16'h8000
+`define S3_TOP        16'hBFFF
+`define S3_WORDS      16384
+`define S3_LADDR_W    14
+
+//--------------------------------------------------------------------------
 // Remote window, per the link spec.  Local address - REMOTE_BASE = the far
 // board's own address, and the low 14 bits of that are what travels on the
 // wire as {dev[1:0], offset[11:0]}.
@@ -99,11 +115,12 @@
 `define LINK_REQ_TAG  8'hA5
 `define LINK_RESP_TAG 8'h5A
 
-// Slave index positions inside the one-hot select vector.  The default slave
-// always occupies the top bit, so a vector is {def, s2, s1, s0}.
+// Target positions inside the one-hot select vector.  The default responder
+// always occupies the top bit, so a vector is {def, bridge, s2, s1, s0}.
 `define SEL_S0        0
 `define SEL_S1        1
 `define SEL_S2        2
-`define SEL_DEF       3
+`define SEL_BR        3
+`define SEL_DEF       4
 
 `endif // BUS_DEFS_VH

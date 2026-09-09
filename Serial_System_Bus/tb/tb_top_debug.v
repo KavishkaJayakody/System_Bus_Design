@@ -139,7 +139,7 @@ module tb_top_debug;
         probe;
         chk(PRB[9]  === 1'b0, "master 0 not busy out of reset");
         chk(PRB[39] === 1'b0, "master 1 not busy out of reset");
-        chk(PRB[61:60] === 2'b00, "nobody holds the grant out of reset");
+        chk(PRB[62:60] === 3'b000, "nobody holds the grant out of reset");
 
         rst_n = 1'b1;
         repeat (4) @(posedge clk); #1;
@@ -227,8 +227,8 @@ module tb_top_debug;
         chk(r_rdata === 8'h3C,  "master 1 round-tripped through the same map");
 
         probe;
-        chk(PRB[90:86] === 5'd16, "frame_len reads 16 on the real top level");
-        chk(PRB[91]    === 1'b0,  "frame_bad clear - every frame was full length");
+        chk(PRB[93:89] === 5'd16, "frame_len reads 16 on the real top level");
+        chk(PRB[94]    === 1'b0,  "frame_bad clear - every frame was full length");
 
         $display("======================================================");
         if (errors == 0) $display(" tb_top_debug: PASSED (0 errors)");

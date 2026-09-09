@@ -57,8 +57,8 @@ if {!$ok} { fail "M1 read from 0x2345 never completed (lat=$lat)" } \
 pause
 puts "\n\[TEST 3\] Serial framing: the address frame must be exactly 16 clocks..."
 set p [probe]
-set fl [bits $p 90 86]
-set fb [bits $p 91 91]
+set fl [bits $p 93 89]
+set fb [bits $p 94 94]
 if {$fb} {
     fail "frame_bad is SET - some address frame was not 16 clocks (last was $fl)"
 } elseif {$fl != $ADDR_W} {

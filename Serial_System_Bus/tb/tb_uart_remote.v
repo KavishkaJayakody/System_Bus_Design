@@ -49,9 +49,12 @@
 
 module tb_uart_remote;
 
-    localparam NM     = `BUS_N_MASTERS;
+    localparam NM     = `BUS_N_MASTERS;   // bus masters, incl. each bridge
+    // COMMAND ports, one per LOCAL master.  The bridge is bus master NM-1 and
+    // has no command port - it is driven by the other board.
+    localparam NLM    = NM - 1;
     localparam NS     = `BUS_N_SLAVES;
-    localparam ID_W   = 1;
+    localparam ID_W   = `BUS_ID_W;
     localparam ADDR_W = `BUS_ADDR_W;
     localparam DATA_W = `BUS_DATA_W;
     localparam RESP_W = `BUS_RESP_W;
@@ -70,22 +73,22 @@ module tb_uart_remote;
     //======================================================================
     // Two boards.  Only master 0 of each is driven; master 1 stays idle.
     //======================================================================
-    reg  [NM-1:0]        a_valid, a_we;
-    reg  [NM*ADDR_W-1:0] a_addr;
-    reg  [NM*DATA_W-1:0] a_wdata;
-    wire [NM-1:0]        a_accept, a_done, a_err, a_busy;
-    wire [NM*DATA_W-1:0] a_rdata;
-    wire [NM*RESP_W-1:0] a_resp;
-    wire [NM*8-1:0]      a_splits;
+    reg  [NLM-1:0]        a_valid, a_we;
+    reg  [NLM*ADDR_W-1:0] a_addr;
+    reg  [NLM*DATA_W-1:0] a_wdata;
+    wire [NLM-1:0]        a_accept, a_done, a_err, a_busy;
+    wire [NLM*DATA_W-1:0] a_rdata;
+    wire [NLM*RESP_W-1:0] a_resp;
+    wire [NLM*8-1:0]      a_splits;
     wire                 a_cmd_error, a_tx, a_rembusy, a_srvbusy;
 
-    reg  [NM-1:0]        b_valid, b_we;
-    reg  [NM*ADDR_W-1:0] b_addr;
-    reg  [NM*DATA_W-1:0] b_wdata;
-    wire [NM-1:0]        b_accept, b_done, b_err, b_busy;
-    wire [NM*DATA_W-1:0] b_rdata;
-    wire [NM*RESP_W-1:0] b_resp;
-    wire [NM*8-1:0]      b_splits;
+    reg  [NLM-1:0]        b_valid, b_we;
+    reg  [NLM*ADDR_W-1:0] b_addr;
+    reg  [NLM*DATA_W-1:0] b_wdata;
+    wire [NLM-1:0]        b_accept, b_done, b_err, b_busy;
+    wire [NLM*DATA_W-1:0] b_rdata;
+    wire [NLM*RESP_W-1:0] b_resp;
+    wire [NLM*8-1:0]      b_splits;
     wire                 b_cmd_error, b_tx, b_rembusy, b_srvbusy;
 
     // The cable.  An idle UART line sits HIGH, so an unplugged input is 1.
@@ -163,6 +166,40 @@ module tb_uart_remote;
     // uses.  Dropping valid before the core samples it loses the command.
     localparam TMO_CLK = 200000;
 
+    // Per-master completion flag, so a test can assert that a transaction
+    // finished rather than silently absorbing a hang.
+    reg [NLM-1:0] timed_out;
+
+    // Board A, ANY local master.  `a_cmd' below is this with m = 0, kept
+    // because most tests only ever drive master 0.
+    task automatic a_cmd_m;
+        input integer        m;
+        input                we_i;
+        input [ADDR_W-1:0]   ad;
+        input [DATA_W-1:0]   d;
+        integer              n;
+        begin
+            @(posedge clk);
+            a_valid[m]              <= 1'b1;
+            a_we[m]                 <= we_i;
+            a_addr [m*ADDR_W +: ADDR_W] <= ad;
+            a_wdata[m*DATA_W +: DATA_W] <= d;
+
+            n = 0;
+            @(posedge clk);
+            while (!a_accept[m] && n < TMO_CLK) begin @(posedge clk); n = n + 1; end
+            a_valid[m] <= 1'b0;
+
+            while (!a_done[m] && n < TMO_CLK) begin @(posedge clk); n = n + 1; end
+            timed_out[m] = (n >= TMO_CLK);
+            if (timed_out[m]) begin
+                $display("  ERROR board A master %0d: 0x%04h TIMED OUT", m, ad);
+                errors = errors + 1;
+            end
+            #1;
+        end
+    endtask
+
     task automatic a_cmd;
         input                we_i;
         input [ADDR_W-1:0]   ad;
@@ -222,10 +259,11 @@ module tb_uart_remote;
         $display(" tb_uart_remote -- two boards, one crossed UART link");
         $display("======================================================");
 
-        a_valid = {NM{1'b0}}; a_we = {NM{1'b0}};
-        a_addr  = {NM*ADDR_W{1'b0}}; a_wdata = {NM*DATA_W{1'b0}};
-        b_valid = {NM{1'b0}}; b_we = {NM{1'b0}};
-        b_addr  = {NM*ADDR_W{1'b0}}; b_wdata = {NM*DATA_W{1'b0}};
+        timed_out = {NLM{1'b0}};
+        a_valid = {NLM{1'b0}}; a_we = {NLM{1'b0}};
+        a_addr  = {NLM*ADDR_W{1'b0}}; a_wdata = {NLM*DATA_W{1'b0}};
+        b_valid = {NLM{1'b0}}; b_we = {NLM{1'b0}};
+        b_addr  = {NLM*ADDR_W{1'b0}}; b_wdata = {NLM*DATA_W{1'b0}};
 
         repeat (4) @(posedge clk);
         rst_n = 1'b1;
@@ -327,7 +365,13 @@ module tb_uart_remote;
         $display("-- 9. the local bus survived the dead link -----------");
         a_cmd(1'b0, 16'h1ABC, 8'h00);
         chk(a_rdata[0 +: DATA_W] === 8'h11, "A's local read still works");
-        chk(!a_cmd_error,                   "and carries no error");
+        chk(!a_err[0],                      "and the local transfer itself is clean");
+        // br_error belongs to the BRIDGE now, not to master 0's command
+        // stream: it says "the last thing that went over the wire failed"
+        // and stays true until another remote transaction is attempted.  A
+        // local read is unrelated to the link and no longer clears it - which
+        // is the more useful reading, and why the check above moved to err[0].
+        chk(a_cmd_error,                    "br_error still reports the dead link");
         a_cmd(1'b1, 16'h1DEF, 8'h3C);
         a_cmd(1'b0, 16'h1DEF, 8'h00);
         chk(a_rdata[0 +: DATA_W] === 8'h3C, "and a fresh local write/read round-trips");
@@ -479,17 +523,66 @@ module tb_uart_remote;
         chk(a_rdata[0 +: DATA_W] === 8'h00, "and returned 0x00 from B, not A's 0xFF");
 
         //==================================================================
-        $display("-- 17. only addr[13:0] travels -----------------------");
-        // The link command carries 14 address bits, so addr[14] is dropped
-        // and 0xC000 aliases onto 0x8000.  That is a documented limit of the
-        // agreed wire format, not a defect - but it is pinned here so it
-        // cannot change silently.
+        $display("-- 17. the bridge window is exactly the 14 bits it carries");
+        // The link command carries 14 address bits and the bridge window is
+        // exactly 16K, so every address the window accepts travels intact.
+        // 0xC000 and above are OUTSIDE the window and are a decode hole -
+        // they no longer alias onto 0x8000, which they did while the remote
+        // window was intercepted in the master rather than decoded.
         b_cmd(1'b1, 16'h0055, 8'h3B);
         a_cmd(1'b0, 16'h8055, 8'h00);
         chk(a_rdata[0 +: DATA_W] === 8'h3B, "0x8055 reads B's 0x0055");
+        a_cmd(1'b0, 16'hBFFF, 8'h00);
+        chk(!a_cmd_error,                   "0xBFFF is the top of the window and still works");
         a_cmd(1'b0, 16'hC055, 8'h00);
-        chk(a_rdata[0 +: DATA_W] === 8'h3B,
-            "0xC055 ALIASES onto it - addr[14] does not travel (documented)");
+        chk(a_resp[0 +: RESP_W] === `RESP_ERROR,
+            "0xC055 is ABOVE the window - a decode hole, no longer an alias");
+
+        //==================================================================
+        // The point of taking the UART out of master 0 and putting it on the
+        // bus as a device: the far board is reachable from ANY master, not
+        // just the one that happened to own the wire.  This is impossible in
+        // the bus_bridge design and is the reason for the refactor.
+        $display("-- 18. EITHER master can reach the far board ---------");
+        b_cmd(1'b1, 16'h1C00, 8'h91);
+        a_cmd_m(0, 1'b0, 16'h9C00, 8'h00);
+        chk(!a_cmd_error,                   "master 0 read the far board");
+        chk(a_rdata[0*DATA_W +: DATA_W] === 8'h91, "and got the right byte");
+
+        a_cmd_m(1, 1'b0, 16'h9C00, 8'h00);
+        chk(a_rdata[1*DATA_W +: DATA_W] === 8'h91,
+            "MASTER 1 read the far board too - it has no UART of its own");
+
+        // and a remote WRITE from master 1
+        a_cmd_m(1, 1'b1, 16'h9C01, 8'h92);
+        repeat (600) @(posedge clk);
+        b_cmd(1'b0, 16'h1C01, 8'h00);
+        chk(b_rdata[0 +: DATA_W] === 8'h92, "master 1's remote WRITE landed on B");
+
+        //==================================================================
+        $display("-- 19. the bridge is ONE transaction at a time -------");
+        // A second master addressing the bridge while a round trip is in
+        // flight is answered ERROR, not deferred - there is one set of
+        // deferred state and one split_complete to release it with.  It must
+        // COMPLETE, though: the bus never hangs.
+        link_up = 1'b0;                     // make the round trip take the
+        @(posedge clk); #1;                 // full timeout, so it stays busy
+        fork
+            a_cmd_m(0, 1'b0, 16'h9C00, 8'h00);
+            begin
+                repeat (40) @(posedge clk);
+                a_cmd_m(1, 1'b0, 16'h9C00, 8'h00);
+            end
+        join
+        chk(!timed_out[0] && !timed_out[1],
+            "both masters completed - a busy bridge never hangs the bus");
+        chk(a_resp[1*RESP_W +: RESP_W] === `RESP_ERROR,
+            "the second master was answered ERROR while the bridge was busy");
+        link_up = 1'b1;
+        @(posedge clk); #1;
+        a_cmd_m(0, 1'b0, 16'h9C00, 8'h00);
+        chk(a_rdata[0*DATA_W +: DATA_W] === 8'h91,
+            "and the bridge is usable again straight afterwards");
 
         $display("======================================================");
         if (errors == 0) $display(" tb_uart_remote: PASSED (0 errors)");

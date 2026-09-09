@@ -22,27 +22,31 @@
 #    [54] split_en                                    remote timeout, M0 only)
 #    [55] spare       (remote is      m0 = prb[29:0]  m1 = prb[59:30]
 #         chosen by the ADDRESS,
-#         not a command bit)            [61:60]  gnt
-#                                        [63:62]  split_mask
-#                                        [67:64]  sel_q {def,s2,s1,s0}
-#                                        [68]     split_busy
-#                                        [69]     collision (sticky)
-#                                        [85:70]  bus_addr  (reassembled)
-#                                        [90:86]  frame_len (must be 16)
-#                                        [91]     frame_bad (sticky)
-#                                        [92]     remote_busy
-#                                        [93]     srv_busy
-#                                        [94]     rx_active (line not idle)
-#                                        [95]     req_overrun (sticky: an
+#         not a command bit)            [62:60]  gnt  (m0,m1,BRIDGE)
+#                                        [65:63]  split_mask
+#                                        [70:66]  sel_q {def,BR,s2,s1,s0}
+#                                        [71]     split_busy
+#                                        [72]     collision (sticky)
+#                                        [88:73]  bus_addr  (reassembled)
+#                                        [93:89]  frame_len (must be 16)
+#                                        [94]     frame_bad (sticky)
+#                                        [95]     remote_busy
+#                                        [96]     srv_busy
+#                                        [97]     rx_active (line not idle)
+#                                        [98]     req_overrun (sticky: an
 #                                                 incoming REQUEST was thrown
 #                                                 away - no flow control)
+#
+#  THE BRIDGE is a device on the bus, not part of a master: bus master 2 on
+#  the grant, and decoded target 3 at 0x8000-0xBFFF on sel_q.
+#
 #  LINK DIAGNOSTICS (probe is 128 bits)
-#    [103:96]  rx_last     last byte framed
-#    [111:104] rx_count    bytes received (wraps)
-#    [119:112] tx_count    bytes sent (wraps)
-#    [121:120] rx_state    0=hunting 1=in REQ 2=in RESP
-#    [122]     req_seen    sticky: parsed a whole REQUEST
-#    [123]     resp_seen   sticky: parsed a whole RESPONSE
+#    [106:99]  rx_last     last byte framed
+#    [114:107] rx_count    bytes received (wraps)
+#    [122:115] tx_count    bytes sent (wraps)
+#    [124:123] rx_state    0=hunting 1=in REQ 2=in RESP
+#    [125]     req_seen    sticky: parsed a whole REQUEST
+#    [126]     resp_seen   sticky: parsed a whole RESPONSE
 # ===========================================================================
 
 set SRC        0      ;# shadow copy of the 56-bit source register
@@ -95,16 +99,16 @@ proc probe {} {
 # arriving that we cannot parse", which are completely different faults.
 proc link_status {} {
     set p [probe]
-    set rxc  [bits $p 111 104]
-    set txc  [bits $p 119 112]
-    set last [bits $p 103 96]
-    set st   [bits $p 121 120]
-    set reqs [bits $p 122 122]
-    set rsps [bits $p 123 123]
-    set act  [bits $p 94 94]
-    set ovr  [bits $p 95 95]
-    set rb   [bits $p 92 92]
-    set sb   [bits $p 93 93]
+    set rxc  [bits $p 114 107]
+    set txc  [bits $p 122 115]
+    set last [bits $p 106 99]
+    set st   [bits $p 124 123]
+    set reqs [bits $p 125 125]
+    set rsps [bits $p 126 126]
+    set act  [bits $p 97 97]
+    set ovr  [bits $p 98 98]
+    set rb   [bits $p 95 95]
+    set sb   [bits $p 96 96]
     set names {"hunting for a tag" "collecting a REQUEST" "collecting a RESPONSE" "?"}
 
     puts ""
@@ -259,12 +263,13 @@ proc resp_name {r} {
 
 proc sel_name {s} {
     switch -- $s {
-        1 { return "slave 0" }
-        2 { return "slave 1" }
-        4 { return "slave 2" }
-        8 { return "default" }
-        0 { return "none"    }
-        default { return [format "0b%04b??" $s] }
+        1  { return "slave 0" }
+        2  { return "slave 1" }
+        4  { return "slave 2" }
+        8  { return "BRIDGE"  }
+        16 { return "default" }
+        0  { return "none"    }
+        default { return [format "0b%05b??" $s] }
     }
 }
 
@@ -274,18 +279,18 @@ proc bus_status {} {
     global ADDR_W
     set p [probe]
     puts ""
-    puts [format "  grant        %02b        split mask  %02b" \
-              [bits $p 61 60] [bits $p 63 62]]
-    puts [format "  responder    %s   (sel_q %04b)" \
-              [sel_name [bits $p 67 64]] [bits $p 67 64]]
+    puts [format "  grant        %03b       split mask  %03b   (bit 2 = the bridge)" \
+              [bits $p 62 60] [bits $p 65 63]]
+    puts [format "  responder    %s   (sel_q %05b)" \
+              [sel_name [bits $p 70 66]] [bits $p 70 66]]
     puts [format "  split slave  %s" \
-              [expr {[bits $p 68 68] ? "BUSY - a split is in flight" : "idle"}]]
+              [expr {[bits $p 71 71] ? "BUSY - a split is in flight" : "idle"}]]
     puts [format "  collision    %d         (sticky: both masters in flight at once)" \
-              [bits $p 69 69]]
+              [bits $p 72 72]]
     puts [format "  last address 0x%04X    reassembled off the serial wire" \
-              [bits $p 85 70]]
-    set fl [bits $p 90 86]
-    set fb [bits $p 91 91]
+              [bits $p 88 73]]
+    set fl [bits $p 93 89]
+    set fb [bits $p 94 94]
     if {$fb} {
         puts [format "  frame length %d clocks  ** frame_bad SET - some frame was not %d **" \
                   $fl $ADDR_W]
@@ -294,8 +299,8 @@ proc bus_status {} {
                   $fl $ADDR_W]
     }
     puts [format "  uart link    %s%s" \
-              [expr {[bits $p 92 92] ? "remote transaction OUTSTANDING" : "idle"}] \
-              [expr {[bits $p 93 93] ? ", SERVING the other board" : ""}]]
+              [expr {[bits $p 95 95] ? "remote transaction OUTSTANDING" : "idle"}] \
+              [expr {[bits $p 96 96] ? ", SERVING the other board" : ""}]]
     puts ""
     puts [format "  m0  rdata 0x%02X  resp %-5s  lat %3d  err %d  splits %d  cmd_error %d" \
               [bits $p 7 0] [resp_name [bits $p 11 10]] [bits $p 20 13] \

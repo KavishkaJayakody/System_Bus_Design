@@ -48,29 +48,29 @@
 //                               Master 0 only; prb[59] reads 0 always.
 //   so  m0 = prb[29:0]   m1 = prb[59:30]
 //
-//     prb[61:60]  gnt         one-hot grant
-//     prb[63:62]  split_mask  a lit bit = that master is split-deferred
-//     prb[67:64]  sel_q       latched responder {default, s2, s1, s0}
-//     prb[68]     split_busy  the split slave has one in flight
-//     prb[69]     collision   sticky: both masters were in flight at once
-//     prb[85:70]  bus_addr    the address REASSEMBLED off the serial wire
-//     prb[90:86]  frame_len   clocks the last address frame was high
-//     prb[91]     frame_bad   sticky: some frame was not ADDR_W clocks
-//     prb[92]     remote_busy a remote transaction is outstanding
-//     prb[93]     srv_busy    serving the other board's request right now
-//     prb[94]     rx_active   the link's RX line is not idle-high
-//     prb[95]     req_overrun sticky: an incoming REQUEST was overwritten
+//     prb[62:60]  gnt         one-hot grant, 3 masters: m0, m1, BRIDGE
+//     prb[65:63]  split_mask  a lit bit = that master is split-deferred
+//     prb[70:66]  sel_q       latched responder {def, BRIDGE, s2, s1, s0}
+//     prb[71]     split_busy  the split memory has one in flight
+//     prb[72]     collision   sticky: both masters were in flight at once
+//     prb[88:73]  bus_addr    the address REASSEMBLED off the serial wire
+//     prb[93:89]  frame_len   clocks the last address frame was high
+//     prb[94]     frame_bad   sticky: some frame was not ADDR_W clocks
+//     prb[95]     remote_busy a remote round trip is outstanding
+//     prb[96]     srv_busy    serving the other board's request right now
+//     prb[97]     rx_active   the link's RX line is not idle-high
+//     prb[98]     req_overrun sticky: an incoming REQUEST was overwritten
 //                             before the server could run it - the far board
 //                             sent faster than this side drained
 //
 //   LINK DIAGNOSTICS - what you read when the far board says nothing:
-//     prb[103:96]   rx_last     last byte the UART framed
-//     prb[111:104]  rx_count    bytes received since reset (wraps)
-//     prb[119:112]  tx_count    bytes sent since reset (wraps)
-//     prb[121:120]  rx_state    0=hunting for a tag, 1=in REQ, 2=in RESP
-//     prb[122]      req_seen    sticky: a whole REQUEST was parsed
-//     prb[123]      resp_seen   sticky: a whole RESPONSE was parsed
-//     prb[127:124]  spare
+//     prb[106:99]   rx_last     last byte the UART framed
+//     prb[114:107]  rx_count    bytes received since reset (wraps)
+//     prb[122:115]  tx_count    bytes sent since reset (wraps)
+//     prb[124:123]  rx_state    0=hunting for a tag, 1=in REQ, 2=in RESP
+//     prb[125]      req_seen    sticky: a whole REQUEST was parsed
+//     prb[126]      resp_seen   sticky: a whole RESPONSE was parsed
+//     prb[127]      spare
 //
 //   rx_count == 0        nothing is arriving: cable, ground or baud
 //   rx_count > 0 but
@@ -113,9 +113,9 @@ module bus_issp_driver #(
     input  wire [15:0]           split_count_flat,
 
     // ---- bus observability ----------------------------------------------
-    input  wire [1:0]            gnt,
-    input  wire [1:0]            split_mask,
-    input  wire [3:0]            sel_q,
+    input  wire [2:0]            gnt,          // 3 masters: m0, m1, bridge
+    input  wire [2:0]            split_mask,
+    input  wire [4:0]            sel_q,        // {def, bridge, s2, s1, s0}
     input  wire                  split_busy,
     input  wire [ADDR_W-1:0]     bus_addr,
     input  wire                  bus_valid,
@@ -283,25 +283,25 @@ module bus_issp_driver #(
     // Probe assembly.  Keep this in step with the header comment and with
     // tcl/issp_bus_lib.tcl - three places, one bit map.
     //----------------------------------------------------------------------
-    assign prb = { 4'b0,                                   // [127:124] spare
-                   dbg_resp_seen,                          // [123]
-                   dbg_req_seen,                           // [122]
-                   dbg_rx_state,                           // [121:120]
-                   dbg_tx_count,                           // [119:112]
-                   dbg_rx_count,                           // [111:104]
-                   dbg_rx_last,                            // [103:96]
-                   dbg_req_overrun,                        // [95]
-                   dbg_rx_active,                          // [94]
-                   srv_busy,                               // [93]
-                   remote_busy,                            // [92]
-                   frame_bad,                              // [91]
-                   frame_len,                              // [90:86]
-                   bus_addr,                               // [85:70]
-                   collision,                              // [69]
-                   split_busy,                             // [68]
-                   sel_q,                                  // [67:64]
-                   split_mask,                             // [63:62]
-                   gnt,                                    // [61:60]
+    assign prb = { 1'b0,                                   // [127] spare
+                   dbg_resp_seen,                          // [126]
+                   dbg_req_seen,                           // [125]
+                   dbg_rx_state,                           // [124:123]
+                   dbg_tx_count,                           // [122:115]
+                   dbg_rx_count,                           // [114:107]
+                   dbg_rx_last,                            // [106:99]
+                   dbg_req_overrun,                        // [98]
+                   dbg_rx_active,                          // [97]
+                   srv_busy,                               // [96]
+                   remote_busy,                            // [95]
+                   frame_bad,                              // [94]
+                   frame_len,                              // [93:89]
+                   bus_addr,                               // [88:73]
+                   collision,                              // [72]
+                   split_busy,                             // [71]
+                   sel_q,                                  // [70:66]
+                   split_mask,                             // [65:63]
+                   gnt,                                    // [62:60]
                    1'b0, split_count_flat[15:8],           // [59:51] m1
                    lat[1], err_s[1], rp[1], busy[1], done_s[1], rl[1],
                    rem_err_s, split_count_flat[7:0],       // [29:21] m0

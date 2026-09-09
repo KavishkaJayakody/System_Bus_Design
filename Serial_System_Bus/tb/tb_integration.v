@@ -40,7 +40,7 @@ module tb_integration;
     localparam ADDR_W = `BUS_ADDR_W;
     localparam DATA_W = `BUS_DATA_W;
     localparam RESP_W = `BUS_RESP_W;
-    localparam ID_W   = 1;
+    localparam ID_W   = `BUS_ID_W;
     localparam SPLAT  = 6;           // split slave (slave 2) latency, cycles
     // A serial transaction is ~21 clocks for a write and ~29 for a read,
     // so the per-transaction budget has to be far larger than it was on
@@ -399,11 +399,11 @@ module tb_integration;
         m_run(0, 1'b1, 16'h0FFF, 8'hDD);
         chk(mresp(0) === `RESP_ERROR, "an unmapped WRITE also answers ERROR");
 
-        // The remote window, seen from master 1.  Master 1 is a plain
-        // `master' with no UART, so addr[15]=1 reaches the local decoder and
-        // is simply unmapped - only master 0 takes that window off-board.
-        m_run(1, 1'b0, 16'h8000, {DATA_W{1'b0}});
-        chk(!timed_out[1],            "addr[15]=1 completed on the local-only master");
+        // 0x8000-0xBFFF is the BRIDGE now, not a hole - either master can
+        // address it and it answers SPLIT, so it is NOT tested here.  What is
+        // still a hole is everything ABOVE the bridge window.
+        m_run(1, 1'b0, 16'hC000, {DATA_W{1'b0}});
+        chk(!timed_out[1],            "0xC000, above the bridge window, completed");
         chk(mresp(1) === `RESP_ERROR, "and answers ERROR - nothing up there is mapped");
         m_run(1, 1'b0, 16'hFFFF, {DATA_W{1'b0}});
         chk(mresp(1) === `RESP_ERROR, "top of memory answers ERROR");

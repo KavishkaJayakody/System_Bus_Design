@@ -12,14 +12,14 @@ Three kinds of module speak this protocol, and the split is strict:
 |---|---|
 | `system_bus` | the bus: arbiter, decoder, `bus_mux`, the central address deserialiser, the default responder. No master, no memory. |
 | `master` | drives a frame, absorbs a split, reassembles read data. No arbitration, no decoding. |
-| `master_uart` | `master` plus a UART client and server, for transactions run on ANOTHER board (`addr[15] == 1`). It wraps the core; it does not change this protocol. See §15 and §17 of [design_notes.md](design_notes.md). |
+| `bus_bridge` | `master` plus a UART client and server, for transactions run on ANOTHER board (`addr[15] == 1`). It wraps the core; it does not change this protocol. See §15 and §17 of [design_notes.md](design_notes.md). |
 | `slave` | shifts every frame in, acts only on `sel`. No arbitration, no decoding. |
 
 `bus_top` composes the three into a complete system and holds no logic
 itself; `top_debug` and both integration testbenches instantiate it. Everything
 below describes the two interfaces between the three modules above.
 
-## The shared bus is 8 wires
+## The shared bus is 9 wires
 
 | Wire | Width | Direction | Meaning |
 |---|---|---|---|
@@ -83,7 +83,7 @@ sel[i]       ____________________|‾‾‾‾‾|__________     one-hot, 1 clk
 
 `addr_done` is simply the falling edge of `bus_valid`, derived inside
 `system_bus`. Deriving it instead of adding an "end of frame" wire keeps the
-shared bus at eight wires and keeps the frame length defined in exactly one
+shared bus narrow and keeps the frame length defined in exactly one
 place — the master's counter.
 
 **`addr_decoder` is serial too.** It watches the address arrive bit by bit on
@@ -133,7 +133,7 @@ with *no* select and checks that no slave answers and no memory changes.
 | unmapped | S+1 | the default slave answers immediately |
 
 A transaction with `addr[15] == 1` never reaches this table at all:
-`master_uart` sends it to the other board over the UART instead. See
+`bus_bridge` sends it to the other board over the UART instead. See
 [address_map.md](address_map.md).
 
 (S = the cycle `sel` pulses.)

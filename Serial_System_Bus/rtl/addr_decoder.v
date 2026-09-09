@@ -8,10 +8,13 @@
 // ever assembled: the decoder is a progressive prefix matcher, not a
 // comparator behind a deserialiser.
 //
-// Any address outside the three mapped ranges - including the 0x0800-0x0FFF
-// hole above slave 0 - selects the default slave, which answers ERROR.
-// addr[15]==1 never reaches here at all: master_uart takes those to the
-// other board, so the decoder still sees the window as unmapped.
+// Any address outside the four mapped ranges - including the 0x0800-0x0FFF
+// hole above slave 0 and everything from 0xC000 up - selects the default
+// slave, which answers ERROR.
+//
+// The fourth target is the REMOTE BRIDGE at 0x8000-0xBFFF.  It is decoded
+// exactly like a memory; what sits behind it is the other board rather than
+// an array, which the decoder neither knows nor cares about.
 //
 // Exactly one of {def_sel, slv_sel} is high whenever `en' is high, so the bus
 // can never be left without a responder and can never hang on a bad address.
@@ -59,6 +62,7 @@
 //   slave 0   base 0x0000, 11 offset bits -> prefix 00000 (5 bits)
 //   slave 1   base 0x1000, 12 offset bits -> prefix 0001  (4 bits)
 //   slave 2   base 0x2000, 12 offset bits -> prefix 0010  (4 bits)
+//   bridge    base 0x8000, 14 offset bits -> prefix 10    (2 bits)
 //
 // PFX_W is the longest of those prefixes; shorter ones simply have
 // don't-care bits at the bottom, which is what CARE encodes.
@@ -99,26 +103,31 @@ module addr_decoder #(
     //----------------------------------------------------------------------
     // Prefix lengths, derived from the slave sizes in bus_defs.vh.
     //----------------------------------------------------------------------
-    localparam S0_PLEN = ADDR_W - `S0_LADDR_W;      // 5  (2K slave)
-    localparam S1_PLEN = ADDR_W - `S1_LADDR_W;      // 4  (4K slave)
-    localparam S2_PLEN = ADDR_W - `S2_LADDR_W;      // 4  (4K slave)
+    localparam S0_PLEN = ADDR_W - `S0_LADDR_W;      // 5  (2K memory)
+    localparam S1_PLEN = ADDR_W - `S1_LADDR_W;      // 4  (4K memory)
+    localparam S2_PLEN = ADDR_W - `S2_LADDR_W;      // 4  (4K memory)
+    localparam S3_PLEN = ADDR_W - `S3_LADDR_W;      // 2  (16K remote bridge)
 
     localparam MAX01   = (S0_PLEN > S1_PLEN) ? S0_PLEN : S1_PLEN;
-    localparam PFX_W   = (MAX01   > S2_PLEN) ? MAX01   : S2_PLEN;   // 5
+    localparam MAX012  = (MAX01   > S2_PLEN) ? MAX01   : S2_PLEN;
+    localparam PFX_W   = (MAX012  > S3_PLEN) ? MAX012  : S3_PLEN;   // 5
 
-    // The expected prefix: the top PFX_W bits of the slave's base address.
+    // The expected prefix: the top PFX_W bits of the target's base address.
     localparam [PFX_W-1:0] PFX0 = `S0_BASE >> (ADDR_W - PFX_W);
     localparam [PFX_W-1:0] PFX1 = `S1_BASE >> (ADDR_W - PFX_W);
     localparam [PFX_W-1:0] PFX2 = `S2_BASE >> (ADDR_W - PFX_W);
+    localparam [PFX_W-1:0] PFX3 = `S3_BASE >> (ADDR_W - PFX_W);
 
     // Which of those bits actually matter: the top PLEN of them.  A 4-bit
-    // prefix inside a 5-bit field leaves the bottom bit don't-care.
+    // prefix inside a 5-bit field leaves the bottom bit don't-care; the
+    // bridge's is only 2 bits, so it leaves the bottom three.
     localparam [PFX_W-1:0] CARE0 = ((1 << S0_PLEN) - 1) << (PFX_W - S0_PLEN);
     localparam [PFX_W-1:0] CARE1 = ((1 << S1_PLEN) - 1) << (PFX_W - S1_PLEN);
     localparam [PFX_W-1:0] CARE2 = ((1 << S2_PLEN) - 1) << (PFX_W - S2_PLEN);
+    localparam [PFX_W-1:0] CARE3 = ((1 << S3_PLEN) - 1) << (PFX_W - S3_PLEN);
 
-    localparam [N_SLAVES*PFX_W-1:0] PFX_FLAT  = {PFX2,  PFX1,  PFX0};
-    localparam [N_SLAVES*PFX_W-1:0] CARE_FLAT = {CARE2, CARE1, CARE0};
+    localparam [N_SLAVES*PFX_W-1:0] PFX_FLAT  = {PFX3,  PFX2,  PFX1,  PFX0};
+    localparam [N_SLAVES*PFX_W-1:0] CARE_FLAT = {CARE3, CARE2, CARE1, CARE0};
 
     //----------------------------------------------------------------------
     // Position marker and the per-slave "still matching" bits.
