@@ -86,7 +86,7 @@ module tb_bus_issp_driver;
         .SPLIT_LATENCY(SPLIT_LATENCY)
     ) u_sys (
         .clk              (clk),
-        .rst_n            (rst_n),
+        .rst_n            (rst_n), .rst_m_n(rst_n), .rst_s_n(rst_n),
 
         .cmd_valid        (cmd_valid),
         .cmd_we           (cmd_we),

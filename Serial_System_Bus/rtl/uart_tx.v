@@ -1,20 +1,7 @@
+// 8N1 UART transmitter.  Taken unchanged from System_Bus_Final, where it is
+// hardware-verified; do not rewrite.
+
 `timescale 1ns/1ps
-//==========================================================================
-// uart_tx.v -- 8N1 UART transmitter
-//
-// Taken UNCHANGED from the parallel System_Bus_Final design, where it is
-// hardware-verified board to board.  8N1 is 8N1; nothing about it depends on
-// whether the bus behind it is serial or parallel, so it is copied rather
-// than rewritten.
-//
-// Assert tx_start for one cycle with tx_data valid.  tx_busy stays high until
-// the stop bit has been driven.  CLKS_PER_BIT = f_clk / baud
-// (50 MHz / 115200 = 434).
-//
-// This is the design's ONLY output that is not synchronous to the bus in the
-// obvious sense - the line is still driven from CLOCK_50, one bit every
-// CLKS_PER_BIT clocks, so there is no second clock domain here.
-//==========================================================================
 module uart_tx #(
     parameter CLKS_PER_BIT = 434
 )(

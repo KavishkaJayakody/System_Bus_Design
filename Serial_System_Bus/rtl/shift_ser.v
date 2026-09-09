@@ -1,32 +1,5 @@
-//==========================================================================
-// shift_ser.v
-//
-// Parallel in, serial out.  One of the two primitives the serial bus is
-// built from; instantiated in master.v for the address and write-data
-// streams.
-//
-// MSB first: after `load', dout presents din[W-1], and each cycle of `shift'
-// advances to the next bit down.
-//
-// There is no bit counter and no `done' output, on purpose.  The register
-// shifts ZEROS in behind the data, so once all W bits have been driven the
-// output simply goes quiet at 0 and stays there for as long as the frame
-// runs.  That is what lets a short field (8 bits of write data) sit inside a
-// longer frame (16 clocks of address) without either end counting: the
-// sender pads, the receiver keeps the last W bits.  Frame length is timed
-// once, by the master FSM, and nowhere else.
-//
-//--------------------------------------------------------------------------
-// Port    Dir  Width  Meaning
-//--------------------------------------------------------------------------
-// clk     in   1      Bus clock.
-// rst_n   in   1      Asynchronous active-low reset.
-// load    in   1      Capture din.  Takes priority over shift.  Assert it
-//                     the cycle BEFORE the first bit is wanted on dout.
-// shift   in   1      Advance one bit.
-// din     in   W      Word to send.
-// dout    out  1      Serial output, MSB first, 0 once the word is spent.
-//==========================================================================
+// Parallel in, serial out, MSB first.  Shifts zeros in behind the data, so a
+// short field sits inside a longer frame with no bit counter at either end.
 
 module shift_ser #(
     parameter W = 8

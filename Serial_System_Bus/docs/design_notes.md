@@ -224,9 +224,14 @@ quartus_asm Serial_System_Bus
 > **Superseded.** The table above is the measurement taken at that point in
 > the design's history and is kept as a record. For the CURRENT design — the
 > bridge on the bus, three masters, four decoded targets, ISSP included — the
-> measured figures are **1,651 LEs, 1,297 registers, 81,920 memory bits,
-> 12 pins, Fmax 124.36 MHz**, with worst setup slack 11.959 ns, worst hold
-> slack 0.360 ns, and **zero unconstrained paths**. See §Timing constraints.
+> measured figures are **1,667 LEs, 1,297 registers, 81,920 memory bits,
+> 14 pins, Fmax 115.43 MHz**, with worst setup slack 11.337 ns, worst hold
+> slack 0.366 ns, and **zero unconstrained paths**. See §Timing constraints.
+>
+> The 14 pins and the drop from 124.36 MHz are the three separate reset
+> domains: `rst_n` (KEY[0], bus + bridge), `rst_m_n` (KEY[1], masters) and
+> `rst_s_n` (KEY[2], slaves) are three high-fanout nets where there used to
+> be one. Still 2.3x the 50 MHz requirement.
 
 These are the figures for the bus and the board layer alone. **Every
 bitstream also carries the ISSP debug instance** (§11), which is

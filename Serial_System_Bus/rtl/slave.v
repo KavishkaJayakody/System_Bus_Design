@@ -1,85 +1,7 @@
-//==========================================================================
-// slave.v
-//
-// Word-addressed memory slave on the SERIAL bus.  One module covers all
-// three slaves; WORDS/LADDR_W set the size and SPLIT_CAPABLE adds the split
-// machinery for slave 0.
-//
-// Every slave taps the same two wires and shifts them in unconditionally
-// while `frame' is high - none of them knows yet whether it is the one being
-// addressed, because the decoder cannot decide until the last address bit
-// has arrived.  Selection comes afterwards, as a one-cycle `sel' pulse.
-// Shifting speculatively costs nothing: a slave that was not selected simply
-// never acts on what it collected.
-//
-// Deserialiser widths do all the field extraction for free:
-//   * the address deserialiser is LADDR_W wide, not ADDR_W, so after the
-//     whole frame it holds addr[LADDR_W-1:0] - this slave's offset - with
-//     the upper address bits shifted straight through and discarded
-//   * the write-data deserialiser is DATA_W wide, and the master
-//     right-aligns the data in the frame, so it ends up holding exactly the
-//     data
-// Neither needs a bit counter.
-//
-// TIMING
-//
-//   cycle S     `sel' pulses.  laddr and wdata are already assembled.
-//               write -> the word is committed here
-//               read  -> the memory read starts here
-//   S+1         write: ready + OKAY.  Split: ready + SPLIT.
-//   S+2 .. S+9  read: DATA_W bits shifted out on dstream_out, MSB first
-//   S+10        read: ready + OKAY
-//
-// The read data phase starts at S+2, not S+1, and the extra cycle is
-// deliberate.  `mem_q' has to be a plain register loaded straight from the
-// array so Quartus can absorb it as the M9K output register; making it the
-// shift register instead would force an asynchronous array read and drop the
-// whole memory into LUTs.  So mem_q lands at S+1 and is copied into the
-// output shift register for S+2.
-//
-// SPLIT (SPLIT_CAPABLE=1 only)
-//   While split_en is high a fresh access is answered with SPLIT instead of
-//   being performed: the slave latches the requesting master_id, counts
-//   SPLIT_LATENCY cycles, then pulses split_complete[that id].  The arbiter
-//   unmasks that master, it re-transmits the identical frame, and the second
-//   attempt is recognised (resume_pend with a matching master id) and served
-//   normally.  The deferred transfer is NOT performed - no write lands, no
-//   read happens - so the slave only has to remember WHO it deferred.
-//
-//   Note the split answer costs one cycle while a real read costs ten.  On a
-//   serial bus that asymmetry is the whole point of splitting: the slave gets
-//   out of the way fast and the bus goes to somebody else.
-//
-//   Exactly one split may be outstanding.  An access arriving while the
-//   slave is busy, or while a resume is still owed, is served normally.
-//
-//--------------------------------------------------------------------------
-// Port            Dir  Width      Meaning
-//--------------------------------------------------------------------------
-// clk             in   1          Bus clock.
-// rst_n           in   1          Asynchronous active-low reset.
-// frame           in   1          Address-phase marker (bus_valid).  High for
-//                                 ADDR_W clocks; the deserialisers run while
-//                                 it is high.
-// astream         in   1          Shared serial address wire.
-// dstream_in      in   1          Shared serial data wire, as an input.
-// sel             in   1          One-cycle select from the decoder, the
-//                                 cycle after the frame ends.
-// we              in   1          1 = write.  Held stable for the whole
-//                                 transaction by the granted master.
-// master_id       in   ID_W       Tag of the master owning the bus.  Only
-//                                 used when SPLIT_CAPABLE.
-// split_en        in   1          1 = model the slave as busy.  Tied low on
-//                                 the non-split slaves.
-// dstream_out     out  1          This slave's drive onto the shared data
-//                                 wire.  0 unless it is actually shifting
-//                                 read data out.
-// ready           out  1          Completion strobe, one cycle.
-// resp            out  RESP_W     OKAY or SPLIT, valid with ready.
-// split_complete  out  N_MASTERS  One-cycle pulse on the bit of the master
-//                                 whose deferred transfer may be replayed.
-// busy            out  1          A split is in flight.
-//==========================================================================
+// Word-addressed memory slave.  WORDS/LADDR_W set the size; SPLIT_CAPABLE
+// adds the split machinery.  Every slave shifts every frame in speculatively -
+// the decoder cannot say who is addressed until the prefix has arrived.
+
 `include "bus_defs.vh"
 
 module slave #(
@@ -91,9 +13,7 @@ module slave #(
     parameter ID_W          = `BUS_ID_W,
     parameter SPLIT_CAPABLE = 0,
     parameter SPLIT_LATENCY = 4,
-    // Width of the busy counter.  32 bits so any SPLIT_LATENCY an integer
-    // parameter can express fits without being silently truncated - the
-    // board uses 10,000,000 clocks (~0.2 s) so the mask LED is visible.
+    // 32 bits: a counter narrower than SPLIT_LATENCY truncates silently.
     parameter CNT_W         = 32
 ) (
     input  wire                  clk,
@@ -123,9 +43,6 @@ module slave #(
     endfunction
     localparam BCNT_W = clogb2(DATA_W);
 
-    //----------------------------------------------------------------------
-    // Deserialise the frame.  Runs on every slave, selected or not.
-    //----------------------------------------------------------------------
     wire [LADDR_W-1:0] laddr;
     wire [DATA_W-1:0]  wdata_des;
 
@@ -139,9 +56,6 @@ module slave #(
         .shift(frame), .din(dstream_in), .dout(wdata_des)
     );
 
-    //----------------------------------------------------------------------
-    // Split control.  Generated away entirely on the plain slaves.
-    //----------------------------------------------------------------------
     wire do_split;
 
     generate
@@ -186,9 +100,6 @@ module slave #(
                     end
                 end
 
-                // The replay consumes the outstanding resume.  This cannot
-                // collide with the set above: is_resume requires
-                // resume_pend_r=1, the set only happens when it was 0.
                 if (sel && is_resume)
                     resume_pend_r <= 1'b0;
             end
@@ -206,17 +117,10 @@ module slave #(
     end
     endgenerate
 
-    // An access that is actually performed (not deferred).
     wire serve     = sel && !do_split;
     wire mem_write = serve &&  we;
     wire mem_read  = serve && !we;
 
-    //----------------------------------------------------------------------
-    // Read data phase.
-    //   R_IDLE  nothing going on
-    //   R_MEMQ  one cycle: mem_q holds the word, load the output register
-    //   R_SHIFT DATA_W cycles: drive the wire, MSB first
-    //----------------------------------------------------------------------
     localparam R_IDLE  = 2'd0;
     localparam R_MEMQ  = 2'd1;
     localparam R_SHIFT = 2'd2;
@@ -243,10 +147,6 @@ module slave #(
         end
     end
 
-    //----------------------------------------------------------------------
-    // Handshake.  A write or a split answers in one cycle; a read answers
-    // when the last bit has gone out.
-    //----------------------------------------------------------------------
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             ready <= 1'b0;
@@ -257,20 +157,9 @@ module slave #(
         end
     end
 
-    //----------------------------------------------------------------------
-    // Memory array and its output register.
-    //
-    // DELIBERATE EXCEPTION to the "every sequential block has an async reset"
-    // rule: this block is clock-only.  Giving a 4096-word array an
-    // asynchronous reset stops Quartus inferring M9K block RAM and makes it
-    // build the memory out of LUTs and flip-flops instead, which does not fit
-    // and would not close timing.  The array holds no defined value at
-    // power-up; every test writes a location before reading it.
-    //
-    // Read and write enables are mutually exclusive, so the array is never
-    // read and written in the same cycle - a read-during-write would make
-    // Quartus infer a RAM whose result it documents as undefined.
-    //----------------------------------------------------------------------
+    // DELIBERATE: no reset here.  An async reset on a 4096-word array stops
+    // M9K inference and builds the memory from LUTs instead.  mem_read and
+    // mem_write are mutually exclusive - a read-during-write is undefined.
     reg [DATA_W-1:0] mem [0:WORDS-1];
     reg [DATA_W-1:0] mem_q;
 
@@ -279,10 +168,8 @@ module slave #(
         if (mem_read)  mem_q      <= mem[laddr];
     end
 
-    //----------------------------------------------------------------------
-    // Output shift register.  Separate from mem_q so mem_q can stay a plain
-    // register and be absorbed as the M9K output register - see the header.
-    //----------------------------------------------------------------------
+    // Separate from mem_q so mem_q stays a plain register Quartus can absorb
+    // as the M9K output register.  Merging them forces an async array read.
     reg [DATA_W-1:0] rd_sr;
 
     always @(posedge clk or negedge rst_n) begin
@@ -291,8 +178,6 @@ module slave #(
         else if (rs == R_SHIFT)  rd_sr <= {rd_sr[DATA_W-2:0], 1'b0};
     end
 
-    // Quiet unless actually sending, so the shared wire stays readable in a
-    // waveform and an idle bus does not look like traffic.
     assign dstream_out = (rs == R_SHIFT) ? rd_sr[DATA_W-1] : 1'b0;
 
 endmodule

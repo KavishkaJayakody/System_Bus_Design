@@ -1,19 +1,8 @@
+// 8N1 UART receiver.  Taken unchanged from System_Bus_Final.  Double-flops the
+// input and re-checks the start bit at its midpoint.  Do not rewrite.
+
 `timescale 1ns/1ps
-//==========================================================================
-// uart_rx.v -- 8N1 UART receiver
-//
-// Taken UNCHANGED from the parallel System_Bus_Final design, where it is
-// hardware-verified board to board.
-//
-// rx_valid pulses for one cycle when a byte has been framed.  The input is
-// DOUBLE-FLOPPED first: rx_serial arrives from a pin driven by the other
 // board's oscillator and is asynchronous to this one.  That synchroniser is
-// the only place in the design where an unrelated clock is crossed.
-//
-// The start bit is re-checked at its midpoint, so a glitch on an idle line
-// aborts instead of framing a byte of noise, and a byte is only accepted if
-// its stop bit is high.  CLKS_PER_BIT = f_clk / baud (50 MHz / 115200 = 434).
-//==========================================================================
 module uart_rx #(
     parameter CLKS_PER_BIT = 434
 )(
@@ -65,7 +54,6 @@ module uart_rx #(
                     if (!rx) state <= START;   // falling edge = start bit
                 end
 
-                // Sample the middle of the start bit; a glitch aborts.
                 START: begin
                     if (clk_cnt == (CLKS_PER_BIT-1)/2) begin
                         if (!rx) begin

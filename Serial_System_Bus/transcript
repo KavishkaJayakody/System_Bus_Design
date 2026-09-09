@@ -1,0 +1,862 @@
+# do sim/run_questa.do
+# ** Warning: (vlib-34) Library already exists at "work".
+# rtl
+# tb
+# +incdir+rtl
+### tb_shift_ser
+# vsim -quiet -onfinish stop work.tb_shift_ser 
+# Start time: 15:30:19 on Sep 09,2026
+# ======================================================
+#  tb_shift_ser
+# ======================================================
+# -- 1. reset ------------------------------------------
+#   ok    output low in reset
+#   ok    output still low after reset with nothing loaded
+# -- 2. MSB first --------------------------------------
+#   ok    0xB2 came out MSB first
+#   ok    0x01 came out MSB first
+#   ok    0x80 came out MSB first
+#   ok    0xFF came out MSB first
+# -- 3. zero padding past the end of the word ----------
+#   ok    8 data bits then 8 zeros - the padding works
+# -- 4. load beats a simultaneous shift ----------------
+#   ok    loaded 0xC3, MSB presented despite shift being high
+# -- 5. holds while idle -------------------------------
+#   ok    output unchanged for 5 idle cycles
+# -- 6. reload for a replay ----------------------------
+#   ok    first word sent
+#   ok    the SAME word sent again after a reload
+#   ok    a different word after that
+# ======================================================
+#  tb_shift_ser: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_shift_ser.v(127)
+#    Time: 2010 ns  Iteration: 1  Instance: /tb_shift_ser
+# Break in Module tb_shift_ser at tb/tb_shift_ser.v line 127
+# Stopped at tb/tb_shift_ser.v line 127
+# End time: 15:30:19 on Sep 09,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+### tb_shift_deser
+# vsim -quiet -onfinish stop work.tb_shift_deser 
+# Start time: 15:30:19 on Sep 09,2026
+# ======================================================
+#  tb_shift_deser
+# ======================================================
+# -- 1. reset ------------------------------------------
+#   ok    all widths cleared in reset
+# -- 2. MSB first --------------------------------------
+#   ok    8 bits in -> 0xB2, first bit in the MSB
+# -- 3. a 16-bit address frame into every width --------
+#   ok    16-bit receiver holds the whole address
+#   ok    12-bit receiver holds addr[11:0] - a 4K slave's offset
+#   ok    8-bit receiver holds the last 8 bits
+#   ok    second frame: full address
+#   ok    second frame: low 12 bits
+# -- 4. write data right-aligned in the frame ----------
+#   ok    a DATA_W receiver picks up the right-aligned byte
+#   ok    and a zero byte too
+# -- 5. holds while idle -------------------------------
+#   ok    output unchanged for 5 idle cycles
+# ======================================================
+#  tb_shift_deser: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_shift_deser.v(119)
+#    Time: 1891 ns  Iteration: 0  Instance: /tb_shift_deser
+# Break in Module tb_shift_deser at tb/tb_shift_deser.v line 119
+# Stopped at tb/tb_shift_deser.v line 119
+# End time: 15:30:20 on Sep 09,2026, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+### tb_addr_decoder
+# vsim -quiet -onfinish stop work.tb_addr_decoder 
+# Start time: 15:30:20 on Sep 09,2026
+# ======================================================
+#  tb_addr_decoder -- the SERIAL prefix matcher
+# ======================================================
+# -- 1. reset / idle behaviour (en=0) ------------------
+#   ok    idle s0 base: addr=0x0000 en=0 -> {def,sel}=00000
+#   ok    idle s1 mid: addr=0x1234 en=0 -> {def,sel}=00000
+#   ok    idle s2 mid: addr=0x2100 en=0 -> {def,sel}=00000
+#   ok    idle unmapped: addr=0x0900 en=0 -> {def,sel}=00000
+#   ok    idle top of memory: addr=0xffff en=0 -> {def,sel}=00000
+# -- 2. one-hot select in each range -------------------
+#   ok    s0 mid: addr=0x0400 en=1 -> {def,sel}=00001
+#   ok    s1 mid: addr=0x1800 en=1 -> {def,sel}=00010
+#   ok    s2 mid: addr=0x2800 en=1 -> {def,sel}=00100
+# -- 3. range boundaries -------------------------------
+#   ok    s0 first  0x0000: addr=0x0000 en=1 -> {def,sel}=00001
+#   ok    s0 last   0x0FFF: addr=0x07ff en=1 -> {def,sel}=00001
+#   ok    s1 first  0x1000: addr=0x1000 en=1 -> {def,sel}=00010
+#   ok    s1 last   0x1FFF: addr=0x1fff en=1 -> {def,sel}=00010
+#   ok    s2 first  0x2000: addr=0x2000 en=1 -> {def,sel}=00100
+#   ok    s2 last   0x27FF: addr=0x2fff en=1 -> {def,sel}=00100
+#   ok    s0 top+1 -> the 0x0800 hole: addr=0x0800 en=1 -> {def,sel}=10000
+#   ok    s1 top+1 -> s2: addr=0x2000 en=1 -> {def,sel}=00100
+#   ok    s2 top+1 -> default: addr=0x3000 en=1 -> {def,sel}=10000
+# -- 4. unmapped -> default slave ----------------------
+#   ok    hole first 0x0800: addr=0x0800 en=1 -> {def,sel}=10000
+#   ok    hole last  0x0FFF: addr=0x0fff en=1 -> {def,sel}=10000
+#   ok    above map  0x3000: addr=0x3000 en=1 -> {def,sel}=10000
+#   ok    below the bridge window: addr=0x7fff en=1 -> {def,sel}=10000
+#   ok    above the bridge window: addr=0xc000 en=1 -> {def,sel}=10000
+#   ok    top of memory: addr=0xffff en=1 -> {def,sel}=10000
+# -- 4b. the BRIDGE is decoded, like any other target --
+#   ok    bridge base 0x8000: addr=0x8000 en=1 -> {def,sel}=01000
+#   ok    bridge, far slave 1: addr=0x9003 en=1 -> {def,sel}=01000
+#   ok    bridge, far slave 2: addr=0xa567 en=1 -> {def,sel}=01000
+#   ok    bridge top 0xBFFF: addr=0xbfff en=1 -> {def,sel}=01000
+# -- 5. exhaustive 64K one-hot sweep -------------------
+#   ..    65536 frames, 16 clocks each - this takes a moment
+#   ok    64K sweep complete - one-hot for every address, bridge window included
+# -- 6. the decision is reached early ------------------
+#   ok    settled on slave 1 after 5 of 16 bits
+#   ok    the position marker has retired - no further compares
+#   ok    the offset bits could not change the decode
+#   ..    decoder state is 9 flops (pos 5 + alive 4), not 16
+# ======================================================
+#  tb_addr_decoder: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_addr_decoder.v(266)
+#    Time: 11801550 ns  Iteration: 1  Instance: /tb_addr_decoder
+# Break in Module tb_addr_decoder at tb/tb_addr_decoder.v line 266
+# Stopped at tb/tb_addr_decoder.v line 266
+# End time: 15:30:22 on Sep 09,2026, Elapsed time: 0:00:02
+# Errors: 0, Warnings: 0
+### tb_arbiter
+# vsim -quiet -onfinish stop work.tb_arbiter 
+# Start time: 15:30:22 on Sep 09,2026
+# ======================================================
+#  tb_arbiter
+# ======================================================
+# -- 1. reset behaviour --------------------------------
+#   ok    no grant asserted while in reset
+#   ok    split mask clear in reset
+#   ok    gnt_valid low in reset
+#   ok    no grant asserted after reset release with no req
+# -- 2. single requester -------------------------------
+#   ok    master 0 granted
+#   ok    master_id tag = 0
+#   ok    bus locked for the transfer
+#   ok    grant held across the whole transfer
+#   ok    grant released after completion
+#   ok    lock released after completion
+# -- 3. both requesters, fixed priority ----------------
+#   ok    higher-priority master 0 wins
+#   ok    master 1 kept waiting while master 0 owns the bus
+#   ok    master 1 granted once master 0 drops
+#   ok    master_id tag = 1
+# -- 4. split scenario ---------------------------------
+#   ok    master 0 granted for the transfer that will split
+#   ok    mask[0] set by the SPLIT response
+#   ok    grant dropped on SPLIT
+#   ok    master 1 granted while master 0 is masked
+#   ok    master 0 still masked
+#   ok    masked master 0 never granted, though req is high
+#   ok    no grant at all while the only requester is masked
+#   ok    mask[0] cleared by split_complete[0]
+#   ok    master 0 re-granted to replay the transfer
+#   ok    mask stays clear after the replay
+# -- 5. lower-priority master can also split -----------
+#   ok    master 1 granted
+#   ok    mask[1] set, mask[0] untouched
+#   ok    master 0 runs while master 1 is masked
+#   ok    mask[1] cleared
+#   ok    master 1 re-granted to replay the transfer
+#   ok    bus idle again
+# -- 6. ERROR response ends the transfer ---------------
+#   ok    master 0 granted
+#   ok    ERROR does not set the split mask
+#   ok    grant released after ERROR
+# ======================================================
+#  tb_arbiter: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_arbiter.v(229)
+#    Time: 1531 ns  Iteration: 0  Instance: /tb_arbiter
+# Break in Module tb_arbiter at tb/tb_arbiter.v line 229
+# Stopped at tb/tb_arbiter.v line 229
+# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 0
+### tb_bus_mux
+# vsim -quiet -onfinish stop work.tb_bus_mux 
+# Start time: 15:30:23 on Sep 09,2026
+# ======================================================
+#  tb_bus_mux
+# ======================================================
+# -- 1. reset ------------------------------------------
+#   ok    sel_q cleared in reset
+#   ok    no ready returned in reset
+# -- 2. forward mux follows the grant ------------------
+#   ok    no grant -> bus_valid low
+#   ok    no grant -> address wire driven low
+#   ok    grant m0 -> bus_valid follows m0
+#   ok    grant m0 -> bus_we = m0's write
+#   ok    grant m0 -> address wire = m0's bit (0)
+#   ok    grant m1 -> bus_we = m1's read
+#   ok    grant m1 -> address wire = m1's bit (1)
+#   ok    grant m1 but only m0 asserts valid -> bus_valid low
+# -- 3. the data wire's direction is just bus_we -------
+#   ok    write: bus_we high
+#   ok    write: the data wire carries the MASTER's bit
+#   ok    write: a slave driving cannot disturb it
+#   ok    read: bus_we low
+#   ok    read: the data wire carries the SELECTED SLAVE's bit
+#   ok    read: it follows that slave
+# -- 4. the return select is LATCHED, not delayed ------
+#   ok    captured on the one-cycle pulse
+#   ok    held for 12 cycles with no further pulse
+#   ok    slave 2's late ready is returned
+#   ok    slave 2's response is returned
+# -- 5. a new selection replaces it --------------------
+#   ok    sel_q moved to slave 0
+#   ok    slave 0's SPLIT is returned
+#   ok    the default slave's ERROR is returned
+# -- 6. no reply while nothing is answering ------------
+#   ok    bus_ready low
+# ======================================================
+#  tb_bus_mux: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_bus_mux.v(182)
+#    Time: 531 ns  Iteration: 0  Instance: /tb_bus_mux
+# Break in Module tb_bus_mux at tb/tb_bus_mux.v line 182
+# Stopped at tb/tb_bus_mux.v line 182
+# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+### tb_default_slave
+# vsim -quiet -onfinish stop work.tb_default_slave 
+# Start time: 15:30:23 on Sep 09,2026
+# ======================================================
+#  tb_default_slave
+# ======================================================
+# -- 1. reset behaviour --------------------------------
+#   ok    ready low in reset
+#   ok    ready low after reset release
+# -- 2. unmapped access answers ERROR ------------------
+#   ok    ready one cycle after sel
+#   ok    resp = ERROR
+#   ok    never drives the shared data wire
+# -- 3. ready is one cycle wide ------------------------
+#   ok    ready dropped again
+# -- 4. no response while idle -------------------------
+#   ok    quiet for 6 idle cycles
+# -- 5. back-to-back unmapped accesses -----------------
+#   ok    first access answered
+#   ok    second access answered
+#   ok    quiet afterwards
+# ======================================================
+#  tb_default_slave: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_default_slave.v(108)
+#    Time: 371 ns  Iteration: 0  Instance: /tb_default_slave
+# Break in Module tb_default_slave at tb/tb_default_slave.v line 108
+# Stopped at tb/tb_default_slave.v line 108
+# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+### tb_system_bus
+# vsim -quiet -onfinish stop work.tb_system_bus 
+# Start time: 15:30:23 on Sep 09,2026
+# ======================================================
+#  tb_system_bus -- the bus alone, no master, no memory
+# ======================================================
+# -- 1. reset ------------------------------------------
+#   ok    no grant during reset
+#   ok    no slave selected during reset
+#   ok    split mask clear during reset
+#   ok    address wire quiet during reset
+#   ok    data wire quiet during reset
+#   ok    no completion during reset
+#   ok    no grant after reset with no request
+# -- 2. arbitration ------------------------------------
+#   ok    master 0 granted
+#   ok    master_id tag = 0
+#   ok    gnt_valid asserted
+#   ok    grant HELD across the whole frame
+# -- 3. address transport off ONE wire -----------------
+#   ok    decode strobe pulsed at the end of the frame
+#   ok    address reassembled from the single wire
+#   ok    and that is what was on the wire
+#   ok    0x1ABC selected slave 1
+# -- 4. write direction: the master owns the data wire --
+#   ok    bus_we high for a write
+#   ok    the write data arrived RIGHT-ALIGNED in the frame
+#   ok    grant released after completion
+#   ok    exactly one frame went out
+#   ok    and it was exactly ADDR_W clocks
+# -- 5. decode: every range and both boundaries --------
+#   ok    0x0000 -> slave 0
+#   ok    0x0FFF -> slave 0
+#   ok    0x1000 -> slave 1
+#   ok    0x2000 -> slave 2
+#   ok    0x27FF -> slave 2
+# -- 6. read direction: the slave owns the data wire ---
+#   ok    slave 2 selected
+#   ok    bus_we low for a read
+#   ok    the data wire carries the SELECTED SLAVE's bit
+#   ok    and follows it down again
+#   ok    a master cannot disturb the wire during a read
+# -- 7. the return select is LATCHED -------------------
+#   ok    sel_q held onto slave 2 for 9 cycles with no new pulse
+#   ok    the late reply still routed back from slave 2
+# -- 8. two masters, priority and the split mask -------
+#   ok    master 0 wins on a tie
+#   ok    slave 0 selected
+#   ok    mask[0] set by the SPLIT
+#   ok    grant dropped on the SPLIT
+#   ok    master 1 granted while master 0 is masked
+#   ok    master_id tag = 1
+#   ok    master 1's address reached the wire
+#   ok    and its write data
+#   ok    and decoded to slave 2
+#   ok    still no grant - master 0 is masked and master 1 is done
+#   ok    master 0 still masked
+#   ok    mask cleared by split_complete[0]
+#   ok    master 0 re-granted to replay
+#   ok    the replayed frame decoded the same way
+#   ok    every frame so far was ADDR_W clocks
+# -- 9. unmapped: the BUS answers, with nothing attached
+#   ok    no slave select asserted for the decode hole
+#   ok    the bus answered by itself
+#   ok    and answered ERROR
+#   ok    grant released - the bus recovered
+#   ok    0x9003 selects the BRIDGE, target 3
+#   ok    0xC000 is above the map - selects nothing
+#   ok    and the bus answers ERROR by itself
+#   ok    the very next frame decoded normally
+# ======================================================
+#  14 frames on the wire, 0 wrong length
+#  tb_system_bus: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_system_bus.v(370)
+#    Time: 6631 ns  Iteration: 0  Instance: /tb_system_bus
+# Break in Module tb_system_bus at tb/tb_system_bus.v line 370
+# Stopped at tb/tb_system_bus.v line 370
+# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+### tb_master
+# vsim -quiet -onfinish stop work.tb_master 
+# Start time: 15:30:23 on Sep 09,2026
+# ======================================================
+#  tb_master
+# ======================================================
+# -- 1. reset ------------------------------------------
+#   ok    no bus request in reset
+#   ok    no frame in reset
+#   ok    address wire not driven in reset
+#   ok    not busy in reset
+#   ok    FSM in IDLE
+#   ok    still idle with no command
+# -- 2. write transaction ------------------------------
+#   ok    exactly one done pulse
+#   ok    the transfer put exactly ONE frame on the bus
+#   ok    the frame was exactly ADDR_W clocks
+#   ok    the address arrived correctly, MSB first
+#   ok    the write data arrived RIGHT-ALIGNED in the frame
+#   ok    resp = OKAY
+#   ok    err low
+#   ok    a write did not overwrite rdata
+#   ok    no splits counted
+# -- 3. read transaction -------------------------------
+#   ok    exactly one done pulse
+#   ok    one frame
+#   ok    the address arrived correctly
+#   ok    read data reassembled from the last DATA_W bits before ready
+#   ok    resp = OKAY
+#   ok    the master left the shared data wire alone during the read
+#   ok    read 0x00
+#   ok    read 0xFF
+#   ok    read 0x80 (MSB only - catches a bit-order slip)
+#   ok    read 0x01 (LSB only)
+# -- 4. address boundary values ------------------------
+#   ok    address 0x0000 sent correctly
+#   ok    address 0xFFFF sent correctly
+#   ok    address 0x8000 sent correctly
+#   ok    every frame so far was ADDR_W clocks
+# -- 5. ERROR is reported, not retried -----------------
+#   ok    one done pulse
+#   ok    the transfer was NOT retried
+#   ok    resp = ERROR
+#   ok    err asserted
+#   ok    master returned to IDLE, bus not held
+# -- 6. SPLIT and replay -------------------------------
+#   ok    split counted
+#   ok    master parked in SPLIT_WAIT
+#   ok    bus_req HELD high while split-deferred
+#   ok    no done reported for the split itself
+#   ok    one frame sent so far
+#   ok    silent but still requesting for 25 cycles
+#   ok    still only the original frame
+#   ok    exactly ONE done for the whole split + replay
+#   ok    the transfer was sent TWICE: attempt + replay
+#   ok    the replay was a FULL ADDR_W frame, not a resume
+#   ok    the replay re-sent the SAME address
+#   ok    replay data captured
+#   ok    final resp = OKAY, never SPLIT
+#   ok    split_count still 1
+# -- 7. a split WRITE replays its data too -------------
+#   ok    two frames
+#   ok    the replay re-sent the same address
+#   ok    and the same write data
+#   ok    one done
+# -- 8. normal transaction after a split ---------------
+#   ok    one done pulse
+#   ok    no leftover replay
+#   ok    data captured
+# ======================================================
+#  tb_master: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_master.v(364)
+#    Time: 8931 ns  Iteration: 0  Instance: /tb_master
+# Break in Module tb_master at tb/tb_master.v line 364
+# Stopped at tb/tb_master.v line 364
+# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+### tb_slave
+# vsim -quiet -onfinish stop work.tb_slave 
+# Start time: 15:30:23 on Sep 09,2026
+# ======================================================
+#  tb_slave
+# ======================================================
+# -- 1. reset ------------------------------------------
+#   ok    plain slave: ready low in reset
+#   ok    split slave: ready low in reset
+#   ok    split slave: not busy in reset
+#   ok    plain slave: not driving the data wire
+#   ok    split slave: not driving the data wire
+#   ok    split_complete clear in reset
+#   ok    no ready without an access
+# -- 2. write and read back ----------------------------
+#   ok    write answered OKAY
+#   ok    a write answers at S+1
+#   ok    read answered OKAY
+#   ok    read data came back through the wire
+#   ok    a read answers at S+10 (memory + 8 bits)
+#   ok    ready is only one cycle wide
+# -- 3. only the LOW address bits matter ---------------
+#   ok    offset 0x000 intact
+#   ok    offset 0x001 intact
+#   ok    offset 0x040 intact (no 0x40 aliasing)
+#   ok    last word 0x7FF intact
+#   ok    0xF923 and 0x2123 share offset 0x123 - upper bits discarded
+# -- 4. a frame with NO select must do nothing ---------
+#   ok    no slave answered an unselected frame
+#   ok    and the unselected write did NOT reach memory
+# -- 5. split read -------------------------------------
+#   ok    seed write served normally (split_en=0)
+#   ok    fresh access answered with SPLIT
+#   ok    the SPLIT arrives at S+1 - far faster than the 10-cycle read it defers
+#   ok    slave busy with the deferred transfer
+#   ok    split_complete pulsed on master 0's bit
+#   ok    split_complete is exactly one cycle wide
+#   ok    slave no longer busy
+#   ok    replay served with OKAY, not split again
+#   ok    replay returned the correct data
+#   ok    and took the full read time
+# -- 6. split write ------------------------------------
+#   ok    fresh write answered with SPLIT
+#   ok    the deferred write did NOT take effect during the split
+#   ok    write splits again from a fresh start
+#   ok    write replay served with OKAY
+#   ok    the replayed write took effect
+# -- 7. only one split outstanding ---------------------
+#   ok    master 0's access splits
+#   ok    slave busy
+#   ok    master 1 served normally while a split is in flight
+#   ok    master 1 got real data
+#   ok    the wake-up still belongs to master 0
+# -- 8. the data wire is left alone when idle ----------
+#   ok    both slaves quiet for 8 idle cycles
+# ======================================================
+#  tb_slave: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_slave.v(325)
+#    Time: 12571 ns  Iteration: 0  Instance: /tb_slave
+# Break in Module tb_slave at tb/tb_slave.v line 325
+# Stopped at tb/tb_slave.v line 325
+# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 0
+### tb_bus_issp_driver
+# vsim -quiet -onfinish stop work.tb_bus_issp_driver 
+# Start time: 15:30:23 on Sep 09,2026
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'dut'.  Expected 31, found 23.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/dut File: tb/tb_bus_issp_driver.v Line: 64
+# ** Warning: (vsim-3015) [PCDPC] - Port size (3) does not match connection size (2) for port 'gnt'. The port definition is at: rtl/bus_issp_driver.v(47).
+#    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/dut File: tb/tb_bus_issp_driver.v Line: 64
+# ** Warning: (vsim-3015) [PCDPC] - Port size (3) does not match connection size (2) for port 'split_mask'. The port definition is at: rtl/bus_issp_driver.v(48).
+#    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/dut File: tb/tb_bus_issp_driver.v Line: 64
+# ** Warning: (vsim-3015) [PCDPC] - Port size (5) does not match connection size (4) for port 'sel_q'. The port definition is at: rtl/bus_issp_driver.v(49).
+#    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/dut File: tb/tb_bus_issp_driver.v Line: 64
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(64): [TFMPC] - Missing connection for port 'dbg_rx_last'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(64): [TFMPC] - Missing connection for port 'dbg_rx_count'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(64): [TFMPC] - Missing connection for port 'dbg_tx_count'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(64): [TFMPC] - Missing connection for port 'dbg_rx_state'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(64): [TFMPC] - Missing connection for port 'dbg_req_seen'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(64): [TFMPC] - Missing connection for port 'dbg_resp_seen'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(64): [TFMPC] - Missing connection for port 'dbg_rx_active'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(64): [TFMPC] - Missing connection for port 'dbg_req_overrun'.
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'u_sys'.  Expected 43, found 35.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/u_sys File: tb/tb_bus_issp_driver.v Line: 87
+# ** Warning: (vsim-3015) [PCDPC] - Port size (3) does not match connection size (2) for port 'gnt'. The port definition is at: rtl/bus_top.v(61).
+#    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/u_sys File: tb/tb_bus_issp_driver.v Line: 87
+# ** Warning: (vsim-3015) [PCDPC] - Port size (3) does not match connection size (2) for port 'split_mask'. The port definition is at: rtl/bus_top.v(63).
+#    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/u_sys File: tb/tb_bus_issp_driver.v Line: 87
+# ** Warning: (vsim-3015) [PCDPC] - Port size (5) does not match connection size (4) for port 'sel_q'. The port definition is at: rtl/bus_top.v(64).
+#    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/u_sys File: tb/tb_bus_issp_driver.v Line: 87
+# ** Warning: (vsim-3015) [PCDPC] - Port size (2) does not match connection size (1) for port 'master_id'. The port definition is at: rtl/bus_top.v(66).
+#    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/u_sys File: tb/tb_bus_issp_driver.v Line: 87
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(87): [TFMPC] - Missing connection for port 'dbg_rx_last'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(87): [TFMPC] - Missing connection for port 'dbg_rx_count'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(87): [TFMPC] - Missing connection for port 'dbg_tx_count'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(87): [TFMPC] - Missing connection for port 'dbg_rx_state'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(87): [TFMPC] - Missing connection for port 'dbg_req_seen'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(87): [TFMPC] - Missing connection for port 'dbg_resp_seen'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(87): [TFMPC] - Missing connection for port 'dbg_rx_active'.
+# ** Warning: (vsim-3722) tb/tb_bus_issp_driver.v(87): [TFMPC] - Missing connection for port 'dbg_req_overrun'.
+# ======================================================
+#  tb_bus_issp_driver -- the JTAG debug path
+# ======================================================
+# -- 1. reset ------------------------------------------
+#   ok    no command issued out of reset
+#   ok    m0 done sticky clear
+#   ok    m0 not busy
+#   ok    collision clear
+#   ok    frame_bad clear
+#   ok    issp_mode low until the host sets it
+#   ok    s0_split_en low until the host sets it
+#   ok    host took the command ports
+# -- 2. write and read back on master 0 ----------------
+#   ok    write completed
+#   ok    write resp = OKAY
+#   ok    no error flagged
+#   ok    read completed
+#   ok    read data came back through the ISSP path
+#   ok    read resp = OKAY
+# -- 3. latency ----------------------------------------
+#   ..    write 22 clks, read 31 clks (as seen from JTAG)
+#   ok    a read costs more than a write - the data phase
+#   ok    nowhere near the 0xFF saturation that means hung
+#   ok    and both are longer than the 16-clock frame
+# -- 4. re-arm between commands ------------------------
+#   ok    done sticky cleared after go was released
+#   ok    a second command really ran, not a stale result
+# -- 5. unmapped address: ERROR, and it COMPLETES ------
+#   ok    the decode hole completed instead of hanging
+#   ok    resp = ERROR
+#   ok    sticky error flagged
+#   ok    latency did not saturate
+#   ok    0x3000, above the map, answers ERROR too
+#   ok    the very next command worked - bus recovered
+# -- 6. split transaction over JTAG --------------------
+#   ok    host enabled slave 0's split
+#   ok    the split read completed
+#   ok    and returned the right data after the replay
+#   ok    the split count probe rose
+#   ..    split read took 58 clks vs 31 for a plain read
+#   ok    and cost visibly more than a plain read
+# -- 7. serial framing watchdog ------------------------
+#   ok    frame_len reads 16 - the address frame is right
+#   ok    frame_bad clear - no frame was ever the wrong length
+# -- 8. the reassembled address is visible -------------
+#   ok    bus_addr probe shows the address reassembled off the serial wire
+# -- 9. master 1 through the same map ------------------
+#   ok    m1 write completed
+#   ok    m1 read data correct
+#   ok    m1 resp = OKAY
+# -- 10. collision flag --------------------------------
+#   ok    collision clear after soft_rst
+#   ok    collision set - both masters were in flight together
+#   ok    m0's concurrent write landed
+#   ok    m1's concurrent write landed
+# -- 11. soft_rst clears the sticky flags --------------
+#   ok    error sticky set
+#   ok    error sticky cleared
+#   ok    collision cleared
+#   ok    frame_bad cleared
+# ======================================================
+#  tb_bus_issp_driver: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_bus_issp_driver.v(357)
+#    Time: 10731 ns  Iteration: 0  Instance: /tb_bus_issp_driver
+# Break in Module tb_bus_issp_driver at tb/tb_bus_issp_driver.v line 357
+# Stopped at tb/tb_bus_issp_driver.v line 357
+# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 25
+### tb_integration
+# vsim -quiet -onfinish stop work.tb_integration 
+# Start time: 15:30:23 on Sep 09,2026
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'u_sys'.  Expected 43, found 35.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_integration/u_sys File: tb/tb_integration.v Line: 92
+# ** Warning: (vsim-3722) tb/tb_integration.v(92): [TFMPC] - Missing connection for port 'dbg_rx_last'.
+# ** Warning: (vsim-3722) tb/tb_integration.v(92): [TFMPC] - Missing connection for port 'dbg_rx_count'.
+# ** Warning: (vsim-3722) tb/tb_integration.v(92): [TFMPC] - Missing connection for port 'dbg_tx_count'.
+# ** Warning: (vsim-3722) tb/tb_integration.v(92): [TFMPC] - Missing connection for port 'dbg_rx_state'.
+# ** Warning: (vsim-3722) tb/tb_integration.v(92): [TFMPC] - Missing connection for port 'dbg_req_seen'.
+# ** Warning: (vsim-3722) tb/tb_integration.v(92): [TFMPC] - Missing connection for port 'dbg_resp_seen'.
+# ** Warning: (vsim-3722) tb/tb_integration.v(92): [TFMPC] - Missing connection for port 'dbg_rx_active'.
+# ** Warning: (vsim-3722) tb/tb_integration.v(92): [TFMPC] - Missing connection for port 'dbg_req_overrun'.
+# ======================================================
+#  tb_integration -- 2 masters, 3 slaves + default slave
+# ======================================================
+# -- 1. reset ------------------------------------------
+#   ok    no grant during reset
+#   ok    split mask clear during reset
+#   ok    no slave selected during reset
+#   ok    bus idle during reset
+#   ok    both masters idle during reset
+#   ok    no grant after reset with no command
+#   ok    no spurious ready after reset
+# -- 2. one master, all three slaves -------------------
+#   ok    slave 0 first word: [0x0000] = 0x000000a0
+#   ok    slave 0 last word : [0x07ff] = 0x000000af
+#   ok    slave 0 word 0x40 : [0x0040] = 0x000000a4
+#   ok    slave 1 first word: [0x1000] = 0x000000b0
+#   ok    slave 1 last word : [0x1fff] = 0x000000bf
+#   ok    slave 2 first word: [0x2000] = 0x000000c0
+#   ok    slave 2 last word : [0x2fff] = 0x000000c7
+#   ..    WRITE latency 21 clocks
+#   ..    READ  latency 30 clocks
+#   ok    slave 0 word 0 survived the other writes
+#   ok    slave 1 word 0 is a different location
+#   ok    slave 2 word 0 is a different location
+#   ok    no split happened with split_en=0
+# -- 3. two masters requesting on the same clock -------
+#   ok    master 0 got ITS data
+#   ok    master 1 got ITS data
+#   ok    both masters completed
+#   ..    contended latencies: m0 30 clocks, m1 59 clocks
+#   ok    master 0's concurrent write landed
+#   ok    master 1's concurrent write landed
+# -- 4. full split transaction, end to end -------------
+#   ok    arbiter masked master 0 during the split
+#   ok    master 1 was granted the bus while master 0 was deferred
+#   ok    master 0's split transaction completed
+#   ok    master 0 recorded at least one SPLIT
+#   ok    the RE-ISSUED transfer returned the right data
+#   ok    master 0's final response is OKAY, never SPLIT
+#   ok    master 1's work in the gap was correct
+#   ok    mask cleared again afterwards
+#   ..    split read cost master 0 79 clocks
+#   ok    the write was split as well
+#   ok    the split write landed exactly once
+# -- 5. unmapped access: ERROR, and the bus RECOVERS ---
+#   ok    0x0800 completed instead of hanging the bus
+#   ok    0x0800 answered ERROR
+#   ok    master 0 reports err
+#   ok    the grant was released, bus not held
+#   ok    an ERROR read returns zero, not the last read's data
+#   ok    the next transfer completed normally
+#   ok    and returned correct data
+#   ok    and a clean OKAY
+#   ok    an unmapped WRITE also answers ERROR
+#   ok    0xC000, above the bridge window, completed
+#   ok    and answers ERROR - nothing up there is mapped
+#   ok    top of memory answers ERROR
+#   ok    master 1 recovered too
+#   ok    consecutive unmapped access answered ERROR
+#   ok    consecutive unmapped access answered ERROR
+#   ok    consecutive unmapped access answered ERROR
+#   ok    consecutive unmapped access answered ERROR
+#   ok    four consecutive unmapped accesses all completed
+#   ok    bus fully healthy afterwards
+# -- 6. the LOW-priority master can split too ----------
+#   ok    master 1's split read completed (did not hang)
+#   ok    master 1 recorded a SPLIT
+#   ok    master 1's re-issued transfer got the data
+#   ok    master 1's final response is OKAY
+# -- 7. serial framing ---------------------------------
+#   ok    address frames were seen on the wire
+#   ok    EVERY frame was exactly ADDR_W clocks long
+#   ..    53 frames on the wire, all 16 clocks
+#   ok    the address reassembled off the single wire matches what was sent
+#   ok    and again from the other master
+#   ok    the split transaction put TWO frames on the wire
+#   ok    the re-issued frame was full length as well
+#   ok    the replay re-sent the SAME address
+#   ok    and returned the right data
+# -- 8. three reset domains, one per KEY ---------------
+#   ok    KEY[2] reset the slaves; memory contents survive
+#   ok    and the bus still completes transfers
+#   ok    KEY[1] reset the masters - none left busy
+#   ok    and master 1 reads memory the slaves still hold
+#   ok    KEY[0] reset the bus - no grant held
+#   ok    and the split mask is clear
+#   ok    and the whole system works again afterwards
+# ======================================================
+#  splits seen: master 0 = 0, master 1 = 0
+#  tb_integration: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_integration.v(515)
+#    Time: 37671 ns  Iteration: 0  Instance: /tb_integration
+# Break in Module tb_integration at tb/tb_integration.v line 515
+# Stopped at tb/tb_integration.v line 515
+# End time: 15:30:24 on Sep 09,2026, Elapsed time: 0:00:01
+# Errors: 0, Warnings: 9
+### tb_uart_remote
+# vsim -quiet -onfinish stop work.tb_uart_remote 
+# Start time: 15:30:24 on Sep 09,2026
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'A'.  Expected 43, found 35.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_uart_remote/A File: tb/tb_uart_remote.v Line: 109
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(109): [TFMPC] - Missing connection for port 'dbg_rx_last'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(109): [TFMPC] - Missing connection for port 'dbg_rx_count'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(109): [TFMPC] - Missing connection for port 'dbg_tx_count'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(109): [TFMPC] - Missing connection for port 'dbg_rx_state'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(109): [TFMPC] - Missing connection for port 'dbg_req_seen'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(109): [TFMPC] - Missing connection for port 'dbg_resp_seen'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(109): [TFMPC] - Missing connection for port 'dbg_rx_active'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(109): [TFMPC] - Missing connection for port 'dbg_req_overrun'.
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'B'.  Expected 43, found 35.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_uart_remote/B File: tb/tb_uart_remote.v Line: 129
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(129): [TFMPC] - Missing connection for port 'dbg_rx_last'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(129): [TFMPC] - Missing connection for port 'dbg_rx_count'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(129): [TFMPC] - Missing connection for port 'dbg_tx_count'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(129): [TFMPC] - Missing connection for port 'dbg_rx_state'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(129): [TFMPC] - Missing connection for port 'dbg_req_seen'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(129): [TFMPC] - Missing connection for port 'dbg_resp_seen'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(129): [TFMPC] - Missing connection for port 'dbg_rx_active'.
+# ** Warning: (vsim-3722) tb/tb_uart_remote.v(129): [TFMPC] - Missing connection for port 'dbg_req_overrun'.
+# ======================================================
+#  tb_uart_remote -- two boards, one crossed UART link
+# ======================================================
+# -- 1. each board's own memory, locally ---------------
+#   ..    local WRITE latency 21 clocks
+#   ok    a local write still costs 21 clocks - the wrapper is a pass-through
+#   ..    local READ  latency 30 clocks
+#   ok    a local read still costs 30 clocks
+#   ok    A's own 0x1ABC reads back 0x11
+#   ok    B's own 0x1ABC reads back 0x22 - independent
+# -- 2. A REMOTE WRITE: 0x9ABC here = B's 0x1ABC -------
+#   ok    the posted write reported no error
+#   ok    and reports OKAY
+#   ..    posted remote write retired in 42 clocks
+#   ok    it retired on send, without waiting for a reply
+# -- 3. it landed on B, and only on B ------------------
+#   ok    B's 0x1ABC now holds A's 0x5A
+#   ok    A's own 0x1ABC is untouched
+# -- 4. A REMOTE READ of B's 0x1ABC (via 0x9ABC) -------
+#   ok    the remote read completed
+#   ok    and brought B's data back
+#   ..    remote read took 348 clocks
+# -- 5. all three device ids, and the reverse direction -
+#   ok    0x85C3 reached B's slave 0 (id 0, 2K)
+#   ok    0xA567 reached B's slave 2 (id 2, 4K)
+#   ok    B's remote read completed
+#   ok    B read A's 0x2FFF - slave 2 really is 4K
+# -- 6. remote read of the far board's SPLIT slave -----
+#   ok    the remote split read completed
+#   ok    and returned the right data
+#   ok    B's master 0 really absorbed a SPLIT
+# -- 7. BOTH boards read each other at once ------------
+#   ok    neither side deadlocked - both got an answer
+#   ok    A got B's byte
+#   ok    B got A's byte
+# -- 8. unplug the cable -------------------------------
+#   ok    the remote read reported cmd_error
+#   ok    and returned 0xFF, as the spec requires
+#   ok    resp = ERROR
+#   ok    the master finished, so it was the LINK that timed out
+# -- 9. the local bus survived the dead link -----------
+#   ok    A's local read still works
+#   ok    and the local transfer itself is clean
+#   ok    br_error still reports the dead link
+#   ok    and a fresh local write/read round-trips
+# -- 10. and the link recovers when plugged back in ----
+#   ok    a remote read works again
+#   ok    and returns B's data
+# -- 11. LOOPBACK: the board answers itself --------------
+#   ok    the looped-back read completed
+#   ok    0x9ABC returned A's own 0x1ABC
+#   ok    a looped-back posted write landed
+# -- 12. EVERY byte value survives a remote read -------
+#   ok    all 256 byte values round-tripped over the link
+# -- 13. no address bit is lost on the way -------------
+#   ok    all 12 offset bits reached the far board intact
+#   ok    device field 00 selected the far slave 0
+#   ok    device field 01 selected the far slave 1
+#   ok    device field 10 selected the far slave 2
+#   ok    0x9500 read its own word
+#   ok    0x9501 read the NEXT word, not the same one
+# -- 14. tag bytes inside the payload ------------------
+#   ok    a request carrying both tags was parsed
+#   ok    and 0xA5 came back as data, not as a tag
+#   ok    0x5A survives as a data byte too
+# -- 15. back-to-back remote reads ---------------------
+#   ok    four consecutive remote reads each returned their own byte
+# -- 16. a remote read of ZERO is not a failure --------
+#   ok    the remote read of 0x00 completed
+#   ok    and returned 0x00 from B, not A's 0xFF
+# -- 17. the bridge window is exactly the 14 bits it carries
+#   ok    0x8055 reads B's 0x0055
+#   ok    0xBFFF is the top of the window and still works
+#   ok    0xC055 is ABOVE the window - a decode hole, no longer an alias
+# -- 18. EITHER master can reach the far board ---------
+#   ok    master 0 read the far board
+#   ok    and got the right byte
+#   ok    MASTER 1 read the far board too - it has no UART of its own
+#   ok    master 1's remote WRITE landed on B
+# -- 19. the bridge is ONE transaction at a time -------
+#   ok    both masters completed - a busy bridge never hangs the bus
+#   ok    the second master was answered ERROR while the bridge was busy
+#   ok    and the bridge is usable again straight afterwards
+# ======================================================
+#  tb_uart_remote: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_uart_remote.v(591)
+#    Time: 2377671 ns  Iteration: 0  Instance: /tb_uart_remote
+# Break in Module tb_uart_remote at tb/tb_uart_remote.v line 591
+# Stopped at tb/tb_uart_remote.v line 591
+# End time: 15:30:26 on Sep 09,2026, Elapsed time: 0:00:02
+# Errors: 0, Warnings: 18
+### tb_top_debug
+# vsim -quiet -onfinish stop work.tb_top_debug 
+# Start time: 15:30:26 on Sep 09,2026
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'dut'.  Expected 7, found 5.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_top_debug/dut File: tb/tb_top_debug.v Line: 49
+# ** Warning: (vsim-3722) tb/tb_top_debug.v(49): [TFMPC] - Missing connection for port 'rm_rx'.
+# ** Warning: (vsim-3722) tb/tb_top_debug.v(49): [TFMPC] - Missing connection for port 'rm_tx'.
+# ======================================================
+#  tb_top_debug -- the synthesis top through its pins
+# ======================================================
+# -- 1. reset ------------------------------------------
+#   ok    master 0 not busy out of reset
+#   ok    master 1 not busy out of reset
+#   ok    nobody holds the grant out of reset
+# -- 2. write and read back through the top level -------
+#   ok    the write completed
+#   ok    write resp = OKAY
+#   ok    the read completed
+#   ok    read data matches what was written
+# -- 3. led[7:0] shows master 0's read data ------------
+#   ok    led follows the last read
+#   ok    a write leaves the display unchanged
+#   ok    and the next read updates it
+#   ok    ALL 8 data bits reach a pin and change
+# -- 4. all three slaves -------------------------------
+#   ok    slave 0 kept its word
+#   ok    slave 1 kept its word
+#   ok    slave 2 kept its word
+#   ok    slave 2's last word 0x2FFF is mapped
+# -- 5. unmapped address: ERROR, and it COMPLETES ------
+#   ok    the decode hole completed instead of hanging
+#   ok    resp = ERROR
+#   ok    0x3000, above the map, too
+#   ok    the very next transfer worked - bus recovered
+# -- 6. remote window with no cable --------------------
+#   ok    the remote read completed instead of hanging
+#   ok    and reported an error
+#   ok    returning 0xFF, as the spec requires
+#   ok    the local bus still works afterwards
+# -- 7. split, enabled from the host -------------------
+#   ok    the split read completed
+#   ok    and returned the right data after the replay
+#   ok    the split count rose
+# -- 8. master 1, and the framing watchdog -------------
+#   ok    master 1 round-tripped through the same map
+#   ok    frame_len reads 16 on the real top level
+#   ok    frame_bad clear - every frame was full length
+# ======================================================
+#  tb_top_debug: PASSED (0 errors)
+# ======================================================
+# ** Note: $finish    : tb/tb_top_debug.v(237)
+#    Time: 74331 ns  Iteration: 0  Instance: /tb_top_debug
+# Break in Module tb_top_debug at tb/tb_top_debug.v line 237
+# Stopped at tb/tb_top_debug.v line 237
+# End time: 15:30:26 on Sep 09,2026, Elapsed time: 0:00:00
+# Errors: 0, Warnings: 3
+# Check the transcript above: every testbench must print PASSED.

@@ -48,7 +48,7 @@ module tb_top_debug;
     // SPLIT_LATENCY shrunk so a split does not take 0.2 s of simulated time.
     top_debug #(.SPLIT_LATENCY(6), .CLKS_PER_BIT(4), .RESP_TIMEOUT(3000)) dut (
         .CLOCK_50 (CLOCK_50),
-        .rst_n    (rst_n),
+        .rst_n    (rst_n), .rst_m_n(rst_n), .rst_s_n(rst_n),
         .led      (led)
     );
 

@@ -36,6 +36,11 @@
 module tb_integration;
 
     localparam NM     = `BUS_N_MASTERS;
+    // Command ports, not bus masters: the bridge is bus master NM-1 and
+    // is driven by the far board, so it has no command port.  Sizing
+    // these NM wide leaves the top bit unconnected - and an unconnected
+    // bit is `z', which fails === against 0 under ModelSim.
+    localparam NLM    = NM - 1;
     localparam NS     = `BUS_N_SLAVES;
     localparam ADDR_W = `BUS_ADDR_W;
     localparam DATA_W = `BUS_DATA_W;
@@ -50,15 +55,16 @@ module tb_integration;
 
     reg clk = 1'b0;
     reg rst_n;
+    reg rst_m_n, rst_s_n;   // the other two KEY domains
     always #10 clk = ~clk;           // 50 MHz
 
-    reg  [NM-1:0]           cmd_valid, cmd_we;
-    reg  [NM*ADDR_W-1:0]    cmd_addr_flat;
-    reg  [NM*DATA_W-1:0]    cmd_wdata_flat;
-    wire [NM-1:0]           cmd_accept, done, err, mst_busy;
-    wire [NM*DATA_W-1:0]    rdata_flat;
-    wire [NM*RESP_W-1:0]    resp_flat;
-    wire [NM*8-1:0]         split_count_flat;
+    reg  [NLM-1:0]          cmd_valid, cmd_we;
+    reg  [NLM*ADDR_W-1:0]   cmd_addr_flat;
+    reg  [NLM*DATA_W-1:0]   cmd_wdata_flat;
+    wire [NLM-1:0]          cmd_accept, done, err, mst_busy;
+    wire [NLM*DATA_W-1:0]   rdata_flat;
+    wire [NLM*RESP_W-1:0]   resp_flat;
+    wire [NLM*8-1:0]        split_count_flat;
     reg                     split_en_r;
 
     wire [NM-1:0]           gnt;
@@ -85,7 +91,7 @@ module tb_integration;
         .SPLIT_LATENCY(SPLIT_LATENCY)
     ) u_sys (
         .clk              (clk),
-        .rst_n            (rst_n),
+        .rst_n            (rst_n), .rst_m_n(rst_m_n), .rst_s_n(rst_s_n),
 
         .cmd_valid        (cmd_valid),
         .cmd_we           (cmd_we),
@@ -256,10 +262,12 @@ module tb_integration;
         $display("======================================================");
 
         rst_n          = 1'b0;
-        cmd_valid      = {NM{1'b0}};
-        cmd_we         = {NM{1'b0}};
-        cmd_addr_flat  = {NM*ADDR_W{1'b0}};
-        cmd_wdata_flat = {NM*DATA_W{1'b0}};
+        rst_m_n        = 1'b0;
+        rst_s_n        = 1'b0;
+        cmd_valid      = {NLM{1'b0}};
+        cmd_we         = {NLM{1'b0}};
+        cmd_addr_flat  = {NLM*ADDR_W{1'b0}};
+        cmd_wdata_flat = {NLM*DATA_W{1'b0}};
         split_en_r     = 1'b0;
 
         //==================================================================
@@ -269,8 +277,8 @@ module tb_integration;
         chk(split_mask === {NM{1'b0}}, "split mask clear during reset");
         chk(sel_q      === {(NS+1){1'b0}}, "no slave selected during reset");
         chk(bus_valid  === 1'b0,       "bus idle during reset");
-        chk(mst_busy   === {NM{1'b0}}, "both masters idle during reset");
-        @(posedge clk); rst_n = 1'b1;
+        chk(mst_busy   === {NLM{1'b0}}, "both masters idle during reset");
+        @(posedge clk); rst_n = 1'b1; rst_m_n = 1'b1; rst_s_n = 1'b1;
         repeat (4) @(posedge clk); #1;
         chk(gnt       === {NM{1'b0}}, "no grant after reset with no command");
         chk(bus_ready === 1'b0,       "no spurious ready after reset");
@@ -465,6 +473,39 @@ module tb_integration;
         split_en_r = 1'b0;
 
         //==================================================================
+        //==================================================================
+        // Three KEY buttons, three reset domains.  If all three were secretly
+        // one net this would pass its first half and fail the rest, so it
+        // checks INDEPENDENCE, not just that reset works.
+        $display("-- 8. three reset domains, one per KEY ---------------");
+
+        m_run(0, 1'b1, 16'h0010, 8'hA1);
+        m_run(0, 1'b1, 16'h1010, 8'hB2);
+        m_run(0, 1'b1, 16'h2010, 8'hC3);
+
+        // KEY[2]: slaves only.  Their arrays are deliberately unreset so M9K
+        // is inferred, so the DATA must survive - only the control FSMs clear.
+        rst_s_n = 1'b0; repeat (4) @(posedge clk); rst_s_n = 1'b1;
+        repeat (4) @(posedge clk); #1;
+        m_run(0, 1'b0, 16'h1010, {DATA_W{1'b0}});
+        chk(mrd(0) === 8'hB2, "KEY[2] reset the slaves; memory contents survive");
+        chk(!timed_out[0],    "and the bus still completes transfers");
+
+        // KEY[1]: masters only.  Bus and memories untouched.
+        rst_m_n = 1'b0; repeat (4) @(posedge clk); rst_m_n = 1'b1;
+        repeat (4) @(posedge clk); #1;
+        chk(mst_busy === {NLM{1'b0}}, "KEY[1] reset the masters - none left busy");
+        m_run(1, 1'b0, 16'h2010, {DATA_W{1'b0}});
+        chk(mrd(1) === 8'hC3, "and master 1 reads memory the slaves still hold");
+
+        // KEY[0]: the bus.  Grant, lock and split mask clear.
+        rst_n = 1'b0; repeat (4) @(posedge clk); rst_n = 1'b1;
+        repeat (4) @(posedge clk); #1;
+        chk(gnt === {NM{1'b0}},        "KEY[0] reset the bus - no grant held");
+        chk(split_mask === {NM{1'b0}}, "and the split mask is clear");
+        m_run(0, 1'b0, 16'h0010, {DATA_W{1'b0}});
+        chk(mrd(0) === 8'hA1, "and the whole system works again afterwards");
+
         $display("======================================================");
         $display(" splits seen: master 0 = %0d, master 1 = %0d",
                  msplits(0), msplits(1));

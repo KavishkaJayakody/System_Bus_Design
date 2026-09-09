@@ -1,98 +1,19 @@
-//==========================================================================
-// bus_bridge.v -- the board-to-board link, as a DEVICE ON THE BUS
+// The board-to-board link, as a DEVICE ON THE BUS - not part of any master.
+// Two faces:
+//   slave face   target 3 at 0x8000-0xBFFF; either master reaches the far
+//                board by addressing it like a memory
+//   master face  bus master N_MASTERS-1, LOWEST priority, so remote traffic
+//                cannot out-rank local traffic
 //
-// There is exactly one UART in the design and it lives in here.  No master
-// owns it.  The bridge is a device with TWO FACES, which is what lets either
-// local master reach the far board and lets the far board reach all three
-// local memories:
+// far address = local - 0x8000, and only addr[13:0] travels.
 //
-//   SLAVE FACE   decoded target 3, 0x8000-0xBFFF.  A local master reaches
-//                the other board by addressing it exactly as it addresses a
-//                memory.  Serialisation, decode and arbitration are the
-//                bus's normal ones; nothing about the transaction is special
-//                until it gets in here.
+// Wire format (8N1, 115200):
+//   REQUEST   A5 b0 b1 b2     RESPONSE  5A data   (READS ONLY)
+//   cmd = {wdata[7:0], addr[13:0], we, 1'b0}, little-endian
 //
-//   MASTER FACE  arbiter index N_MASTERS-1, the LOWEST priority.  Requests
-//                arriving from the far board are issued on this bus through
-//                an ordinary `master' core, so remote traffic can never
-//                out-rank the local masters.
-//
-// far address = local address - 0x8000, and the window is exactly 16K -
-// which is exactly the 14 address bits the link carries, so nothing is
-// silently truncated on the way out.
-//
-//--------------------------------------------------------------------------
-// Wire format (8N1, 115200 baud, CLKS_PER_BIT = 434 at 50 MHz)
-//--------------------------------------------------------------------------
-//   REQUEST  (4 bytes)          RESPONSE (2 bytes, READS ONLY)
-//     0xA5                        0x5A
-//     cmd[7:0]                    data byte
-//     cmd[15:8]
-//     cmd[23:16]
-//
-// Byte order is LITTLE-ENDIAN: the low byte of the command goes first.
-//
-//   bit  23 ........ 16 | 15  14 | 13 .......... 2 |  1  |  0
-//       +---------------+--------+-----------------+-----+-----+
-//       |    wdata[7:0] |  dev   |   offset[11:0]  | we  |  0  |
-//       +---------------+--------+-----------------+-----+-----+
-//                  00=slave0  01=slave1  10=slave2    1=write  reserved
-//
-// `dev' and `offset' together are simply addr[13:0], which is what the slave
-// face collects off the serial wire in one 14-bit deserialiser.
-//
-//--------------------------------------------------------------------------
-// A REMOTE TRANSACTION IS A SPLIT TRANSACTION
-//--------------------------------------------------------------------------
-// A round trip costs 347 us for the request and another 174 us for a reply -
-// tens of thousands of clocks.  Holding the bus for that would be absurd, so
-// the bridge answers SPLIT on the first access, exactly as the split-capable
-// memory does:
-//
-//   S      master addresses the bridge -> SPLIT.  The arbiter masks that
-//          master and RELEASES THE BUS.  The other master runs at full speed.
-//   ...    the bridge sends the request and, on a read, waits for the reply
-//   T      split_complete[id] pulses, the arbiter unmasks the master
-//   T+n    the master re-issues the identical frame and the bridge serves it:
-//          a write answers OKAY at S+1, a read shifts 8 bits out and answers
-//          at S+10 - the same shape as a memory read, so nothing upstream
-//          needs to know this one went over a wire.
-//
-// WRITES SPLIT TOO, and complete once the request bytes are on the wire.
-// That is what makes the link safe to drive hard: the master cannot issue a
-// second remote write until the first has actually gone, so the far board's
-// single-byte receiver can never be overrun by us.  It costs one replay and
-// buys back-pressure the wire format itself does not provide.
-//
-// ONE TRANSACTION AT A TIME.  A second master addressing the bridge while a
-// round trip is in flight is answered ERROR, not deferred: there is one set
-// of deferred state and one split_complete to release it with, so queueing a
-// second would need a second of each.  ERROR completes, the master reports
-// it, and the bus does not hang - the same discipline as the default slave.
-//
-//--------------------------------------------------------------------------
-// Things that are load-bearing
-//--------------------------------------------------------------------------
-// * RESPONSES TAKE PRIORITY over requests in the shared transmitter.  If both
-//   boards issue at the same instant and each preferred its own request, both
-//   would wait for an answer neither is sending.
-//
-// * TAG HUNTING.  Hunt a tag, then take exactly 3 more bytes (request) or 1
-//   (response).  Never re-scan the payload - a payload byte may be 0xA5/0x5A.
-//
-// * THE LINK IS LOOP-FREE BY CONSTRUCTION.  The server issues
-//   {2'b00, addr[13:0]}, so a received request can only ever reach device ids
-//   0-2 - the three real memories.  It can never address the bridge itself,
-//   so nothing can be forwarded back out.  No hop count is needed.
-//
-// * RESP_TIMEOUT (32 bits) completes a remote READ with 0xFF and latches
-//   br_error rather than hanging.  A counter narrower than its own parameter
-//   truncates silently.
-//
-// * THE UART IS REACHED THROUGH A NARROW BYTE INTERFACE - a byte plus enable
-//   and busy going out, a byte plus ready coming in.  Anything honouring that
-//   can replace it; the framing, both faces and the split handling stay.
-//==========================================================================
+// A remote transaction is a SPLIT transaction: the round trip is ~347us each
+// way, so the bridge defers the master and frees the bus.
+
 `timescale 1ns/1ps
 `include "bus_defs.vh"
 
@@ -109,7 +30,6 @@ module bus_bridge #(
     input  wire                  clk,
     input  wire                  rst_n,
 
-    // ---- SLAVE FACE: identical in shape to `slave' ----------------------
     input  wire                  frame,
     input  wire                  astream,
     input  wire                  dstream_in,
@@ -122,7 +42,6 @@ module bus_bridge #(
     output wire [N_MASTERS-1:0]  split_complete,
     output wire                  busy,
 
-    // ---- MASTER FACE: identical in shape to `master' --------------------
     output wire                  bus_req,
     input  wire                  bus_gnt,
     output wire                  m_valid,
@@ -133,17 +52,13 @@ module bus_bridge #(
     input  wire [RESP_W-1:0]     bus_resp,
     input  wire                  bus_dstream,
 
-    // ---- the wire -------------------------------------------------------
     input  wire                  rm_rx,
     output wire                  rm_tx,
 
-    // ---- status ---------------------------------------------------------
     output wire                  br_error,        // last remote read timed out
     output wire                  remote_busy,     // a round trip is in flight
     output wire                  srv_busy,        // serving the far board now
 
-    // ---- LINK DIAGNOSTICS -----------------------------------------------
-    // You cannot debug a serial link you cannot see.
     output wire [7:0]            dbg_rx_last,
     output wire [7:0]            dbg_rx_count,
     output wire [7:0]            dbg_tx_count,
@@ -170,9 +85,6 @@ module bus_bridge #(
     endfunction
     localparam BCNT_W = clogb2(DATA_W);
 
-    //======================================================================
-    // The wire, and the narrow byte interface onto it
-    //======================================================================
     wire [7:0] rx_data;
     wire       rx_valid;
 
@@ -191,9 +103,6 @@ module bus_bridge #(
         .tx_serial(rm_tx), .tx_busy(tx_busy)
     );
 
-    //======================================================================
-    // Byte-stream sender: 1..5 bytes out, least significant first
-    //======================================================================
     localparam TXS_IDLE = 2'd0;
     localparam TXS_SEND = 2'd1;
     localparam TXS_WAIT = 2'd2;
@@ -232,8 +141,6 @@ module bus_bridge #(
                 end
                 TXS_WAIT: begin
                     tx_start <= 1'b0;
-                    // uart_tx raises tx_busy on the edge it accepts tx_start,
-                    // so both low means the byte has actually gone.
                     if (!tx_start && !tx_busy)
                         txs <= (txcnt == 3'd0) ? TXS_IDLE : TXS_SEND;
                 end
@@ -242,9 +149,6 @@ module bus_bridge #(
         end
     end
 
-    //======================================================================
-    // Receive parser: splits the byte stream into requests and responses
-    //======================================================================
     localparam R_TAG  = 2'd0;
     localparam R_REQ  = 2'd1;
     localparam R_RESP = 2'd2;
@@ -276,9 +180,7 @@ module bus_bridge #(
                         else if (rx_data == RESP_TAG) rxs <= R_RESP;
                         // anything else: stay hunting for a tag
                     end
-                    // Exactly three more bytes, then stop.  A payload byte
                     // may itself be 0xA5 or 0x5A; re-scanning it for tags
-                    // would desynchronise the stream.
                     R_REQ: begin
                         case (rxn)
                             2'd0: rx_cmd[7:0]   <= rx_data;
@@ -303,9 +205,6 @@ module bus_bridge #(
         end
     end
 
-    //======================================================================
-    // Link diagnostics.  Free-running; nothing here affects a transfer.
-    //======================================================================
     reg [7:0] rx_last, rx_count, tx_count;
     reg       req_seen, resp_seen;
 
@@ -335,14 +234,6 @@ module bus_bridge #(
     assign dbg_resp_seen = resp_seen;
     assign dbg_rx_active = ~rm_rx;      // an idle 8N1 line sits HIGH
 
-    //======================================================================
-    // SLAVE FACE - deserialisers.  Every target on this bus shifts every
-    // frame in speculatively; selection arrives afterwards.
-    //
-    // LADDR_W is 14, so this holds addr[13:0] - which is precisely the field
-    // the link carries.  No arithmetic is needed to turn a local address
-    // into a far one; the window's base simply is not in these bits.
-    //======================================================================
     wire [LADDR_W-1:0] laddr;
     wire [DATA_W-1:0]  wdata_des;
 
@@ -356,9 +247,6 @@ module bus_bridge #(
         .shift(frame), .din(dstream_in), .dout(wdata_des)
     );
 
-    //======================================================================
-    // CLIENT: a local master's transaction, carried to the far board
-    //======================================================================
     localparam B_IDLE = 2'd0;   // no round trip in flight
     localparam B_SEND = 2'd1;   // request built, waiting for the transmitter
     localparam B_WAIT = 2'd2;   // read: waiting for the far board's answer
@@ -374,15 +262,12 @@ module bus_bridge #(
     reg                  err_r;
     reg [N_MASTERS-1:0]  sc_r;
 
-    // The replay: the same master coming back for the answer we are holding.
     wire is_replay = (bs == B_RDY) && (master_id == own_id);
 
-    // A fresh access we can take on.
     wire take_new  = sel && (bs == B_IDLE);
-    // Anything else addressed at us while busy - answered ERROR, never left
-    // hanging.  The owner cannot be here: the arbiter has it masked.
+    // Busy: a second master is answered ERROR, not deferred - there is one set
+    // of deferred state and one split_complete.  It completes; nothing hangs.
     wire reject    = sel && (bs != B_IDLE) && !is_replay;
-    // The replay actually being served.
     wire serve     = sel && is_replay;
 
     assign split_complete = sc_r;
@@ -390,9 +275,6 @@ module bus_bridge #(
     assign remote_busy    = (bs != B_IDLE);
     assign br_error       = err_r;
 
-    //----------------------------------------------------------------------
-    // SERVER: the far board's transaction, issued on OUR bus
-    //======================================================================
     localparam S_IDLE = 2'd0;
     localparam S_EXEC = 2'd1;
     localparam S_RESP = 2'd2;
@@ -413,9 +295,8 @@ module bus_bridge #(
     assign srv_busy        = (ss != S_IDLE);
     assign dbg_req_overrun = req_overrun;
 
-    // The master face is an ordinary `master'.  It is driven ONLY by the
-    // server - a local command never enters here, which is the whole point of
-    // taking the UART out of the master.
+    // The master face is driven ONLY by the server - no local command enters
+    // here.  That is the whole point of taking the UART out of master 0.
     master #(
         .ADDR_W (ADDR_W),
         .DATA_W (DATA_W),
@@ -446,13 +327,8 @@ module bus_bridge #(
         .bus_dstream (bus_dstream)
     );
 
-    // The cycle the server picks the held request up.  Naming it here is what
-    // lets the receive latch below tell "consumed" from "overwritten".
     wire srv_take = (ss == S_IDLE) && req_hold && !core_busy && (bs != B_SEND);
 
-    //======================================================================
-    // The two faces, and the transmitter they share
-    //======================================================================
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             bs           <= B_IDLE;
@@ -480,14 +356,6 @@ module bus_bridge #(
             sc_r  <= {N_MASTERS{1'b0}};      // default: one-cycle pulse
             tx_go <= 1'b0;
 
-            //--------------------------------------------------------------
-            // Latch an incoming request.  The link has NO FLOW CONTROL to
-            // push back with, so a request that overwrites an unconsumed one
-            // is gone and is FLAGGED rather than hidden.  A request arriving
-            // on the very cycle the server takes the previous one must
-            // survive, so req_hold is cleared HERE and only when nothing new
-            // arrived on the same cycle.
-            //--------------------------------------------------------------
             if (req_valid) begin
                 req_cmd_hold <= rx_cmd;
                 req_hold     <= 1'b1;
@@ -496,19 +364,16 @@ module bus_bridge #(
                 req_hold <= 1'b0;
             end
 
-            //--------------------------------------------------------------
-            // SERVER - runs first, so RESPONSES BEAT REQUESTS for the
-            // transmitter.  The client below checks `ss != S_RESP' against
-            // the registered value, so the two can never both claim it.
-            //--------------------------------------------------------------
+            // Server runs first, so RESPONSES BEAT REQUESTS for the
+            // transmitter; the client's `ss != S_RESP' uses the registered
+            // value, so the two can never both claim it.
             case (ss)
                 S_IDLE: begin
                     if (srv_take) begin
                         srv_we    <= req_cmd_hold[1];
-                        // {2'b00, addr[13:0]}: the top two bits are ALWAYS
-                        // zero, which is what stops a received request from
-                        // decoding back into our own bridge window.  The
-                        // link is loop-free by construction.
+                        // {2'b00, addr[13:0]}: the top bits are always zero,
+                        // so a received request can never decode back into
+                        // our own bridge window.  Loop-free by construction.
                         srv_addr  <= {{(ADDR_W-FAR_W){1'b0}},
                                       req_cmd_hold[FAR_W+1:2]};
                         srv_wdata <= req_cmd_hold[CMD_W-1 -: DATA_W];
@@ -520,8 +385,7 @@ module bus_bridge #(
                     if (core_accept) srv_valid <= 1'b0;
                     if (core_done) begin
                         srv_result <= core_rdata;
-                        // WRITES ARE POSTED: the far side expects nothing
-                        // back, so only a read goes on to send a RESPONSE.
+                        // WRITES ARE POSTED - only a read sends a RESPONSE.
                         ss <= srv_we ? S_IDLE : S_RESP;
                     end
                 end
@@ -536,9 +400,6 @@ module bus_bridge #(
                 default: ss <= S_IDLE;
             endcase
 
-            //--------------------------------------------------------------
-            // CLIENT
-            //--------------------------------------------------------------
             case (bs)
                 B_IDLE: begin
                     if (sel) begin
@@ -553,8 +414,7 @@ module bus_bridge #(
                 end
 
                 B_SEND: begin
-                    // Responses take priority: never start a request while
-                    // the server owes the other board an answer.
+                    // Never start a request while the server owes an answer.
                     if (tx_seq_idle && ss != S_RESP) begin
                         tx_payload <= {{(40-8-CMD_W){1'b0}},
                                        own_wdata, own_addr, own_we, 1'b0,
@@ -563,9 +423,6 @@ module bus_bridge #(
                         tx_go      <= 1'b1;
                         to_cnt     <= 32'd0;
                         if (own_we) begin
-                            // The request is on the wire; that IS the
-                            // completion for a posted write.  Wake the
-                            // master so it can replay and retire.
                             sc_r[own_id] <= 1'b1;
                             bs           <= B_RDY;
                         end else begin
@@ -574,15 +431,12 @@ module bus_bridge #(
                     end
                 end
 
-                // Only a READ reaches here - writes are posted.
                 B_WAIT: begin
                     if (resp_valid) begin
                         rd_byte      <= resp_data;
                         sc_r[own_id] <= 1'b1;
                         bs           <= B_RDY;
                     end else if (to_cnt >= RESP_TIMEOUT) begin
-                        // Link dead or unplugged: complete with an error
-                        // rather than hang the master forever.
                         rd_byte      <= {DATA_W{1'b1}};
                         err_r        <= 1'b1;
                         sc_r[own_id] <= 1'b1;
@@ -592,8 +446,6 @@ module bus_bridge #(
                 end
 
                 B_RDY: begin
-                    // The masked master has been released; when it re-issues
-                    // the identical frame we serve it and are free again.
                     if (serve) bs <= B_IDLE;
                 end
 
@@ -602,14 +454,6 @@ module bus_bridge #(
         end
     end
 
-    //======================================================================
-    // Read data phase, shaped exactly like a memory slave's so that nothing
-    // upstream can tell this word came off a wire:
-    //   S     `serve' - the replay is selected
-    //   S+1   the byte is loaded into the output register
-    //   S+2 .. S+9   DATA_W bits out on dstream_out, MSB first
-    //   S+10  ready + OKAY
-    //======================================================================
     localparam R_IDLE_D  = 2'd0;
     localparam R_LOAD    = 2'd1;
     localparam R_SHIFT   = 2'd2;
@@ -645,25 +489,12 @@ module bus_bridge #(
         else if (rs == R_SHIFT) rd_sr <= {rd_sr[DATA_W-2:0], 1'b0};
     end
 
-    // Quiet unless actually sending, so an idle bus does not look like
-    // traffic in a waveform.
     assign dstream_out = (rs == R_SHIFT) ? rd_sr[DATA_W-1] : 1'b0;
 
-    //======================================================================
-    // Handshake.  A fresh access is deferred (SPLIT), a rejected one is
-    // ERROR, a replayed write answers OKAY at once and a replayed read when
-    // its last bit has gone.  Exactly one of these can be true at a time.
-    //
-    // A ROUND TRIP THAT TIMED OUT COMPLETES WITH ERROR, not OKAY.  The data
-    // is 0xFF either way, but a transaction the far board never answered has
-    // failed and the master must be able to see that on `resp' alone - the
-    // same channel an unmapped address uses.  `br_error' is the finer-grained
-    // report that separates "the link died" from "that address is not
-    // mapped"; it does not replace saying so on the bus.
-    //
-    // err_r is cleared when a fresh access is taken on, so it can only ever
-    // describe the transaction being completed here.
-    //======================================================================
+    // A timed-out round trip completes with ERROR, not OKAY: the data is 0xFF
+    // either way, but the master must see the failure on `resp' alone.
+    // err_r is cleared when a fresh access starts, so it only ever describes
+    // the transaction being completed here.
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             ready <= 1'b0;

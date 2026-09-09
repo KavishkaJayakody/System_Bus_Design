@@ -79,10 +79,33 @@ top_debug                        synthesis top (DE2-115)
 
 **There is no board layer.** `de2_top`, `board_ctrl`, `status_display`,
 `master_prog`, `seg7_hex`, `reset_ctrl` and `debouncer` were deleted — every
-transaction is issued over JTAG. Five ports leave the device: `CLOCK_50`
-(`Y2`), `rst_n` (`M23`, `KEY[0]`), `led[7:0]`
+transaction is issued over JTAG. Seven ports leave the device: `CLOCK_50`
+(`Y2`), the **three reset buttons**, `led[7:0]`
 (`G19 F19 E19 F21 F18 E18 J19 H19` = `LEDR[7:0]`, master 0's last read data),
 and the board-to-board link `rm_rx` (`AB22`) / `rm_tx` (`AC15`).
+
+**THREE RESET DOMAINS, one per KEY.** All active low with pull-ups:
+
+| Port | Pin | Key | Resets |
+|---|---|---|---|
+| `rst_n` | `M23` | `KEY[0]` | `system_bus` **and the bridge** |
+| `rst_m_n` | `M21` | `KEY[1]` | the two local masters |
+| `rst_s_n` | `N21` | `KEY[2]` | the three memory slaves |
+
+The bridge sits on `rst_n` because it is the link, not a memory — it has a
+master face as well as a slave one, so neither of the other two domains fits.
+The ISSP driver is on `rst_n` too.
+
+**A partial reset can wedge the bus, and that is inherent.** Resetting the
+masters mid-transfer leaves the arbiter locked with a grant nobody will
+complete; resetting the slaves mid-transfer leaves a master waiting for a
+`ready` that will never come. There is no bus-level timeout. `KEY[0]` clears
+the arbiter and is the recovery. `tb_integration` test 8 exercises each
+domain from an idle bus, which is the safe order.
+
+**A slave reset does not clear memory.** The arrays are deliberately unreset
+so Quartus infers M9K; `rst_s_n` clears only the slave control FSMs. Test 8
+asserts the contents survive.
 
 **`led[7:0]` is load-bearing, not decoration.** It is the only path from the
 memories to a pin, and the fitter deletes memory bits that cannot reach an

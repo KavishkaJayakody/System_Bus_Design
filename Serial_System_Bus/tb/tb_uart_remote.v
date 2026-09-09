@@ -107,7 +107,7 @@ module tb_uart_remote;
         .ADDR_W(ADDR_W), .DATA_W(DATA_W), .RESP_W(RESP_W),
         .SPLIT_LATENCY(SPL), .CLKS_PER_BIT(CPB), .RESP_TIMEOUT(TMO)
     ) A (
-        .clk(clk), .rst_n(rst_n),
+        .clk(clk), .rst_n(rst_n), .rst_m_n(rst_n), .rst_s_n(rst_n),
         .cmd_valid(a_valid), .cmd_we(a_we),
         .cmd_addr_flat(a_addr), .cmd_wdata_flat(a_wdata),
         .cmd_accept(a_accept), .done(a_done),
@@ -127,7 +127,7 @@ module tb_uart_remote;
         .ADDR_W(ADDR_W), .DATA_W(DATA_W), .RESP_W(RESP_W),
         .SPLIT_LATENCY(SPL), .CLKS_PER_BIT(CPB), .RESP_TIMEOUT(TMO)
     ) B (
-        .clk(clk), .rst_n(rst_n),
+        .clk(clk), .rst_n(rst_n), .rst_m_n(rst_n), .rst_s_n(rst_n),
         .cmd_valid(b_valid), .cmd_we(b_we),
         .cmd_addr_flat(b_addr), .cmd_wdata_flat(b_wdata),
         .cmd_accept(b_accept), .done(b_done),

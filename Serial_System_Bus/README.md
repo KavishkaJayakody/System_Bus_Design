@@ -65,7 +65,8 @@ whole round trip. The far board reaches all three local memories through the
 bridge's master face, which sits at the lowest arbiter priority so remote
 traffic can never out-rank local traffic.
 
-**Five things leave the device**: `CLOCK_50`, `rst_n` (`KEY[0]`), `led[7:0]`
+**Seven things leave the device**: `CLOCK_50`, three reset buttons
+(`KEY[0]` bus, `KEY[1]` masters, `KEY[2]` slaves), `led[7:0]`
 (`LEDR[7:0]`, master 0's last read data) and the two UART bridge pins that
 reach a second board. Everything else goes over JTAG — there are no switches
 to set and no scenario to select. Issue a transaction from the host, read the
@@ -148,12 +149,12 @@ the bridge refactor), Quartus Prime Lite 24.1std, `EP4CE115F29C7`:
 
 | | |
 |---|---|
-| Logic elements | 1,651 / 114,480 (1 %) |
+| Logic elements | 1,667 / 114,480 (1 %) |
 | Registers | 1,297 |
 | Memory bits | **81,920** / 3,981,312 — 2 KB + 4 KB + 4 KB, all M9K |
-| Pins | 12 / 529 |
-| $F_{max}$, `CLOCK_50` (slow 1200 mV 85 °C) | **124.36 MHz** |
-| Worst setup / hold slack | 11.959 ns / 0.360 ns |
+| Pins | 14 / 529 |
+| $F_{max}$, `CLOCK_50` (slow 1200 mV 85 °C) | **115.43 MHz** |
+| Worst setup / hold slack | 11.337 ns / 0.366 ns |
 | Unconstrained paths | **0** — fully constrained for setup and hold |
 
 `Total memory bits` must read **81,920**; anything less means the fitter

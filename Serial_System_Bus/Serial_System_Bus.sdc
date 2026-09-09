@@ -30,7 +30,9 @@ derive_clock_uncertainty
 # case is one metastable release, cured by pressing KEY[0] again) but it is a
 # deliberate shortcut, not a verified path.
 #---------------------------------------------------------------------------
-set_false_path -from [get_ports {rst_n}] -to [all_registers]
+set_false_path -from [get_ports {rst_n}]   -to [all_registers]
+set_false_path -from [get_ports {rst_m_n}] -to [all_registers]
+set_false_path -from [get_ports {rst_s_n}] -to [all_registers]
 set_false_path -from * -to [get_ports {led[*]}]
 
 #---------------------------------------------------------------------------

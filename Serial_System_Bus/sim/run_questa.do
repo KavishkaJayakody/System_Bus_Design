@@ -45,9 +45,16 @@ foreach tb [list \
         tb_bus_issp_driver tb_integration tb_uart_remote \
         tb_top_debug] {
     echo "### $tb"
-    vsim -c -quiet work.$tb
+    # -onfinish stop: a testbench's $finish must END THE SIMULATION, not the
+    # simulator.  In batch mode the default is `exit', so without this the
+    # first $finish kills vsim and the remaining testbenches never run.
+    vsim -quiet -onfinish stop work.$tb
     run -all
     quit -sim
 }
 
 echo "Check the transcript above: every testbench must print PASSED."
+
+# Batch runs must exit; a GUI run must NOT - `quit -f' there would close
+# ModelSim on the user.
+if {[batch_mode]} { quit -f }

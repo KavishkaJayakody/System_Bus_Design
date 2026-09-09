@@ -116,6 +116,8 @@ set_location_assignment PIN_Y2 -to CLOCK_50
 
 # KEY[0] -> rst_n
 set_location_assignment PIN_M23 -to rst_n
+set_location_assignment PIN_M21 -to rst_m_n
+set_location_assignment PIN_N21 -to rst_s_n
 
 # Board-to-board link, per the interface spec agreed with the other team.
 # 8N1 at 115200 baud, crossed over, plus a COMMON GROUND.
@@ -252,4 +254,12 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[6]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[7]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[8]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to SW[9]
+set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
+set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+set_global_assignment -name EDA_TEST_BENCH_ENABLE_STATUS TEST_BENCH_MODE -section_id eda_simulation
+set_global_assignment -name EDA_NATIVELINK_SIMULATION_TEST_BENCH tb_system_bus -section_id eda_simulation
+set_global_assignment -name EDA_TEST_BENCH_NAME tb_system_bus -section_id eda_simulation
+set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id tb_system_bus
+set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME tb_system_bus -section_id tb_system_bus
+set_global_assignment -name EDA_TEST_BENCH_FILE tb/tb_system_bus.v -section_id tb_system_bus
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
