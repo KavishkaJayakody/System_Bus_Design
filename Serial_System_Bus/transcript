@@ -5,7 +5,7 @@
 # +incdir+rtl
 ### tb_shift_ser
 # vsim -quiet -onfinish stop work.tb_shift_ser 
-# Start time: 15:30:19 on Sep 09,2026
+# Start time: 16:13:04 on Sep 09,2026
 # ======================================================
 #  tb_shift_ser
 # ======================================================
@@ -34,11 +34,11 @@
 #    Time: 2010 ns  Iteration: 1  Instance: /tb_shift_ser
 # Break in Module tb_shift_ser at tb/tb_shift_ser.v line 127
 # Stopped at tb/tb_shift_ser.v line 127
-# End time: 15:30:19 on Sep 09,2026, Elapsed time: 0:00:00
+# End time: 16:13:05 on Sep 09,2026, Elapsed time: 0:00:01
 # Errors: 0, Warnings: 0
 ### tb_shift_deser
 # vsim -quiet -onfinish stop work.tb_shift_deser 
-# Start time: 15:30:19 on Sep 09,2026
+# Start time: 16:13:05 on Sep 09,2026
 # ======================================================
 #  tb_shift_deser
 # ======================================================
@@ -64,11 +64,11 @@
 #    Time: 1891 ns  Iteration: 0  Instance: /tb_shift_deser
 # Break in Module tb_shift_deser at tb/tb_shift_deser.v line 119
 # Stopped at tb/tb_shift_deser.v line 119
-# End time: 15:30:20 on Sep 09,2026, Elapsed time: 0:00:01
+# End time: 16:13:05 on Sep 09,2026, Elapsed time: 0:00:00
 # Errors: 0, Warnings: 0
 ### tb_addr_decoder
 # vsim -quiet -onfinish stop work.tb_addr_decoder 
-# Start time: 15:30:20 on Sep 09,2026
+# Start time: 16:13:05 on Sep 09,2026
 # ======================================================
 #  tb_addr_decoder -- the SERIAL prefix matcher
 # ======================================================
@@ -119,11 +119,11 @@
 #    Time: 11801550 ns  Iteration: 1  Instance: /tb_addr_decoder
 # Break in Module tb_addr_decoder at tb/tb_addr_decoder.v line 266
 # Stopped at tb/tb_addr_decoder.v line 266
-# End time: 15:30:22 on Sep 09,2026, Elapsed time: 0:00:02
+# End time: 16:13:08 on Sep 09,2026, Elapsed time: 0:00:03
 # Errors: 0, Warnings: 0
 ### tb_arbiter
 # vsim -quiet -onfinish stop work.tb_arbiter 
-# Start time: 15:30:22 on Sep 09,2026
+# Start time: 16:13:08 on Sep 09,2026
 # ======================================================
 #  tb_arbiter
 # ======================================================
@@ -173,11 +173,11 @@
 #    Time: 1531 ns  Iteration: 0  Instance: /tb_arbiter
 # Break in Module tb_arbiter at tb/tb_arbiter.v line 229
 # Stopped at tb/tb_arbiter.v line 229
-# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:01
+# End time: 16:13:08 on Sep 09,2026, Elapsed time: 0:00:00
 # Errors: 0, Warnings: 0
 ### tb_bus_mux
 # vsim -quiet -onfinish stop work.tb_bus_mux 
-# Start time: 15:30:23 on Sep 09,2026
+# Start time: 16:13:08 on Sep 09,2026
 # ======================================================
 #  tb_bus_mux
 # ======================================================
@@ -218,11 +218,11 @@
 #    Time: 531 ns  Iteration: 0  Instance: /tb_bus_mux
 # Break in Module tb_bus_mux at tb/tb_bus_mux.v line 182
 # Stopped at tb/tb_bus_mux.v line 182
-# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# End time: 16:13:08 on Sep 09,2026, Elapsed time: 0:00:00
 # Errors: 0, Warnings: 0
 ### tb_default_slave
 # vsim -quiet -onfinish stop work.tb_default_slave 
-# Start time: 15:30:23 on Sep 09,2026
+# Start time: 16:13:08 on Sep 09,2026
 # ======================================================
 #  tb_default_slave
 # ======================================================
@@ -248,11 +248,11 @@
 #    Time: 371 ns  Iteration: 0  Instance: /tb_default_slave
 # Break in Module tb_default_slave at tb/tb_default_slave.v line 108
 # Stopped at tb/tb_default_slave.v line 108
-# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# End time: 16:13:08 on Sep 09,2026, Elapsed time: 0:00:00
 # Errors: 0, Warnings: 0
 ### tb_system_bus
 # vsim -quiet -onfinish stop work.tb_system_bus 
-# Start time: 15:30:23 on Sep 09,2026
+# Start time: 16:13:08 on Sep 09,2026
 # ======================================================
 #  tb_system_bus -- the bus alone, no master, no memory
 # ======================================================
@@ -320,19 +320,37 @@
 #   ok    0xC000 is above the map - selects nothing
 #   ok    and the bus answers ERROR by itself
 #   ok    the very next frame decoded normally
+# -- 10. RESET IN THE MIDDLE OF A TRANSACTION ----------
+#   ok    a frame is genuinely in flight
+#   ok    and master 0 owns the bus
+#   ok    the grant went away with the reset
+#   ok    and the frame with it - no half frame left running
+#   ok    address wire quiet
+#   ok    data wire quiet
+#   ok    no slave select left asserted
+#   ok    the LATCHED return select cleared too
+#   ok    split mask clear
+#   ok    no completion strobe to a master that is gone
+#   ok    the half-shifted address was dropped, not kept
+#   ok    no grant conjured out of the release
+#   ok    the first frame after the reset decoded to slave 1
+#   ok    its address arrived intact
+#   ok    and so did its write data
+#   ok    and it completed OKAY
+#   ok    exactly one full-length frame since the reset - no leftovers
 # ======================================================
-#  14 frames on the wire, 0 wrong length
+#  15 frames on the wire, 0 wrong length
 #  tb_system_bus: PASSED (0 errors)
 # ======================================================
-# ** Note: $finish    : tb/tb_system_bus.v(370)
-#    Time: 6631 ns  Iteration: 0  Instance: /tb_system_bus
-# Break in Module tb_system_bus at tb/tb_system_bus.v line 370
-# Stopped at tb/tb_system_bus.v line 370
-# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# ** Note: $finish    : tb/tb_system_bus.v(441)
+#    Time: 7391 ns  Iteration: 0  Instance: /tb_system_bus
+# Break in Module tb_system_bus at tb/tb_system_bus.v line 441
+# Stopped at tb/tb_system_bus.v line 441
+# End time: 16:13:08 on Sep 09,2026, Elapsed time: 0:00:00
 # Errors: 0, Warnings: 0
 ### tb_master
 # vsim -quiet -onfinish stop work.tb_master 
-# Start time: 15:30:23 on Sep 09,2026
+# Start time: 16:13:08 on Sep 09,2026
 # ======================================================
 #  tb_master
 # ======================================================
@@ -406,11 +424,11 @@
 #    Time: 8931 ns  Iteration: 0  Instance: /tb_master
 # Break in Module tb_master at tb/tb_master.v line 364
 # Stopped at tb/tb_master.v line 364
-# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# End time: 16:13:08 on Sep 09,2026, Elapsed time: 0:00:00
 # Errors: 0, Warnings: 0
 ### tb_slave
 # vsim -quiet -onfinish stop work.tb_slave 
-# Start time: 15:30:23 on Sep 09,2026
+# Start time: 16:13:08 on Sep 09,2026
 # ======================================================
 #  tb_slave
 # ======================================================
@@ -470,11 +488,11 @@
 #    Time: 12571 ns  Iteration: 0  Instance: /tb_slave
 # Break in Module tb_slave at tb/tb_slave.v line 325
 # Stopped at tb/tb_slave.v line 325
-# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# End time: 16:13:09 on Sep 09,2026, Elapsed time: 0:00:01
 # Errors: 0, Warnings: 0
 ### tb_bus_issp_driver
 # vsim -quiet -onfinish stop work.tb_bus_issp_driver 
-# Start time: 15:30:23 on Sep 09,2026
+# Start time: 16:13:09 on Sep 09,2026
 # ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'dut'.  Expected 31, found 23.
 #    Time: 0 ps  Iteration: 0  Instance: /tb_bus_issp_driver/dut File: tb/tb_bus_issp_driver.v Line: 64
 # ** Warning: (vsim-3015) [PCDPC] - Port size (3) does not match connection size (2) for port 'gnt'. The port definition is at: rtl/bus_issp_driver.v(47).
@@ -576,11 +594,11 @@
 #    Time: 10731 ns  Iteration: 0  Instance: /tb_bus_issp_driver
 # Break in Module tb_bus_issp_driver at tb/tb_bus_issp_driver.v line 357
 # Stopped at tb/tb_bus_issp_driver.v line 357
-# End time: 15:30:23 on Sep 09,2026, Elapsed time: 0:00:00
+# End time: 16:13:09 on Sep 09,2026, Elapsed time: 0:00:00
 # Errors: 0, Warnings: 25
 ### tb_integration
 # vsim -quiet -onfinish stop work.tb_integration 
-# Start time: 15:30:23 on Sep 09,2026
+# Start time: 16:13:09 on Sep 09,2026
 # ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'u_sys'.  Expected 43, found 35.
 #    Time: 0 ps  Iteration: 0  Instance: /tb_integration/u_sys File: tb/tb_integration.v Line: 92
 # ** Warning: (vsim-3722) tb/tb_integration.v(92): [TFMPC] - Missing connection for port 'dbg_rx_last'.
@@ -686,11 +704,11 @@
 #    Time: 37671 ns  Iteration: 0  Instance: /tb_integration
 # Break in Module tb_integration at tb/tb_integration.v line 515
 # Stopped at tb/tb_integration.v line 515
-# End time: 15:30:24 on Sep 09,2026, Elapsed time: 0:00:01
+# End time: 16:13:09 on Sep 09,2026, Elapsed time: 0:00:00
 # Errors: 0, Warnings: 9
 ### tb_uart_remote
 # vsim -quiet -onfinish stop work.tb_uart_remote 
-# Start time: 15:30:24 on Sep 09,2026
+# Start time: 16:13:09 on Sep 09,2026
 # ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'A'.  Expected 43, found 35.
 #    Time: 0 ps  Iteration: 0  Instance: /tb_uart_remote/A File: tb/tb_uart_remote.v Line: 109
 # ** Warning: (vsim-3722) tb/tb_uart_remote.v(109): [TFMPC] - Missing connection for port 'dbg_rx_last'.
@@ -801,11 +819,11 @@
 #    Time: 2377671 ns  Iteration: 0  Instance: /tb_uart_remote
 # Break in Module tb_uart_remote at tb/tb_uart_remote.v line 591
 # Stopped at tb/tb_uart_remote.v line 591
-# End time: 15:30:26 on Sep 09,2026, Elapsed time: 0:00:02
+# End time: 16:13:11 on Sep 09,2026, Elapsed time: 0:00:02
 # Errors: 0, Warnings: 18
 ### tb_top_debug
 # vsim -quiet -onfinish stop work.tb_top_debug 
-# Start time: 15:30:26 on Sep 09,2026
+# Start time: 16:13:11 on Sep 09,2026
 # ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'dut'.  Expected 7, found 5.
 #    Time: 0 ps  Iteration: 0  Instance: /tb_top_debug/dut File: tb/tb_top_debug.v Line: 49
 # ** Warning: (vsim-3722) tb/tb_top_debug.v(49): [TFMPC] - Missing connection for port 'rm_rx'.
@@ -857,6 +875,6 @@
 #    Time: 74331 ns  Iteration: 0  Instance: /tb_top_debug
 # Break in Module tb_top_debug at tb/tb_top_debug.v line 237
 # Stopped at tb/tb_top_debug.v line 237
-# End time: 15:30:26 on Sep 09,2026, Elapsed time: 0:00:00
+# End time: 16:13:11 on Sep 09,2026, Elapsed time: 0:00:00
 # Errors: 0, Warnings: 3
 # Check the transcript above: every testbench must print PASSED.

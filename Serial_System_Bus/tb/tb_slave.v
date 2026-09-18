@@ -28,7 +28,7 @@
 //   8. one split outstanding - another master is served normally meanwhile
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_slave;
 

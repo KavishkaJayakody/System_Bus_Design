@@ -25,9 +25,13 @@
 //                          runs, and split_complete restores it
 //   9. no slave, no hang - an unmapped frame is answered ERROR by the bus
 //                          ITSELF, with nothing attached to the slave ports
+//  10. reset mid-transfer- rst_n asserted with a frame HALF SHIFTED OUT: the
+//                          grant, the select, the latched return select and
+//                          the part-received address must all go, and the
+//                          next frame must decode from scratch
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_system_bus;
 
@@ -67,6 +71,10 @@ module tb_system_bus;
 
     integer errors = 0;
     integer k;
+    // section 10: the address whose frame is deliberately cut short, and the
+    // framing monitor's totals from before that happens.
+    reg [ADDR_W-1:0] mid_addr;
+    integer pre_frames, pre_bad;
 
     system_bus #(
         .N_MASTERS(NM), .ID_W(ID_W), .N_SLAVES(NS),
@@ -361,6 +369,69 @@ module tb_system_bus;
         drive_frame(0, 1'b0, 16'h1234, 8'h00);
         chk(s_sel === 4'b0010, "the very next frame decoded normally");
         slave_answer(1, `RESP_OKAY, 0);
+
+        //==================================================================
+        $display("-- 10. RESET IN THE MIDDLE OF A TRANSACTION ----------");
+        // KEY[0] can be pressed at any instant, and half way through a frame
+        // is the instant that matters: a grant is held, six bits of an
+        // address are already inside the deserialiser, and the decoder's
+        // prefix matcher has partly made up its mind.  None of that may
+        // survive the reset - if it does, the NEXT master's frame is decoded
+        // against the last one's leftovers, which is a fault that shows up
+        // one transaction later and nowhere near the button that caused it.
+        //
+        // The aborted frame is a short one by construction.  That is this
+        // testbench cutting it off, not a framing defect, so the monitor's
+        // part-count is dropped rather than retired as a bad frame.
+        pre_frames = frames;
+        pre_bad    = bad_len;
+
+        mid_addr = 16'h2ABC;                 // slave 2's prefix, and note the
+        acquire(0);                          // recovery frame below is slave 1's
+        for (k = ADDR_W-1; k >= ADDR_W-6; k = k - 1) begin
+            @(posedge clk);
+            m_valid  [0] <= 1'b1;
+            m_we     [0] <= 1'b1;
+            m_astream[0] <= mid_addr[k];
+            m_dstream[0] <= 1'b0;
+        end
+        @(posedge clk); #1;
+        chk(bus_valid === 1'b1,    "a frame is genuinely in flight");
+        chk(m_gnt     === 4'b0001, "and master 0 owns the bus");
+
+        // ---- the reset itself, asserted with the frame still running -----
+        rst_n = 1'b0; #1;
+        chk(m_gnt       === {NM{1'b0}}, "the grant went away with the reset");
+        chk(bus_valid   === 1'b0,       "and the frame with it - no half frame left running");
+        chk(bus_astream === 1'b0,       "address wire quiet");
+        chk(bus_dstream === 1'b0,       "data wire quiet");
+        @(posedge clk); #1;
+        chk(s_sel      === {NS{1'b0}},     "no slave select left asserted");
+        chk(sel_q      === {(NS+1){1'b0}}, "the LATCHED return select cleared too");
+        chk(split_mask === {NM{1'b0}},     "split mask clear");
+        chk(bus_ready  === 1'b0,           "no completion strobe to a master that is gone");
+        chk(bus_addr   === {ADDR_W{1'b0}}, "the half-shifted address was dropped, not kept");
+
+        // The masters share the button here, so they let go of the bus too.
+        m_req = 0; m_valid = 0; m_we = 0; m_astream = 0; m_dstream = 0;
+        s_ready = 0; s_dstream = 0; s_resp_flat = 0; s_split_complete = 0;
+        frame_cycles = 0;            // drop the aborted frame, do not retire it
+        repeat (2) @(posedge clk);
+        @(posedge clk); rst_n = 1'b1;
+        repeat (2) @(posedge clk); #1;
+        chk(m_gnt === {NM{1'b0}}, "no grant conjured out of the release");
+
+        // Recovery.  A DIFFERENT slave from the aborted frame's, so a decoder
+        // that kept half a decision cannot pass this by luck.
+        acquire(0);
+        drive_frame(0, 1'b1, 16'h1F00, 8'h3C);
+        chk(s_sel    === 4'b0010,  "the first frame after the reset decoded to slave 1");
+        chk(rx_addr  === 16'h1F00, "its address arrived intact");
+        chk(rx_wdata === 8'h3C,    "and so did its write data");
+        slave_answer(1, `RESP_OKAY, 0);
+        chk(bus_resp === `RESP_OKAY, "and it completed OKAY");
+        chk(frames == pre_frames + 1 && bad_len == pre_bad,
+            "exactly one full-length frame since the reset - no leftovers");
 
         $display("======================================================");
         $display(" %0d frames on the wire, %0d wrong length", frames, bad_len);

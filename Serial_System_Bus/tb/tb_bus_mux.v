@@ -20,7 +20,7 @@
 //   6. idle return       - no ready before anything has been selected
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_bus_mux;
 

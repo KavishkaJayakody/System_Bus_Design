@@ -14,7 +14,7 @@
 //                            bad addresses instead of stalling
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_default_slave;
 

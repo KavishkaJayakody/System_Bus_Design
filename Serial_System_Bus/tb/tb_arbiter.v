@@ -18,7 +18,7 @@
 //   6. ERROR response    - behaves like OKAY as far as arbitration goes
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_arbiter;
 

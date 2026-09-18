@@ -31,7 +31,7 @@
 // running until the simulator gives up, which is the whole point of test 5.
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_integration;
 

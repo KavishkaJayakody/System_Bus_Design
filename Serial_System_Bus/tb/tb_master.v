@@ -28,7 +28,7 @@
 //   8. writes do not clobber rdata
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_master;
 

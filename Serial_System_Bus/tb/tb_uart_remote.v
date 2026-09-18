@@ -45,7 +45,7 @@
 // wrapper, so test 1 also records the local latency for comparison.
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_uart_remote;
 

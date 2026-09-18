@@ -29,7 +29,7 @@
 //   7. framing          - frame_len reads 16 on the real top level
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_top_debug;
 

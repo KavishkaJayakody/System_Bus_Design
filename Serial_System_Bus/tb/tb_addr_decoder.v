@@ -24,7 +24,7 @@
 // Prints PASS/FAIL and an error count.
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_addr_decoder;
 

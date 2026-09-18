@@ -27,7 +27,7 @@
 //  11. soft_rst          - clears the sticky flags
 //==========================================================================
 `timescale 1ns/1ps
-`include "bus_defs.vh"
+`include "../rtl/bus_defs.vh"
 
 module tb_bus_issp_driver;
 
